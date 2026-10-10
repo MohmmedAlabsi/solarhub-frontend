@@ -9,12 +9,13 @@ export default defineNuxtConfig({
   ],
 
   // ربط ملف التنسيقات العام
-  css: ['~/assets/main.css'],
+  css: ['assets/main.css'],
 
-  // المتغيرات البيئية ورابط Laravel API
+  // Laravel API المتغيرات البيئية ورابط
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8000/api',
+      // Nuxt سيقوم بتحديث هذه القيمة تلقائياً من ملف .env
+      apiBase: 'http://localhost:8000/api',
     }
   },
 
