@@ -9,7 +9,7 @@ export default defineNuxtConfig({
   ],
 
   // ربط ملف التنسيقات العام
-  css: ['assets/main.css'],
+  css: ['~/assets/main.css'],
 
   // Laravel API المتغيرات البيئية ورابط
   runtimeConfig: {
