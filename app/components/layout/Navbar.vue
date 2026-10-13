@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Menu, Sun, X } from 'lucide-vue-next'
+import { LayoutDashboard, Menu, Sun, X } from 'lucide-vue-next'
 
 const links = [
   { label: 'الرئيسية', to: '/', active: true },
@@ -13,13 +13,13 @@ const isOpen = ref(false)
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 border-b border-surface-line bg-white/90 backdrop-blur">
+  <header class="sticky top-0 z-50 border-b border-surface-line bg-white/95 backdrop-blur">
     <nav class="container-page flex h-16 items-center justify-between gap-6" aria-label="التنقل الرئيسي">
       <NuxtLink to="/" class="flex items-center gap-2" aria-label="سولار هب - الرئيسية">
-        <span class="flex size-9 items-center justify-center rounded-lg bg-brand-400 text-ink">
-          <Sun class="size-5" aria-hidden="true" />
+        <span class="flex size-9 items-center justify-center rounded-lg bg-solar-yellow text-solar-navy-dark shadow-sm">
+          <Sun class="size-5 font-bold" aria-hidden="true" />
         </span>
-        <span class="text-lg font-bold text-ink">سولار <span class="text-brand-600">هب</span></span>
+        <span class="text-lg font-black text-solar-navy-dark">سولار <span class="text-solar-yellow">هب</span></span>
       </NuxtLink>
 
       <ul class="hidden items-center gap-8 lg:flex">
@@ -27,7 +27,7 @@ const isOpen = ref(false)
           <NuxtLink
             :to="link.to"
             class="relative py-5 text-sm font-medium transition-colors"
-            :class="link.active ? 'text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-brand-400' : 'text-ink-500 hover:text-ink'"
+            :class="link.active ? 'text-solar-navy-dark font-bold after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-solar-yellow' : 'text-solar-text-secondary hover:text-solar-text-heading'"
             :aria-current="link.active ? 'page' : undefined"
           >
             {{ link.label }}
@@ -35,9 +35,14 @@ const isOpen = ref(false)
         </li>
       </ul>
 
-      <div class="hidden items-center gap-3 lg:flex">
-        <NuxtLink to="/auth/login" class="btn-outline px-4 py-2">تسجيل الدخول</NuxtLink>
-        <NuxtLink to="/auth/register" class="btn-dark px-4 py-2">إنشاء حساب</NuxtLink>
+      <div class="hidden items-center gap-2.5 lg:flex">
+        <!-- زر مباشر لبوابة العميل -->
+        <NuxtLink to="/customer/dashboard" class="btn-primary px-3.5 py-2 text-xs gap-1.5 shadow-sm">
+          <LayoutDashboard class="size-4" />
+          <span>بوابة العميل</span>
+        </NuxtLink>
+        <NuxtLink to="/auth/login" class="btn-outline px-3.5 py-2 text-xs">تسجيل الدخول</NuxtLink>
+        <NuxtLink to="/auth/register" class="btn-dark px-3.5 py-2 text-xs">إنشاء حساب</NuxtLink>
       </div>
 
       <button
@@ -59,15 +64,18 @@ const isOpen = ref(false)
           <NuxtLink
             :to="link.to"
             class="block rounded-lg px-3 py-2.5 text-sm font-medium"
-            :class="link.active ? 'bg-brand-50 text-ink' : 'text-ink-500 hover:bg-surface'"
+            :class="link.active ? 'bg-solar-yellow/20 text-solar-navy-dark font-bold' : 'text-solar-text-secondary hover:bg-solar-bg-subtle'"
             @click="isOpen = false"
           >
             {{ link.label }}
           </NuxtLink>
         </li>
-        <li class="mt-3 grid grid-cols-2 gap-3">
-          <NuxtLink to="/auth/login" class="btn-outline">تسجيل الدخول</NuxtLink>
-          <NuxtLink to="/auth/register" class="btn-dark">إنشاء حساب</NuxtLink>
+        <li class="mt-3 flex flex-col gap-2">
+          <NuxtLink to="/customer/dashboard" class="btn-primary w-full text-center">بوابة العميل</NuxtLink>
+          <div class="grid grid-cols-2 gap-2">
+            <NuxtLink to="/auth/login" class="btn-outline text-center">تسجيل الدخول</NuxtLink>
+            <NuxtLink to="/auth/register" class="btn-dark text-center">إنشاء حساب</NuxtLink>
+          </div>
         </li>
       </ul>
     </div>

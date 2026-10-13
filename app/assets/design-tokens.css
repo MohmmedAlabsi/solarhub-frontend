@@ -1,0 +1,85 @@
+/**
+ * SolarHub Customer Portal - Design Tokens & Visual Identity
+ * Variables extracted directly from official UI screens.
+ * Shared between Developer Mohamed & Developer Abdulbaqi.
+ */
+
+:root {
+  /* ========================================================
+     1. BRAND COLORS (الهوية البصرية الأساسية)
+     ======================================================== */
+  --solar-primary: #F2B705;          /* أصفر سولار الأساسي (الأزرار الرئيسية، القائمة النشطة) */
+  --solar-primary-hover: #DCA90E;    /* حالة التمرير للزر الأساسي */
+  --solar-primary-active: #C79607;   /* حالة النقر */
+  --solar-primary-light: #FCC019;    /* إضاءة النجوم والتقييمات */
+  --solar-primary-tint: #FEF8E7;     /* خلفية هادئة للصفراء */
+
+  --solar-navy: #243B53;             /* كحلي السايدبار والفوتر */
+  --solar-navy-dark: #0C253C;        /* كحلي الأزرار الداكنة والعناوين */
+  --solar-navy-hover: #1B2D3C;       /* حالة التمرير للأزرار الداكنة */
+  --solar-navy-light: #334E68;       /* حدود وفواصل السايدبار */
+
+  /* ========================================================
+     2. BACKGROUNDS & SURFACES (الخلفيات والأسطح)
+     ======================================================== */
+  --solar-bg-page: #F9F9FF;          /* خلفية الصفحة العامة */
+  --solar-bg-card: #FFFFFF;          /* خلفية البطاقات والحاويات */
+  --solar-bg-subtle: #F1F5F9;        /* خلفية الصناديق الرمادية الخفيفة */
+
+  /* ========================================================
+     3. BORDERS & DIVIDERS (الحدود والفواصل)
+     ======================================================== */
+  --solar-border-card: #DBDDE1;      /* إطار البطاقات */
+  --solar-border-input: #CBD5E1;     /* إطار حقول الإدخال */
+  --solar-border-focus: #F2B705;     /* إطار حقل الإدخال عند التركيز */
+
+  /* ========================================================
+     4. TYPOGRAPHY COLORS (ألوان النصوص)
+     ======================================================== */
+  --solar-text-heading: #0C253C;     /* نصوص العناوين الرئيسية H1, H2 */
+  --solar-text-body: #334E68;        /* النصوص العامة والفقرات */
+  --solar-text-secondary: #5A5E63;   /* النصوص الثانوية والتوضيحية */
+  --solar-text-muted: #727579;       /* النصوص الخافتة والتواريخ */
+  --solar-text-disabled: #9AA0A6;    /* النصوص المعطلة */
+
+  /* ========================================================
+     5. STATUS & BADGES (ألوان الحالات والإشعارات)
+     ======================================================== */
+  /* Success / معتمد ومقبول */
+  --solar-success-base: #059669;
+  --solar-success-bg: #ECFDF5;
+  --solar-success-text: #065F46;
+  --solar-success-border: #A7F3D0;
+
+  /* Info / الشحن والمعلومات المعتمدة */
+  --solar-info-base: #2563EB;
+  --solar-info-bg: #E8EEFF;
+  --solar-info-text: #1D4ED8;
+  --solar-info-border: #BFDBFE;
+
+  /* Warning / قيد المراجعة وعروض الأسعار */
+  --solar-warning-base: #F59E0B;
+  --solar-warning-bg: #FEF3C7;
+  --solar-warning-text: #B45309;
+  --solar-warning-border: #FDE68A;
+
+  /* Danger / خطأ أو ملغي */
+  --solar-danger-base: #DC2626;
+  --solar-danger-bg: #FEE2E2;
+  --solar-danger-text: #B91C1C;
+  --solar-danger-border: #FECACA;
+
+  /* ========================================================
+     6. GEOMETRY (الأبعاد، الحواف، والظلال)
+     ======================================================== */
+  --solar-radius-sm: 6px;
+  --solar-radius-md: 8px;            /* الأزرار وحقول الإدخال */
+  --solar-radius-lg: 12px;           /* البطاقات الصغيرة */
+  --solar-radius-xl: 16px;           /* البطاقات والبانرات الكبيرة */
+  --solar-radius-full: 9999px;       /* الشارات والكبسولات */
+
+  --solar-shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  --solar-shadow-dropdown: 0 10px 25px -5px rgba(12, 37, 60, 0.1), 0 8px 10px -6px rgba(12, 37, 60, 0.05);
+
+  --solar-font-family: 'Cairo', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+}
