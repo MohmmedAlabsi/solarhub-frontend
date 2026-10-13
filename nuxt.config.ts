@@ -62,5 +62,7 @@ export default defineNuxtConfig({
     '/products/**': { swr: 3600 },
     '/admin/**': { ssr: false },
     '/profile/**': { ssr: false },
+    '/dashboard/**': { ssr: false },
   }
 })
+
