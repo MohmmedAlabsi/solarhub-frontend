@@ -12,10 +12,14 @@ onMounted(() => {
     isCollapsed.value = savedState === 'true'
   }
 
-  // إغلاق الدرج عند الضغط على زر Esc
+  // إغلاق الدرج عند الضغط على زر Esc + اختصار Ctrl+B لطي/توسيع السايدبار
   const handleKeydown = (e: KeyboardEvent) => {
     if (e.key === 'Escape' && isMobileOpen.value) {
       isMobileOpen.value = false
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+      e.preventDefault()
+      toggleSidebar()
     }
   }
   window.addEventListener('keydown', handleKeydown)
@@ -41,9 +45,9 @@ function toggleMobile() {
 </script>
 
 <template>
-  <div dir="rtl" class="flex min-h-screen bg-solar-bg-page text-solar-text-heading antialiased selection:bg-solar-yellow selection:text-solar-navy-dark">
-    <!-- 1. السايدبار المكتبي الثابت (يظهر للشاشات المتوسطة والكبيرة lg وما فوق) -->
-    <div class="hidden lg:block shrink-0 sticky top-0 h-screen z-40 transition-all duration-300">
+  <div dir="rtl" class="flex h-screen w-full max-w-full overflow-hidden bg-solar-bg-page text-solar-text-heading antialiased selection:bg-solar-yellow selection:text-solar-navy-dark">
+    <!-- 1. السايدبار المكتبي الثابت تماماً (لا يتحرك نهائياً عند تمرير الصفحة) -->
+    <div class="hidden lg:block shrink-0 h-screen z-50 overflow-visible">
       <CustomerSidebar
         :is-collapsed="isCollapsed"
         @toggle="toggleSidebar"
@@ -82,20 +86,18 @@ function toggleMobile() {
       </Transition>
     </Teleport>
 
-    <!-- 3. جسم الصفحة الكامل المتجاوب -->
-    <div class="flex flex-1 flex-col min-w-0 min-h-screen overflow-x-hidden">
-      <!-- رأس الصفحة -->
+    <!-- 3. جسم الصفحة المتحرك (هو فقط الذي يحتوي على شريط التمرير الرأسي حسب حجم المحتوى) -->
+    <div class="flex flex-1 flex-col h-screen min-w-0 overflow-y-auto overflow-x-hidden">
+      <!-- رأس الصفحة الثابت في أعلى منطقة المحتوى -->
       <CustomerHeader @toggle-mobile-menu="toggleMobile" />
 
-      <!-- المحتوى الرئيسي المتكيف مع جميع مقاسات الشاشات -->
-      <main class="flex-1 flex flex-col p-3 sm:p-5 md:p-6 lg:p-8">
-        <div class="flex-1 w-full max-w-7xl mx-auto">
-          <slot />
-        </div>
-
-        <!-- تذييل الصفحة من أصل الصفحة نفسها في أسفلها -->
-        <CustomerFooter class="mt-8 sm:mt-12 -mx-3 -mb-3 sm:-mx-5 sm:-mb-5 md:-mx-6 md:-mb-6 lg:-mx-8 lg:-mb-8" />
+      <!-- المحتوى الرئيسي المتكيف والقابل للتمرير -->
+      <main class="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-5 md:p-6 lg:p-8">
+        <slot />
       </main>
+
+      <!-- تذييل الصفحة من أصل الصفحة نفسها في أسفل المحتوى -->
+      <CustomerFooter class="mt-auto w-full shrink-0" />
     </div>
   </div>
 </template>

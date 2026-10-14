@@ -72,7 +72,7 @@ function handleLinkClick() {
 
 <template>
   <aside
-    class="relative flex h-screen flex-col justify-between bg-solar-navy transition-all duration-300 ease-in-out z-40 select-none shadow-sidebar"
+    class="relative flex h-screen flex-col justify-between bg-solar-navy transition-all duration-300 ease-in-out z-50 select-none shadow-sidebar overflow-visible"
     :class="[
       isMobile ? 'w-full' : (isCollapsed ? 'w-20' : 'w-64 lg:w-72'),
     ]"
@@ -83,12 +83,13 @@ function handleLinkClick() {
       v-if="!isMobile"
       type="button"
       @click="emit('toggle')"
-      class="absolute top-24 -left-3.5 z-50 flex size-7 items-center justify-center rounded-full bg-solar-yellow text-solar-navy-dark shadow-md transition-transform hover:scale-110 active:scale-95 focus:outline-none cursor-pointer ring-2 ring-white/20"
-      :title="isCollapsed ? 'توسيع القائمة' : 'طي القائمة'"
+      class="absolute top-24 -left-3.5 z-50 flex size-7 items-center justify-center rounded-full bg-solar-yellow text-solar-navy-dark shadow-md transition-transform hover:scale-110 active:scale-95 focus:outline-none cursor-pointer ring-2 ring-white/20 hover:ring-solar-yellow/50"
+      :title="isCollapsed ? 'توسيع القائمة (Ctrl+B)' : 'طي القائمة (Ctrl+B)'"
       :aria-label="isCollapsed ? 'توسيع القائمة' : 'طي القائمة'"
     >
-      <ChevronRight v-if="isCollapsed" class="size-4 stroke-[2.5]" />
-      <ChevronLeft v-else class="size-4 stroke-[2.5]" />
+      <!-- في اتجاه RTL: عند الطي يشير السهم لليسار نحو الصفحة للتوسيع، وعند الفتح يشير لليمين للطي -->
+      <ChevronLeft v-if="isCollapsed" class="size-4 stroke-[2.5]" />
+      <ChevronRight v-else class="size-4 stroke-[2.5]" />
     </button>
 
     <!-- زر إغلاق القائمة في الهواتف الذكية -->
@@ -123,7 +124,10 @@ function handleLinkClick() {
     </div>
 
     <!-- قائمة الروابط الرئيسية -->
-    <nav class="flex-1 min-h-0 flex flex-col gap-1 p-2 sm:p-3 overflow-y-auto">
+    <nav
+      class="flex-1 min-h-0 flex flex-col gap-1 p-2 sm:p-3"
+      :class="isCollapsed && !isMobile ? 'overflow-visible' : 'overflow-y-auto'"
+    >
       <!-- المجموعة 1 -->
       <div class="flex flex-col gap-1">
         <NuxtLink
@@ -142,12 +146,13 @@ function handleLinkClick() {
           <component :is="item.icon" class="size-5 shrink-0" />
           <span v-if="!isCollapsed || isMobile" class="truncate">{{ item.label }}</span>
 
-          <!-- Tooltip في حالة الطي على سطح المكتب -->
+          <!-- Tooltip يطفو فوق واجهة الصفحة بدون قص أو حجب -->
           <div
             v-if="isCollapsed && !isMobile"
-            class="pointer-events-none absolute right-full mr-2 z-50 hidden rounded-md bg-solar-navy-dark px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg whitespace-nowrap group-hover:block"
+            class="pointer-events-none absolute right-full mr-3.5 top-1/2 -translate-y-1/2 z-[100] hidden group-hover:flex items-center rounded-lg bg-solar-navy-dark px-3 py-1.5 text-xs font-bold text-white shadow-2xl border border-white/10 whitespace-nowrap drop-shadow-xl"
           >
-            {{ item.label }}
+            <span>{{ item.label }}</span>
+            <span class="absolute -right-1 top-1/2 -translate-y-1/2 border-y-4 border-y-transparent border-l-4 border-l-solar-navy-dark" />
           </div>
         </NuxtLink>
       </div>
@@ -173,11 +178,13 @@ function handleLinkClick() {
           <component :is="item.icon" class="size-5 shrink-0" />
           <span v-if="!isCollapsed || isMobile" class="truncate">{{ item.label }}</span>
 
+          <!-- Tooltip يطفو فوق واجهة الصفحة بدون قص أو حجب -->
           <div
             v-if="isCollapsed && !isMobile"
-            class="pointer-events-none absolute right-full mr-2 z-50 hidden rounded-md bg-solar-navy-dark px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg whitespace-nowrap group-hover:block"
+            class="pointer-events-none absolute right-full mr-3.5 top-1/2 -translate-y-1/2 z-[100] hidden group-hover:flex items-center rounded-lg bg-solar-navy-dark px-3 py-1.5 text-xs font-bold text-white shadow-2xl border border-white/10 whitespace-nowrap drop-shadow-xl"
           >
-            {{ item.label }}
+            <span>{{ item.label }}</span>
+            <span class="absolute -right-1 top-1/2 -translate-y-1/2 border-y-4 border-y-transparent border-l-4 border-l-solar-navy-dark" />
           </div>
         </NuxtLink>
       </div>
@@ -203,18 +210,20 @@ function handleLinkClick() {
           <component :is="item.icon" class="size-5 shrink-0" />
           <span v-if="!isCollapsed || isMobile" class="truncate">{{ item.label }}</span>
 
+          <!-- Tooltip يطفو فوق واجهة الصفحة بدون قص أو حجب -->
           <div
             v-if="isCollapsed && !isMobile"
-            class="pointer-events-none absolute right-full mr-2 z-50 hidden rounded-md bg-solar-navy-dark px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg whitespace-nowrap group-hover:block"
+            class="pointer-events-none absolute right-full mr-3.5 top-1/2 -translate-y-1/2 z-[100] hidden group-hover:flex items-center rounded-lg bg-solar-navy-dark px-3 py-1.5 text-xs font-bold text-white shadow-2xl border border-white/10 whitespace-nowrap drop-shadow-xl"
           >
-            {{ item.label }}
+            <span>{{ item.label }}</span>
+            <span class="absolute -right-1 top-1/2 -translate-y-1/2 border-y-4 border-y-transparent border-l-4 border-l-solar-navy-dark" />
           </div>
         </NuxtLink>
       </div>
     </nav>
 
     <!-- زر تسجيل الخروج السفلي -->
-    <div class="shrink-0 border-t border-solar-navy-light/40 p-2 sm:p-3">
+    <div class="shrink-0 border-t border-solar-navy-light/40 p-2 sm:p-3 overflow-visible">
       <NuxtLink
         to="/auth/login"
         @click="handleLinkClick"
@@ -224,11 +233,13 @@ function handleLinkClick() {
         <LogOut class="size-5 shrink-0" />
         <span v-if="!isCollapsed || isMobile" class="truncate">تسجيل الخروج</span>
 
+        <!-- Tooltip لتسجيل الخروج -->
         <div
           v-if="isCollapsed && !isMobile"
-          class="pointer-events-none absolute right-full mr-2 z-50 hidden rounded-md bg-red-950 px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg whitespace-nowrap group-hover:block"
+          class="pointer-events-none absolute right-full mr-3.5 top-1/2 -translate-y-1/2 z-[100] hidden group-hover:flex items-center rounded-lg bg-rose-950 px-3 py-1.5 text-xs font-bold text-rose-100 shadow-2xl border border-rose-500/20 whitespace-nowrap drop-shadow-xl"
         >
-          تسجيل الخروج
+          <span>تسجيل الخروج</span>
+          <span class="absolute -right-1 top-1/2 -translate-y-1/2 border-y-4 border-y-transparent border-l-4 border-l-rose-950" />
         </div>
       </NuxtLink>
     </div>
