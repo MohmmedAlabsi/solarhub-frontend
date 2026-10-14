@@ -7,12 +7,12 @@
     @apply scroll-smooth;
     font-family: 'Cairo', 'IBM Plex Sans Arabic', system-ui, sans-serif;
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
   body {
     @apply bg-solar-bg-page font-sans text-solar-text-heading antialiased;
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   /* تخصيص شريط التمرير (Custom Scrollbar) ليكون عصرياً ونحيفاً ومريحاً للعين */

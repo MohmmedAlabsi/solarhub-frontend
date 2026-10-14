@@ -72,9 +72,9 @@ function handleLinkClick() {
 
 <template>
   <aside
-    class="relative flex h-screen flex-col justify-between bg-solar-navy transition-all duration-300 ease-in-out z-50 select-none shadow-sidebar overflow-visible"
+    class="relative flex flex-col justify-between bg-solar-navy transition-all duration-300 ease-in-out z-50 select-none shadow-2xl border border-white/10 overflow-visible"
     :class="[
-      isMobile ? 'w-full' : (isCollapsed ? 'w-20' : 'w-64 lg:w-72'),
+      isMobile ? 'h-full w-full' : (isCollapsed ? 'h-[calc(100vh-1.5rem)] w-20 rounded-2xl' : 'h-[calc(100vh-1.5rem)] w-64 lg:w-72 rounded-2xl'),
     ]"
     aria-label="القائمة الجانبية لبوابة العميل"
   >

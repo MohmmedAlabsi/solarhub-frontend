@@ -46,8 +46,8 @@ function toggleMobile() {
 
 <template>
   <div dir="rtl" class="flex h-screen w-full max-w-full overflow-hidden bg-solar-bg-page text-solar-text-heading antialiased selection:bg-solar-yellow selection:text-solar-navy-dark">
-    <!-- 1. السايدبار المكتبي الثابت تماماً (لا يتحرك نهائياً عند تمرير الصفحة) -->
-    <div class="hidden lg:block shrink-0 h-screen z-50 overflow-visible">
+    <!-- 1. السايدبار المكتبي العائم الأنيق الثابت في مكانه (Floating Island Sidebar) -->
+    <div class="hidden lg:block shrink-0 h-screen p-3 z-50 overflow-visible sticky top-0">
       <CustomerSidebar
         :is-collapsed="isCollapsed"
         @toggle="toggleSidebar"
