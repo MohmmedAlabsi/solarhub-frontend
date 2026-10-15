@@ -32,7 +32,7 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          PROJECT_TYPE: "BACKEND"
+          PROJECT_TYPE: "Front_end"
           EVENT_NAME: ${{ github.event_name }}
           REPOSITORY: ${{ github.repository }}
           ACTOR: ${{ github.actor }}
