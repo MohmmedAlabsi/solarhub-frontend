@@ -43,6 +43,7 @@ export default defineNuxtConfig({
     '/': { prerender: true },
     '/products/**': { swr: 3600 },
     '/customer/**': { ssr: false },
+    '/auth/**': { ssr: false },
     '/admin/**': { ssr: false },
     '/profile/**': { ssr: false },
   }
