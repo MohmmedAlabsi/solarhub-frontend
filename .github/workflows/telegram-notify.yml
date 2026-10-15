@@ -149,7 +149,8 @@ jobs:
             workflow_dispatch)
               MESSAGE="$MESSAGE
 
-          🧪 Manual notification test"
+          🧪 Manual no
+          tification test"
               ;;
           esac
                         
