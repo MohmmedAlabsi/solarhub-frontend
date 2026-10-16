@@ -50,6 +50,7 @@ export interface EngineerProject {
   category: 'commercial' | 'agricultural' | 'storage' | 'industrial'
 }
 export interface EngineerProfile extends Engineer {
+  reviews: EngineerReviews
   licenseNumber: string
   experienceYears: number
   verifiedReviews: number
@@ -58,6 +59,23 @@ export interface EngineerProfile extends Engineer {
   expertise: EngineerExpertise[]
   certificates: EngineerCertificate[]
   projects: EngineerProject[]
+}
+
+export type EngineerReviewScore = 1 | 2 | 3 | 4 | 5
+
+export interface EngineerReview {
+  id: string
+  author: string
+  project: string
+  rating: EngineerReviewScore
+  relativeDate: string
+  comment: string
+}
+
+export interface EngineerReviews {
+  /** Aggregate across all reviews, independent of the displayed comment sample. */
+  distribution: Record<EngineerReviewScore, number>
+  comments: EngineerReview[]
 }
 
 export type EngineerProfileTab = 'overview' | 'projects' | 'certificates' | 'reviews'

@@ -6,7 +6,7 @@ defineProps<{ project: EngineerProject }>()
 </script>
 
 <template>
-  <article class="overflow-hidden rounded-2xl border border-solar-border-card bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+  <article class="overflow-hidden solar-card p-0 sm:p-0 transition hover:-translate-y-0.5 hover:shadow-md">
     <div class="relative bg-solar-bg-subtle">
       <img :src="project.image" :alt="`صورة مشروع ${project.title}`" width="720" height="360" loading="lazy" class="aspect-[2/1] w-full object-cover" />
       <span class="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-3 py-2 text-[10px] font-bold text-white shadow"><BadgeCheck class="size-3.5" aria-hidden="true" /> {{ project.statusLabel }}</span>

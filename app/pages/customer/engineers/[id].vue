@@ -4,6 +4,7 @@ import EngineerCertificateCard from '../../../components/customer/engineers/prof
 import EngineerProfileHeader from '../../../components/customer/engineers/profile/EngineerProfileHeader.vue'
 import EngineerProfileTabs from '../../../components/customer/engineers/profile/EngineerProfileTabs.vue'
 import EngineerProjectCard from '../../../components/customer/engineers/profile/EngineerProjectCard.vue'
+import EngineerReviews from '../../../components/customer/engineers/profile/EngineerReviews.vue'
 
 definePageMeta({ layout: 'customer' })
 const { engineer, activeTab, backQuery, noticeMessage, selectTab, requestService, sendMessage } = useEngineerProfile()
@@ -23,11 +24,11 @@ useSeoMeta({ title: () => engineer.value ? `${engineer.value.name} | SolarHub` :
       <EngineerProfileTabs :active-tab="activeTab" :review-count="engineer.verifiedReviews" @select="selectTab" />
 
       <template v-if="activeTab === 'overview'">
-        <section class="rounded-2xl border border-solar-border-card bg-white p-5 shadow-sm sm:p-7" aria-labelledby="bio-heading">
+        <section class="solar-card p-5 sm:p-7" aria-labelledby="bio-heading">
           <h2 id="bio-heading" class="flex items-center gap-2 text-lg font-extrabold text-solar-text-heading"><FileText class="size-5 text-amber-700" aria-hidden="true" /> النبذة المهنية</h2>
           <p class="mt-4 text-sm leading-8 text-solar-text-body">{{ engineer.professionalBio }}</p>
         </section>
-        <section class="rounded-2xl border border-solar-border-card bg-white p-5 shadow-sm sm:p-7" aria-labelledby="expertise-heading">
+        <section class="solar-card p-5 sm:p-7" aria-labelledby="expertise-heading">
           <h2 id="expertise-heading" class="flex items-center gap-2 text-lg font-extrabold text-solar-text-heading"><SlidersHorizontal class="size-5 text-amber-700" aria-hidden="true" /> مجالات التخصص الدقيقة</h2>
           <div class="mt-5 grid gap-4 md:grid-cols-2">
             <article v-for="item in engineer.expertise" :key="item.title" class="rounded-xl bg-solar-bg-subtle p-5">
@@ -40,6 +41,7 @@ useSeoMeta({ title: () => engineer.value ? `${engineer.value.name} | SolarHub` :
         </section>
       </template>
 
+      <EngineerReviews v-else-if="activeTab === 'reviews'" :engineer="engineer" />
       <section v-else-if="activeTab === 'projects'" aria-labelledby="projects-heading">
         <h2 id="projects-heading" class="sr-only">معرض المشاريع المنفذة</h2>
         <div v-if="engineer.projects.length" class="grid gap-5 md:grid-cols-2">
@@ -51,7 +53,7 @@ useSeoMeta({ title: () => engineer.value ? `${engineer.value.name} | SolarHub` :
           <p class="mt-2 text-sm text-solar-text-muted">لم تُضف مشاريع لهذا المهندس ضمن البيانات التجريبية بعد.</p>
         </div>
       </section>
-      <section v-else-if="activeTab === 'certificates'" class="rounded-2xl border border-solar-border-card bg-white p-5 shadow-sm sm:p-7" aria-labelledby="certificates-heading">
+      <section v-else-if="activeTab === 'certificates'" class="solar-card p-5 sm:p-7" aria-labelledby="certificates-heading">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 id="certificates-heading" class="flex items-center gap-2 text-lg font-extrabold text-solar-text-heading"><Award class="size-5 text-amber-700" aria-hidden="true" /> الشهادات والاعتمادات المهنية الرسمية</h2>
           <p class="text-xs text-solar-text-muted">بيانات تجريبية موثقة ضمن العرض فقط</p>

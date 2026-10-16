@@ -1,3 +1,5 @@
+import process from 'node:process'
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-04-03',
   // Disabled by default because @nuxt/devtools 3.4.2 currently emits a Vite 8

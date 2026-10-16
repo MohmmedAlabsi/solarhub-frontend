@@ -1,28 +1,28 @@
 <script setup lang="ts">
-import { Archive, BriefcaseBusiness, FileBadge, ShoppingBag } from 'lucide-vue-next'
+import { FileText, Package, ShoppingBag, Wrench } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import type { DashboardAction } from '~~/types/dashboard'
 
 const props = defineProps<{ action: DashboardAction }>()
 const icons: Record<DashboardAction['icon'], Component> = {
-  products: Archive,
-  service: BriefcaseBusiness,
-  quotes: FileBadge,
+  products: Package,
+  service: Wrench,
+  quotes: FileText,
   orders: ShoppingBag,
 }
 </script>
 
 <template>
-  <article class="flex min-h-48 flex-col items-center rounded-2xl border border-solar-border-card bg-white px-5 py-5 text-center shadow-sm transition-all hover:border-solar-yellow/60 hover:shadow-hover">
-    <span class="mb-2 flex size-11 items-center justify-center rounded-xl bg-solar-status-info-bg text-solar-navy">
-      <component :is="icons[props.action.icon]" class="size-5" aria-hidden="true" />
+  <article class="solar-card flex min-h-48 flex-col items-center p-6 text-center transition-all hover:border-solar-yellow/60 sm:p-6">
+    <span class="mb-4 flex size-14 items-center justify-center rounded-2xl bg-solar-bg-subtle text-solar-navy">
+      <component :is="icons[props.action.icon]" class="size-6" aria-hidden="true" />
     </span>
     <h2 class="text-base font-bold text-solar-text-heading">{{ action.title }}</h2>
     <p class="mt-1 max-w-52 text-xs leading-6 text-solar-text-muted">{{ action.description }}</p>
     <NuxtLink
       :to="action.destination"
-      class="mt-auto w-full rounded-lg px-4 py-2 text-xs font-bold transition hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow focus-visible:ring-offset-2"
-      :class="action.tone === 'yellow' ? 'bg-solar-yellow text-solar-navy-dark hover:bg-solar-yellow-hover' : 'bg-solar-navy-dark text-white hover:bg-solar-navy-hover'"
+      class="mt-6 h-10 w-full text-xs"
+      :class="action.tone === 'yellow' ? 'btn-primary' : 'btn-dark'"
     >
       {{ action.buttonLabel }}
     </NuxtLink>

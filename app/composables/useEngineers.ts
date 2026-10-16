@@ -16,6 +16,7 @@ function querySpecialty(value: string): EngineerFilters['specialty'] { return va
 
 export function useEngineers() {
   const route = useRoute()
+  const router = useRouter()
   const initialQuery = queryString(route.query.q)
   const searchDraft = ref(initialQuery)
   const filters = reactive<EngineerFilters>({
@@ -46,6 +47,29 @@ export function useEngineers() {
     ...(filters.city !== 'all' ? { city: filters.city } : {}),
     ...(filters.minimumRating ? { rating: String(filters.minimumRating) } : {}),
   }))
+  // Keep directory filters in history before opening a profile, and restore them on Back/Forward.
+  const filterKeys = ['q', 'specialty', 'city', 'rating'] as const
+  watch(directoryQuery, next => {
+    if (route.path !== '/customer/engineers' || router.currentRoute.value.path !== '/customer/engineers') return
+    const query = { ...route.query }
+    let changed = false
+    for (const key of filterKeys) {
+      if (queryString(route.query[key]) !== (next[key] ?? '')) changed = true
+      delete query[key]
+    }
+    if (changed) void navigateTo({ path: route.path, query: { ...query, ...next } })
+  })
+  watch(() => route.query, () => {
+    if (route.path !== '/customer/engineers' || router.currentRoute.value.path !== '/customer/engineers') return
+    Object.assign(filters, {
+      query: queryString(route.query.q),
+      specialty: querySpecialty(queryString(route.query.specialty)),
+      city: queryString(route.query.city) || 'all',
+      minimumRating: Number(queryString(route.query.rating)) || 0,
+    })
+    searchDraft.value = filters.query
+    currentPage.value = 1
+  })
 
   function applySearch() { filters.query = searchDraft.value; currentPage.value = 1 }
   function resetFilters() { searchDraft.value = ''; Object.assign(filters, { query: '', specialty: 'all', city: 'all', minimumRating: 0 }); currentPage.value = 1 }

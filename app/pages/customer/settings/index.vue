@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { AtSign, Check, Laptop, LockKeyhole, MessageSquareText, Shield, ShieldCheck, UserRound } from 'lucide-vue-next'
-import ProfileField from '../../../components/customer/profile/ProfileField.vue'
+import FormField from '../../../components/common/FormField.vue'
 import ProfilePasswordField from '../../../components/customer/profile/ProfilePasswordField.vue'
 import ProfileSummaryCard from '../../../components/customer/profile/ProfileSummaryCard.vue'
 
@@ -27,16 +27,16 @@ const currentSession = computed(() => sessions.find(session => session.isCurrent
 
     <ProfileSummaryCard :profile="form" :summary="summary" />
 
-    <form class="rounded-2xl border border-solar-border-card bg-white p-4 shadow-sm sm:p-7 lg:p-8" novalidate @submit.prevent="saveProfile">
+    <form class="solar-card p-4 sm:p-7 lg:p-8" novalidate @submit.prevent="saveProfile">
       <section aria-labelledby="personal-heading">
         <div class="mb-6 flex items-start gap-3">
           <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-navy"><UserRound class="size-5" aria-hidden="true" /></span>
           <div><h2 id="personal-heading" class="text-lg font-extrabold text-solar-text-heading">المعلومات الشخصية</h2><p class="text-xs text-solar-text-muted">البيانات الأساسية ونوع الحساب المعتمد.</p></div>
         </div>
         <div class="grid gap-5 md:grid-cols-3">
-          <ProfileField label="الاسم الكامل" :error="errors.fullName" required><input v-model.trim="form.fullName" type="text" autocomplete="name" class="solar-input h-11" :class="errors.fullName ? 'border-red-400' : ''" /></ProfileField>
-          <ProfileField label="نوع الحساب"><input v-model="form.accountType" type="text" readonly class="solar-input h-11 cursor-not-allowed bg-solar-bg-subtle" /></ProfileField>
-          <ProfileField label="المحافظة / المدينة" :error="errors.city" required><input v-model.trim="form.city" type="text" autocomplete="address-level2" class="solar-input h-11" :class="errors.city ? 'border-red-400' : ''" /></ProfileField>
+          <FormField label="الاسم الكامل" :error="errors.fullName" required><input v-model.trim="form.fullName" type="text" autocomplete="name" class="solar-input h-11" :class="errors.fullName ? 'border-red-400' : ''" /></FormField>
+          <FormField label="نوع الحساب"><input v-model="form.accountType" type="text" readonly class="solar-input h-11 cursor-not-allowed bg-solar-bg-subtle" /></FormField>
+          <FormField label="المحافظة / المدينة" :error="errors.city" required><input v-model.trim="form.city" type="text" autocomplete="address-level2" class="solar-input h-11" :class="errors.city ? 'border-red-400' : ''" /></FormField>
         </div>
       </section>
 
@@ -48,11 +48,11 @@ const currentSession = computed(() => sessions.find(session => session.isCurrent
           <div><h2 id="contact-heading" class="text-lg font-extrabold text-solar-text-heading">بيانات الاتصال</h2><p class="text-xs text-solar-text-muted">معلومات التواصل وتأكيد التوصيل واستلام الإشعارات.</p></div>
         </div>
         <div class="grid gap-5 md:grid-cols-2">
-          <ProfileField label="البريد الإلكتروني" :error="errors.email" required><input v-model.trim="form.email" type="email" autocomplete="email" dir="ltr" class="solar-input h-11 text-right" :class="errors.email ? 'border-red-400' : ''" /></ProfileField>
-          <ProfileField label="رقم الجوال" :error="errors.phone" required>
+          <FormField label="البريد الإلكتروني" :error="errors.email" required><input v-model.trim="form.email" type="email" autocomplete="email" dir="ltr" class="solar-input h-11 text-right" :class="errors.email ? 'border-red-400' : ''" /></FormField>
+          <FormField label="رقم الجوال" :error="errors.phone" required>
             <span class="flex" dir="ltr"><span class="flex h-11 items-center rounded-l-lg border border-r-0 border-solar-border-input bg-solar-bg-subtle px-3 text-sm text-solar-text-muted">+966</span><input v-model.trim="form.phone" type="tel" inputmode="numeric" autocomplete="tel" class="solar-input h-11 rounded-l-none text-right" :class="errors.phone ? 'border-red-400' : ''" /></span>
-          </ProfileField>
-          <ProfileField label="العنوان الوطني / موقع التوصيل" :error="errors.address" required class="md:col-span-2"><input v-model.trim="form.address" type="text" autocomplete="street-address" class="solar-input h-11" :class="errors.address ? 'border-red-400' : ''" /></ProfileField>
+          </FormField>
+          <FormField label="العنوان الوطني / موقع التوصيل" :error="errors.address" required class="md:col-span-2"><input v-model.trim="form.address" type="text" autocomplete="street-address" class="solar-input h-11" :class="errors.address ? 'border-red-400' : ''" /></FormField>
         </div>
       </section>
 
@@ -67,7 +67,7 @@ const currentSession = computed(() => sessions.find(session => session.isCurrent
         <div class="flex flex-col gap-4">
           <div class="flex flex-col gap-4 rounded-xl border border-solar-border-card bg-solar-bg-subtle/70 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex items-start gap-3"><span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-solar-navy"><MessageSquareText class="size-5" aria-hidden="true" /></span><div><h3 class="text-sm font-bold text-solar-text-heading">التحقق بخطوتين (2FA)</h3><p class="mt-1 text-xs leading-5 text-solar-text-muted">إرسال رمز تحقق مؤقت عبر رسالة نصية (SMS) عند كل تسجيل دخول جديد.</p></div></div>
-            <div class="flex items-center gap-3"><span class="text-xs font-bold text-emerald-600">{{ form.twoFactorEnabled ? 'مفعل حاليًا' : 'غير مفعل' }}</span><button type="button" role="switch" :aria-checked="form.twoFactorEnabled" class="relative h-6 w-11 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow" :class="form.twoFactorEnabled ? 'bg-solar-navy' : 'bg-slate-300'" @click="form.twoFactorEnabled = !form.twoFactorEnabled"><span class="absolute top-1 size-4 rounded-full bg-white transition-all" :class="form.twoFactorEnabled ? 'right-6' : 'right-1'" /></button></div>
+            <div class="flex items-center gap-3"><span class="text-xs font-bold text-emerald-600">{{ form.twoFactorEnabled ? 'مفعل حاليًا' : 'غير مفعل' }}</span><button type="button" role="switch" aria-label="التحقق بخطوتين" :aria-checked="form.twoFactorEnabled" class="relative h-6 w-11 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow" :class="form.twoFactorEnabled ? 'bg-solar-navy' : 'bg-slate-300'" @click="form.twoFactorEnabled = !form.twoFactorEnabled"><span class="absolute top-1 size-4 rounded-full bg-white transition-all" :class="form.twoFactorEnabled ? 'right-6' : 'right-1'" /></button></div>
           </div>
 
           <div class="flex flex-col gap-4 rounded-xl border border-solar-border-card bg-solar-bg-subtle/70 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -96,6 +96,7 @@ const currentSession = computed(() => sessions.find(session => session.isCurrent
         <p v-if="statusMessage" class="text-sm font-medium" :class="saveState === 'error' ? 'text-red-600' : 'text-emerald-700'" role="status" aria-live="polite">{{ statusMessage }}</p><span v-else />
         <div class="flex gap-3"><button type="button" class="btn-outline" :disabled="saveState === 'saving'" @click="resetProfile">إلغاء</button><button type="submit" class="btn-primary min-w-40" :disabled="saveState === 'saving'"><Check class="size-4" aria-hidden="true" />{{ saveState === 'saving' ? 'جارٍ الحفظ...' : 'حفظ التعديلات' }}</button></div>
       </div>
+      <p class="mt-4 text-[10px] leading-6 text-solar-text-muted">بيانات وإعدادات تجريبية للعرض؛ لا يتم تحديث الحساب أو إعدادات الأمان على الخادم.</p>
     </form>
   </div>
 </template>

@@ -5,7 +5,7 @@ defineProps<{ profile: CustomerProfileForm; summary: CustomerProfileSummary }>()
 </script>
 
 <template>
-  <section class="flex flex-col items-center gap-4 rounded-2xl border border-solar-border-card bg-white p-5 shadow-sm sm:flex-row sm:p-6">
+  <section class="flex flex-col items-center gap-4 solar-card p-5 sm:flex-row sm:p-6">
     <div class="flex size-20 shrink-0 items-center justify-center rounded-full bg-solar-navy-dark text-2xl font-black text-white ring-4 ring-solar-yellow/30">{{ summary.initials }}</div>
     <div class="min-w-0 flex-1 text-center sm:text-right">
       <div class="flex flex-wrap items-center justify-center gap-2 sm:justify-start">

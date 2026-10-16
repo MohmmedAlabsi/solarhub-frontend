@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CustomerSidebarLink from './CustomerSidebarLink.vue'
 import {
   Bell,
   ChevronLeft,
@@ -54,14 +55,17 @@ const settingsNav = [
   { label: 'الإعدادات', to: '/customer/settings', icon: Settings },
 ]
 
+const navigationGroups = [mainNav, commerceNav, settingsNav]
+
 function isActive(path: string) {
   if (path.includes('?')) {
     const [basePath, queryStr] = path.split('?')
     const queryParams = new URLSearchParams(queryStr)
-    const currentTab = route.query.tab
+    const currentTab = Array.isArray(route.query.tab) ? route.query.tab[0] : route.query.tab
     return route.path === basePath && currentTab === queryParams.get('tab')
   }
-  return route.path.startsWith(path) && (path !== '/customer/orders' || !route.query.tab)
+  const matchesPath = route.path === path || route.path.startsWith(path + '/')
+  return matchesPath && (path !== '/customer/orders' || (Array.isArray(route.query.tab) ? route.query.tab[0] : route.query.tab) !== 'quotes')
 }
 
 function handleLinkClick() {
@@ -73,9 +77,9 @@ function handleLinkClick() {
 
 <template>
   <aside
-    class="relative flex h-screen flex-col justify-between bg-solar-navy transition-all duration-300 ease-in-out z-40 select-none shadow-sidebar"
+    class="relative z-50 flex flex-col justify-between overflow-visible border border-white/10 bg-solar-navy shadow-2xl transition-all duration-300 ease-in-out select-none"
     :class="[
-      isMobile ? 'w-full' : (isCollapsed ? 'w-20' : 'w-64 lg:w-72'),
+      isMobile ? 'h-full w-full' : (isCollapsed ? 'h-[calc(100dvh-1.5rem)] w-20 rounded-2xl' : 'h-[calc(100dvh-1.5rem)] w-64 rounded-2xl lg:w-72'),
     ]"
     aria-label="القائمة الجانبية لبوابة العميل"
   >
@@ -84,12 +88,12 @@ function handleLinkClick() {
       v-if="!isMobile"
       type="button"
       @click="emit('toggle')"
-      class="absolute top-24 -left-3.5 z-50 flex size-7 items-center justify-center rounded-full bg-solar-yellow text-solar-navy-dark shadow-md transition-transform hover:scale-110 active:scale-95 focus:outline-none cursor-pointer ring-2 ring-white/20"
-      :title="isCollapsed ? 'توسيع القائمة' : 'طي القائمة'"
+      class="absolute top-24 -left-3.5 z-50 flex size-7 items-center justify-center rounded-full bg-solar-yellow text-solar-navy-dark shadow-md transition-transform hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-solar-navy cursor-pointer ring-2 ring-white/20 hover:ring-solar-yellow/50"
+      :title="isCollapsed ? 'توسيع القائمة (Ctrl+B)' : 'طي القائمة (Ctrl+B)'"
       :aria-label="isCollapsed ? 'توسيع القائمة' : 'طي القائمة'"
     >
-      <ChevronRight v-if="isCollapsed" class="size-4 stroke-[2.5]" />
-      <ChevronLeft v-else class="size-4 stroke-[2.5]" />
+      <ChevronLeft v-if="isCollapsed" class="size-4 stroke-[2.5]" />
+      <ChevronRight v-else class="size-4 stroke-[2.5]" />
     </button>
 
     <!-- زر إغلاق القائمة في الهواتف الذكية -->
@@ -97,8 +101,9 @@ function handleLinkClick() {
       v-if="isMobile"
       type="button"
       @click="emit('closeMobile')"
-      class="absolute top-5 left-4 z-50 flex size-8 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20 active:scale-95"
+      class="absolute top-5 left-4 z-50 flex size-8 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow"
       aria-label="إغلاق القائمة"
+      data-drawer-close
     >
       <X class="size-5" />
     </button>
@@ -124,100 +129,19 @@ function handleLinkClick() {
     </div>
 
     <!-- قائمة الروابط الرئيسية -->
-    <nav class="flex-1 min-h-0 flex flex-col gap-1 p-2 sm:p-3 overflow-y-auto">
-      <!-- المجموعة 1 -->
-      <div class="flex flex-col gap-1">
-        <NuxtLink
-          v-for="item in mainNav"
-          :key="item.to"
-          :to="item.to"
-          @click="handleLinkClick"
-          class="group relative flex items-center transition-all duration-200"
-          :class="[
-            isCollapsed && !isMobile ? 'justify-center p-3 rounded-xl' : 'gap-3.5 px-3.5 py-2.5 rounded-lg text-sm font-medium',
-            isActive(item.to)
-              ? 'bg-solar-yellow text-solar-navy-dark font-bold shadow-sm'
-              : 'text-white/80 hover:bg-white/10 hover:text-white',
-          ]"
-        >
-          <component :is="item.icon" class="size-5 shrink-0" />
-          <span v-if="!isCollapsed || isMobile" class="truncate">{{ item.label }}</span>
-
-          <!-- Tooltip في حالة الطي على سطح المكتب -->
-          <div
-            v-if="isCollapsed && !isMobile"
-            class="pointer-events-none absolute right-full mr-2 z-50 hidden rounded-md bg-solar-navy-dark px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg whitespace-nowrap group-hover:block"
-          >
-            {{ item.label }}
-          </div>
-        </NuxtLink>
-      </div>
-
-      <!-- فاصل 1 -->
-      <hr class="my-1.5 sm:my-2 border-solar-navy-light/40" />
-
-      <!-- المجموعة 2 (المتجر والطلبات) -->
-      <div class="flex flex-col gap-1">
-        <NuxtLink
-          v-for="item in commerceNav"
-          :key="item.to"
-          :to="item.to"
-          @click="handleLinkClick"
-          class="group relative flex items-center transition-all duration-200"
-          :class="[
-            isCollapsed && !isMobile ? 'justify-center p-3 rounded-xl' : 'gap-3.5 px-3.5 py-2.5 rounded-lg text-sm font-medium',
-            isActive(item.to)
-              ? 'bg-solar-yellow text-solar-navy-dark font-bold shadow-sm'
-              : 'text-white/80 hover:bg-white/10 hover:text-white',
-          ]"
-        >
-          <component :is="item.icon" class="size-5 shrink-0" />
-          <span v-if="!isCollapsed || isMobile" class="truncate">{{ item.label }}</span>
-
-          <div
-            v-if="isCollapsed && !isMobile"
-            class="pointer-events-none absolute right-full mr-2 z-50 hidden rounded-md bg-solar-navy-dark px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg whitespace-nowrap group-hover:block"
-          >
-            {{ item.label }}
-          </div>
-        </NuxtLink>
-      </div>
-
-      <!-- فاصل 2 -->
-      <hr class="my-1.5 sm:my-2 border-solar-navy-light/40" />
-
-      <!-- المجموعة 3 (الإعدادات والإشعارات) -->
-      <div class="flex flex-col gap-1">
-        <NuxtLink
-          v-for="item in settingsNav"
-          :key="item.to"
-          :to="item.to"
-          @click="handleLinkClick"
-          class="group relative flex items-center transition-all duration-200"
-          :class="[
-            isCollapsed && !isMobile ? 'justify-center p-3 rounded-xl' : 'gap-3.5 px-3.5 py-2.5 rounded-lg text-sm font-medium',
-            isActive(item.to)
-              ? 'bg-solar-yellow text-solar-navy-dark font-bold shadow-sm'
-              : 'text-white/80 hover:bg-white/10 hover:text-white',
-          ]"
-        >
-          <component :is="item.icon" class="size-5 shrink-0" />
-          <span v-if="!isCollapsed || isMobile" class="truncate">{{ item.label }}</span>
-
-          <div
-            v-if="isCollapsed && !isMobile"
-            class="pointer-events-none absolute right-full mr-2 z-50 hidden rounded-md bg-solar-navy-dark px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg whitespace-nowrap group-hover:block"
-          >
-            {{ item.label }}
-          </div>
-        </NuxtLink>
-      </div>
+    <nav class="flex-1 min-h-0 flex flex-col gap-1 p-2 sm:p-3 overflow-y-auto" aria-label="التنقل في بوابة العميل">
+      <template v-for="(group, index) in navigationGroups" :key="index">
+        <hr v-if="index" class="my-1.5 border-solar-navy-light/40 sm:my-2" />
+        <div class="flex flex-col gap-1">
+          <CustomerSidebarLink v-for="item in group" :key="item.to" :label="item.label" :to="item.to" :icon="item.icon" :collapsed="isCollapsed && !isMobile" :active="isActive(item.to)" @navigate="handleLinkClick" />
+        </div>
+      </template>
     </nav>
 
     <!-- زر تسجيل الخروج السفلي -->
     <div class="shrink-0 border-t border-solar-navy-light/40 p-2 sm:p-3">
-      <button type="button" @click="emit('unavailable', 'تسجيل الخروج')"
-        class="group relative flex items-center transition-all duration-200 text-red-200 hover:bg-red-500/20 hover:text-red-100"
+      <button type="button" @click="emit('unavailable', 'تسجيل الخروج')" aria-label="تسجيل الخروج"
+        class="group relative flex items-center transition-all duration-200 text-red-200 hover:bg-red-500/20 hover:text-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow"
         :class="isCollapsed && !isMobile ? 'justify-center p-3 rounded-xl' : 'gap-3.5 px-3.5 py-2.5 rounded-lg text-sm font-medium'"
       >
         <LogOut class="size-5 shrink-0" />

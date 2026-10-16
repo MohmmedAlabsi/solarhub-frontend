@@ -1,9 +1,9 @@
 import type { EngineerProfile, EngineerProfileTab } from '../../types/engineer'
 import { engineersData } from './useEngineers'
 
-const profileDetails: Record<number, Pick<EngineerProfile, 'licenseNumber' | 'experienceYears' | 'verifiedReviews' | 'responseTime' | 'professionalBio' | 'expertise'>> = {
+const profileDetails: Record<number, Pick<EngineerProfile, 'licenseNumber' | 'experienceYears' | 'responseTime' | 'professionalBio' | 'expertise'>> = {
   1: {
-    licenseNumber: 'SCE-849201', experienceYears: 8, verifiedReviews: 48, responseTime: 'ساعتان',
+    licenseNumber: 'SCE-849201', experienceYears: 8, responseTime: 'ساعتان',
     professionalBio: 'مهندس استشاري معتمد من الهيئة السعودية للمهندسين بخبرة تفوق 8 سنوات في قطاع الطاقة المتجددة والهندسة الكهروضوئية في المملكة العربية السعودية. حاصل على اعتمادات دولية في سلامة وتركيب المحطات، ومتخصص في تصميم الأنظمة ودراسات الجدوى الفنية والاقتصادية ومخططات التنفيذ لمشاريع الطاقة الشمسية التجارية والصناعية والزراعية وفق اشتراطات كود البناء السعودي ومتطلبات شركة الكهرباء السعودية.',
     expertise: [
       { title: 'أنظمة الربط مع الشبكة (On-Grid)', description: 'تصميم وتدقيق محطات الأسقف الصناعية والتجارية وتجهيز ملفات الربط لاعتماد مزود الخدمة.', icon: 'grid' },
@@ -13,7 +13,7 @@ const profileDetails: Record<number, Pick<EngineerProfile, 'licenseNumber' | 'ex
     ],
   },
   2: {
-    licenseNumber: 'SCE-781452', experienceYears: 7, verifiedReviews: 56, responseTime: 'ساعة واحدة',
+    licenseNumber: 'SCE-781452', experienceYears: 7, responseTime: 'ساعة واحدة',
     professionalBio: 'مهندسة واستشارية طاقة متجددة معتمدة ومتخصصة في حلول الضخ الشمسي والري الذكي للمشاريع الزراعية. تمتلك خبرة عملية في تحليل الاحتياج المائي، اختيار المضخات وتصميم المصفوفات الشمسية بما يحقق استدامة التشغيل وتقليل تكاليف الوقود والصيانة.',
     expertise: [
       { title: 'أنظمة الضخ الشمسي', description: 'تصميم منظومات الضخ للآبار والخزانات وفق معدلات التدفق والرفع المطلوبة.', icon: 'droplet' },
@@ -23,7 +23,7 @@ const profileDetails: Record<number, Pick<EngineerProfile, 'licenseNumber' | 'ex
     ],
   },
   3: {
-    licenseNumber: 'SCE-663908', experienceYears: 11, verifiedReviews: 73, responseTime: '3 ساعات',
+    licenseNumber: 'SCE-663908', experienceYears: 11, responseTime: '3 ساعات',
     professionalBio: 'مهندس كهربائي معتمد بخبرة واسعة في أنظمة تخزين الطاقة والمنظومات الهجينة للمصانع والمنشآت الحيوية. يقود دراسات جودة الطاقة والحماية ومزامنة مصادر التوليد ويشرف على الاختبارات والتشغيل وفق المعايير المحلية والدولية.',
     expertise: [
       { title: 'أنظمة تخزين الطاقة BESS', description: 'تحليل الأحمال واختيار تقنيات البطاريات وأنظمة إدارة الطاقة المناسبة.', icon: 'battery' },
@@ -33,7 +33,7 @@ const profileDetails: Record<number, Pick<EngineerProfile, 'licenseNumber' | 'ex
     ],
   },
   4: {
-    licenseNumber: 'SCE-594327', experienceYears: 9, verifiedReviews: 39, responseTime: 'ساعتان',
+    licenseNumber: 'SCE-594327', experienceYears: 9, responseTime: 'ساعتان',
     professionalBio: 'مهندس صيانة وفحص معتمد متخصص في تقييم أداء محطات الطاقة الشمسية القائمة، الكشف الحراري، اختبارات العزل ومنحنيات الجهد والتيار. يقدم خطط صيانة وتأهيل عملية للمحطات التجارية والصناعية لرفع الاعتمادية والإنتاجية.',
     expertise: [
       { title: 'الفحص الحراري', description: 'تحديد النقاط الساخنة والعيوب الخفية في الألواح والوصلات الكهربائية.', icon: 'thermal' },
@@ -78,10 +78,41 @@ const profileCertificates: Record<number, EngineerProfile['certificates']> = {
   ],
   4: [],
 }
+// Demo aggregates describe the complete review set; comments are a curated sample.
+// Replace both together when an approved reviews endpoint becomes available.
+const profileReviews: Record<number, EngineerProfile['reviews']> = {
+  1: {
+    distribution: { 5: 43, 4: 5, 3: 0, 2: 0, 1: 0 },
+    comments: [
+      { id: 'faisal', author: 'م. فيصل العتيبي', project: 'مصنع الرياض للمنتجات البلاستيكية', rating: 5, relativeDate: 'قبل أسبوعين', comment: 'مهندس متمكن جداً وخبير باشتراطات شركة الكهرباء وكود البناء السعودي. قام بإعداد دراسة الجدوى وتدقيق المخططات لمحطة 300kW دون أي ملاحظات.' },
+      { id: 'fahad', author: 'أبو فهد القحطاني', project: 'مشروع زراعي بوادي الدواسر', rating: 5, relativeDate: 'قبل شهر', comment: 'صمم لنا منظومة ضخ متكاملة للأعماق مع إنفرتر VFD، توفير كامل للديزل واحترافية عالية في المتابعة.' },
+      { id: 'abdullah', author: 'عبدالله السالم', project: 'فيلا سكنية حي النرجس', rating: 5, relativeDate: 'قبل شهرين', comment: 'استشارة هندسية في قمة الدقة، ساعدني في اختيار المورد المناسب وتجنب الألواح الرديئة.' },
+    ],
+  },
+  2: { distribution: { 5: 56, 4: 0, 3: 0, 2: 0, 1: 0 }, comments: [
+    { id: 'nasser', author: 'ناصر الحربي', project: 'مزرعة نخيل بالقصيم', rating: 5, relativeDate: 'قبل أسبوع', comment: 'تصميم دقيق لمنظومة الري الشمسي ومتابعة ممتازة حتى تشغيل المضخات.' },
+  ] },
+  3: { distribution: { 5: 69, 4: 4, 3: 0, 2: 0, 1: 0 }, comments: [
+    { id: 'khaled', author: 'خالد الزهراني', project: 'مرفق صناعي بالدمام', rating: 4, relativeDate: 'قبل شهر', comment: 'حل متكامل لتخزين الطاقة مع شرح واضح لإجراءات التشغيل والصيانة.' },
+  ] },
+  4: { distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }, comments: [] },
+}
+
 function routeId(value: string | string[] | undefined) { return Number(Array.isArray(value) ? value[0] : value) }
 function routeTab(value: string | null | Array<string | null> | undefined): EngineerProfileTab {
   const tab = Array.isArray(value) ? value[0] : value
-  return tab === 'certificates' || tab === 'projects' ? tab : 'overview'
+  return tab === 'certificates' || tab === 'projects' || tab === 'reviews' ? tab : 'overview'
+}
+
+export function getEngineerProfile(id: number): EngineerProfile | undefined {
+  const base = engineersData.find(item => item.id === id)
+  const details = profileDetails[id]
+  const reviews = profileReviews[id]
+  if (!base || !details || !reviews) return undefined
+  const entries = Object.entries(reviews.distribution)
+  const verifiedReviews = entries.reduce((sum, [, count]) => sum + count, 0)
+  const rating = verifiedReviews ? Number((entries.reduce((sum, [score, count]) => sum + Number(score) * count, 0) / verifiedReviews).toFixed(1)) : 0
+  return { ...base, ...details, reviews, rating, verifiedReviews, certificates: profileCertificates[id] ?? [], projects: profileProjects[id] ?? [] }
 }
 
 export function useEngineerProfile() {
@@ -90,11 +121,7 @@ export function useEngineerProfile() {
   let noticeTimer: ReturnType<typeof setTimeout> | undefined
   const engineerId = computed(() => routeId(route.params.id))
   const activeTab = computed<EngineerProfileTab>(() => routeTab(route.query.tab))
-  const engineer = computed<EngineerProfile | undefined>(() => {
-    const base = engineersData.find(item => item.id === engineerId.value)
-    const details = profileDetails[engineerId.value]
-    return base && details ? { ...base, ...details, certificates: profileCertificates[engineerId.value] ?? [], projects: profileProjects[engineerId.value] ?? [] } : undefined
-  })
+  const engineer = computed(() => getEngineerProfile(engineerId.value))
   const backQuery = computed(() => Object.fromEntries(Object.entries(route.query).filter(([key]) => key !== 'tab')))
 
   function showTemporaryNotice(message: string) {
@@ -103,7 +130,7 @@ export function useEngineerProfile() {
     noticeTimer = setTimeout(() => { noticeMessage.value = '' }, 3500)
   }
   function selectTab(tab: EngineerProfileTab) {
-    if (tab === 'overview' || tab === 'certificates' || tab === 'projects') {
+    if (tab === 'overview' || tab === 'certificates' || tab === 'projects' || tab === 'reviews') {
       const query = { ...route.query }
       if (tab === 'overview') delete query.tab
       else query.tab = tab
@@ -111,7 +138,7 @@ export function useEngineerProfile() {
     }
     showTemporaryNotice('سيُنفذ محتوى هذا التبويب في شاشة لاحقة.')
   }
-  function requestService() { if (engineer.value) showTemporaryNotice(`طلب خدمة هندسية من ${engineer.value.name} سيتاح عند ربط خدمة الطلبات.`) }
+  function requestService() { if (engineer.value) return navigateTo({ path: '/customer/services/new', query: { engineerId: engineer.value.id } }) }
   function sendMessage() { if (engineer.value) showTemporaryNotice(`المراسلة مع ${engineer.value.name} ستتاح عند ربط خدمة المحادثات.`) }
 
   onBeforeUnmount(() => { if (noticeTimer) clearTimeout(noticeTimer) })

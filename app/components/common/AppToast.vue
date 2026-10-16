@@ -4,7 +4,7 @@ defineProps<{ message: string }>()
 
 <template>
   <Transition name="toast">
-    <div v-if="message" class="fixed bottom-5 left-1/2 z-[70] -translate-x-1/2 rounded-xl bg-solar-navy-dark px-5 py-3 text-sm font-medium text-white shadow-xl" role="status" aria-live="polite">{{ message }}</div>
+    <div v-if="message" class="fixed bottom-5 left-1/2 z-[70] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl bg-solar-navy-dark px-5 py-3 text-center text-sm font-medium text-white shadow-xl" role="status" aria-live="polite">{{ message }}</div>
   </Transition>
 </template>
 

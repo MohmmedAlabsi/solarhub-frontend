@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, Search, Users, X } from 'lucide-vue-next'
 import EngineerCard from '../../../components/customer/engineers/EngineerCard.vue'
+import type { RouteLocationRaw } from 'vue-router'
 
 definePageMeta({ layout: 'customer' })
 useSeoMeta({ title: 'دليل المهندسين المعتمدين | SolarHub', description: 'تواصل مع مهندسي ومستشاري الطاقة الشمسية المعتمدين.' })
 
 const { searchDraft, filters, displayedEngineers, resultCount, currentPage, totalPages, cities, specialtyLabels, directoryQuery, noticeMessage, applySearch, resetFilters, setPage, requestConsultation } = useEngineers()
+const route = useRoute()
 const pageNumbers = computed(() => currentPage.value <= 3 ? [1, 2, 3] : [currentPage.value - 1, currentPage.value, Math.min(currentPage.value + 1, totalPages)])
-function openProfile(engineerId: number) { return navigateTo({ path: `/customer/engineers/${engineerId}`, query: directoryQuery.value }) }
+function engineerProfileLocation(engineerId: number): RouteLocationRaw {
+  const query = { ...route.query }
+  for (const key of ['q', 'specialty', 'city', 'rating', 'tab']) delete query[key]
+  return { path: `/customer/engineers/${engineerId}`, query: { ...query, ...directoryQuery.value } }
+}
 </script>
 
 <template>
@@ -22,7 +28,7 @@ function openProfile(engineerId: number) { return navigateTo({ path: `/customer/
       <p class="mx-auto mt-3 max-w-3xl text-sm leading-7 text-solar-text-muted">تواصل مع نخبة المهندسين المرخصين في تصميم أنظمة الطاقة الشمسية، دراسات الجدوى والأحمال، والفحص الميداني وفق الكود السعودي.</p>
     </header>
 
-    <section class="rounded-2xl border border-solar-border-card bg-white p-4 shadow-sm sm:p-5" aria-label="البحث والتصفية">
+    <section class="solar-card p-4 sm:p-5" aria-label="البحث والتصفية">
       <form class="flex flex-col gap-3 sm:flex-row" role="search" @submit.prevent="applySearch">
         <label class="relative flex-1"><span class="sr-only">البحث عن مهندس</span><Search class="pointer-events-none absolute right-4 top-1/2 size-5 -translate-y-1/2 text-solar-text-muted" aria-hidden="true" /><input v-model="searchDraft" type="search" class="solar-input h-12 pr-12" placeholder="ابحث باسم المهندس، التخصص الهندسي، أو الكلمات المفتاحية (مثل: دراسات أحمال، مضخات، On-Grid)..." /></label>
         <button type="submit" class="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-solar-navy px-8 text-sm font-bold text-white hover:bg-solar-navy-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow"><Search class="size-4" aria-hidden="true" /> بحث</button>
@@ -40,7 +46,7 @@ function openProfile(engineerId: number) { return navigateTo({ path: `/customer/
         <p>الترتيب حسب: <strong class="text-solar-text-heading underline decoration-solar-yellow decoration-2 underline-offset-4">الأعلى تقييمًا</strong></p>
       </div>
       <div v-if="displayedEngineers.length" class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <EngineerCard v-for="engineer in displayedEngineers" :key="engineer.id" :engineer="engineer" @consultation="requestConsultation" @profile="engineer => openProfile(engineer.id)" />
+        <EngineerCard v-for="engineer in displayedEngineers" :key="engineer.id" :engineer="engineer" :profile-to="engineerProfileLocation(engineer.id)" @consultation="requestConsultation" />
       </div>
       <div v-else class="rounded-2xl border border-dashed border-solar-border-card bg-white px-5 py-14 text-center">
         <Users class="mx-auto size-10 text-solar-text-muted" aria-hidden="true" /><h2 class="mt-4 text-lg font-bold text-solar-text-heading">لا توجد نتائج مطابقة</h2><p class="mt-2 text-sm text-solar-text-muted">جرّب تغيير عبارة البحث أو خيارات التصفية.</p><button type="button" class="mt-5 inline-flex items-center gap-2 rounded-lg bg-solar-yellow px-5 py-3 text-sm font-bold text-solar-navy-dark" @click="resetFilters"><X class="size-4" aria-hidden="true" /> مسح الفلاتر</button>
@@ -54,6 +60,7 @@ function openProfile(engineerId: number) { return navigateTo({ path: `/customer/
       <button v-if="!pageNumbers.includes(totalPages)" type="button" class="size-10 rounded-lg border border-solar-border-card bg-white text-xs font-bold" @click="setPage(totalPages)">{{ totalPages }}</button>
       <button type="button" class="inline-flex h-10 items-center gap-1 rounded-lg border border-solar-border-card bg-white px-4 text-xs font-semibold disabled:opacity-50" :disabled="currentPage === totalPages" @click="setPage(currentPage + 1)">التالي <ChevronLeft class="size-4" aria-hidden="true" /></button>
     </nav>
+    <p class="text-[10px] leading-6 text-solar-text-muted">بيانات الدليل وأعداد الصفحات تجريبية للعرض؛ الطلبات الفعلية تتطلب ربط الخدمات بالخادم.</p>
     <p v-if="noticeMessage" class="fixed bottom-5 left-1/2 z-[70] w-max max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-xl bg-solar-navy-dark px-5 py-3 text-center text-sm font-medium text-white shadow-xl" role="status" aria-live="polite">{{ noticeMessage }}</p>
   </div>
 </template>

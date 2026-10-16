@@ -7,7 +7,7 @@ defineEmits<{ service: []; message: [] }>()
 </script>
 
 <template>
-  <section class="rounded-2xl border border-solar-border-card bg-white p-5 shadow-sm sm:p-7" aria-labelledby="engineer-name">
+  <section class="solar-card p-5 sm:p-7" aria-labelledby="engineer-name">
     <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
       <div class="flex min-w-0 flex-col items-center gap-5 text-center sm:flex-row sm:text-right">
         <div class="relative shrink-0"><img :src="engineer.image" :alt="`صورة ${engineer.name}`" width="112" height="112" class="size-28 rounded-2xl object-cover" /><span class="absolute -bottom-2 right-2 size-6 rounded-full border-4 border-white bg-emerald-500" aria-label="متاح حاليًا" /></div>

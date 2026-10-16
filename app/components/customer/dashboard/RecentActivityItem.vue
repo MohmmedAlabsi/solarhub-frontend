@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ChevronLeft, FileBadge, Truck, UsersRound } from 'lucide-vue-next'
+import { ChevronLeft, FileText, Truck, Wrench } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import type { RecentActivity } from '~~/types/dashboard'
 
 const props = defineProps<{ activity: RecentActivity }>()
-const icons: Record<RecentActivity['icon'], Component> = { delivery: Truck, quote: FileBadge, engineering: UsersRound }
+const icons: Record<RecentActivity['icon'], Component> = { delivery: Truck, quote: FileText, engineering: Wrench }
 const iconTone: Record<RecentActivity['statusTone'], string> = { blue: 'bg-solar-status-info-bg text-solar-status-info-text', yellow: 'bg-solar-status-warning-bg text-solar-status-warning-text', orange: 'bg-orange-100 text-orange-700' }
-const badgeTone: Record<RecentActivity['statusTone'], string> = { blue: 'bg-solar-status-info-bg text-solar-status-info-text', yellow: 'bg-solar-status-warning-bg text-solar-status-warning-text', orange: 'bg-orange-100 text-orange-700' }
+const badgeTone: Record<RecentActivity['statusTone'], string> = { blue: 'badge-info', yellow: 'badge-warning', orange: 'badge-warning' }
 </script>
 
 <template>
