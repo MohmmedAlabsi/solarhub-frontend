@@ -1,6 +1,20 @@
+import process from 'node:process'
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-04-03',
-  devtools: { enabled: true },
+  // Disabled by default because @nuxt/devtools 3.4.2 currently emits a Vite 8
+  // configResolved warning. Opt in locally with NUXT_DEVTOOLS=true.
+  devtools: { enabled: process.env.NUXT_DEVTOOLS === 'true' },
+
+  // @nuxtjs/tailwindcss 6.14 injects tailwindcss/nesting, which Tailwind
+  // 3.4 no longer exposes to Nuxt 4/Vite 8. Keep nesting support through the
+  // compatible PostCSS implementation already installed by the module.
+  postcss: {
+    plugins: {
+      'tailwindcss/nesting': false,
+      'postcss-nesting': {},
+    },
+  },
 
   // تفعيل Tailwind و Pinia
   modules: [
@@ -45,5 +59,7 @@ export default defineNuxtConfig({
     '/customer/**': { ssr: false },
     '/admin/**': { ssr: false },
     '/profile/**': { ssr: false },
+    '/dashboard': { redirect: '/customer/dashboard' },
+    '/dashboard/**': { redirect: '/customer/dashboard' },
   }
 })

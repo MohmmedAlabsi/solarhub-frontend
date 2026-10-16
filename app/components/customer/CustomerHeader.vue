@@ -2,16 +2,29 @@
 import { Bell, ChevronDown, Menu, ShoppingCart, User } from 'lucide-vue-next'
 import { useCartStore } from '~~/app/stores/cart.store'
 
+withDefaults(defineProps<{ isMobileOpen?: boolean; flat?: boolean }>(), { isMobileOpen: false, flat: false })
 const emit = defineEmits<{
   (e: 'toggleMobileMenu'): void
+  (e: 'unavailable', label: string): void
 }>()
 
 const cartStore = useCartStore()
+const { unreadCount } = useNotificationState()
 const isUserMenuOpen = ref(false)
+const accountMenu = ref<HTMLElement>()
+const accountButton = ref<HTMLButtonElement>()
+const route = useRoute()
+function closeAccountMenu(event: PointerEvent) {
+  if (event.target instanceof Node && !accountMenu.value?.contains(event.target)) isUserMenuOpen.value = false
+}
+function escapeAccountMenu() { isUserMenuOpen.value = false; accountButton.value?.focus() }
+watch(() => route.fullPath, () => { isUserMenuOpen.value = false })
+onMounted(() => document.addEventListener('pointerdown', closeAccountMenu))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMenu))
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 flex h-16 sm:h-20 w-full items-center justify-between border-b border-solar-border-card bg-white px-3 sm:px-6 shadow-sm">
+  <header class="sticky top-0 z-30 flex w-full shrink-0 items-center justify-between bg-white px-3 sm:px-6" :class="flat ? 'h-16 shadow-[0_1px_5px_#0c253c04]' : 'h-16 border-b border-solar-border-card shadow-sm sm:h-20'">
     <!-- الجانب الأيمن (زر القائمة للشاشات الصغيرة + عنوان ترحيبي متجاوب) -->
     <div class="flex items-center gap-2 sm:gap-4">
       <button
@@ -19,12 +32,14 @@ const isUserMenuOpen = ref(false)
         @click="emit('toggleMobileMenu')"
         class="flex size-9 sm:size-10 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-heading lg:hidden hover:bg-solar-bg-subtle active:scale-95 transition-all"
         aria-label="فتح القائمة"
+        aria-controls="customer-mobile-navigation"
+        :aria-expanded="isMobileOpen"
       >
         <Menu class="size-5" />
       </button>
 
-      <div class="hidden sm:flex flex-col">
-        <h1 class="text-sm sm:text-base font-bold text-solar-text-heading leading-tight">بوابة العميل | SolarHub</h1>
+      <div v-if="!flat" class="hidden sm:flex flex-col">
+        <p class="text-sm sm:text-base font-bold text-solar-text-heading leading-tight">بوابة العميل | SolarHub</p>
         <p class="text-[11px] text-solar-text-muted">المنظومات وحلول الطاقة الكهروضوئية المعتمدة</p>
       </div>
 
@@ -39,17 +54,17 @@ const isUserMenuOpen = ref(false)
       <!-- زر الإشعارات -->
       <NuxtLink
         to="/customer/notifications"
-        class="relative flex size-9 sm:size-10 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-body transition-colors hover:border-solar-yellow hover:text-solar-text-heading"
-        aria-label="مركز الإشعارات"
+        class="relative flex size-9 sm:size-10 items-center justify-center text-solar-text-body transition-colors hover:text-solar-text-heading" :class="flat ? 'rounded-lg focus-visible:ring-2 focus-visible:ring-solar-yellow' : 'rounded-xl border border-solar-border-card hover:border-solar-yellow'"
+        :aria-label="`مركز الإشعارات، ${unreadCount} غير مقروءة`"
       >
         <Bell class="size-4 sm:size-5" />
-        <span class="absolute top-2 left-2 size-2 sm:size-2.5 rounded-full bg-amber-500 ring-2 ring-white" />
+        <span v-if="unreadCount > 0" class="absolute top-2 left-2 size-2 sm:size-2.5 rounded-full bg-amber-500 ring-2 ring-white" aria-hidden="true" />
       </NuxtLink>
 
       <!-- أيقونة سلة المشتريات التفاعلية مع العداد -->
       <NuxtLink
         to="/customer/cart"
-        class="relative flex size-9 sm:size-10 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-body transition-colors hover:border-solar-yellow hover:text-solar-text-heading"
+        class="relative flex size-9 sm:size-10 items-center justify-center text-solar-text-body transition-colors hover:text-solar-text-heading" :class="flat ? 'rounded-lg focus-visible:ring-2 focus-visible:ring-solar-yellow' : 'rounded-xl border border-solar-border-card hover:border-solar-yellow'"
         aria-label="سلة المشتريات"
       >
         <ShoppingCart class="size-4 sm:size-5" />
@@ -62,13 +77,16 @@ const isUserMenuOpen = ref(false)
       </NuxtLink>
 
       <!-- الملف الشخصي للمستخدم -->
-      <div class="relative">
+      <div ref="accountMenu" class="relative" @keydown.esc.stop="escapeAccountMenu">
         <button
+          ref="accountButton"
           type="button"
           @click="isUserMenuOpen = !isUserMenuOpen"
-          class="flex items-center gap-1.5 sm:gap-2.5 rounded-xl border border-solar-border-card p-1 sm:p-1.5 pr-2 sm:pr-3 transition-colors hover:border-solar-yellow focus:outline-none"
+          class="flex items-center gap-1.5 sm:gap-2.5 p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow" :class="flat ? 'rounded-lg' : 'rounded-xl border border-solar-border-card pr-2 hover:border-solar-yellow sm:p-1.5 sm:pr-3'"
+          :aria-expanded="isUserMenuOpen"
+          aria-controls="customer-account-menu"
         >
-          <div class="flex size-7 sm:size-8 items-center justify-center rounded-lg bg-solar-navy text-white">
+          <div class="flex size-7 sm:size-8 items-center justify-center bg-solar-navy text-white" :class="flat ? 'rounded-full' : 'rounded-lg'">
             <User class="size-3.5 sm:size-4" />
           </div>
           <div class="text-right flex flex-col leading-tight">
@@ -81,6 +99,7 @@ const isUserMenuOpen = ref(false)
         <!-- القائمة المنسدلة -->
         <div
           v-if="isUserMenuOpen"
+          id="customer-account-menu"
           class="absolute left-0 mt-2 w-48 rounded-xl border border-solar-border-card bg-white p-2 shadow-dropdown z-50 text-right"
         >
           <NuxtLink
@@ -98,15 +117,10 @@ const isUserMenuOpen = ref(false)
             طلباتي ومشترياتي
           </NuxtLink>
           <hr class="my-1 border-solar-border-card" />
-          <NuxtLink
-            to="/auth/login"
-            class="block rounded-lg px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
-            @click="isUserMenuOpen = false"
-          >
-            تسجيل الخروج
-          </NuxtLink>
+          <button type="button" class="block w-full rounded-lg px-3 py-2 text-right text-xs font-semibold text-red-600 hover:bg-red-50" @click="isUserMenuOpen = false; emit('unavailable', 'تسجيل الخروج')">تسجيل الخروج</button>
         </div>
       </div>
     </div>
   </header>
 </template>
+

@@ -27,7 +27,9 @@ const storeId = route.params.id as string
 const authModal = useAuthModal()
 
 const store = computed(() => {
-  return visitorStores.find(s => s.id === storeId) || visitorStores[0]
+  const match = visitorStores.find(s => s.id === storeId) || visitorStores[0]
+  if (!match) throw createError({ statusCode: 404, statusMessage: 'Not Found' })
+  return match
 })
 
 useSeoMeta({

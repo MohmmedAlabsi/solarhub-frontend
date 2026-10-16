@@ -98,8 +98,9 @@ export const useCartStore = defineStore('cart', () => {
   // إضافة منتج للسلة
   function addToCart(product: Product, quantity = 1) {
     const existingIndex = items.value.findIndex(i => String(i.product.id) === String(product.id))
-    if (existingIndex > -1) {
-      items.value[existingIndex].quantity += quantity
+    const existingItem = items.value[existingIndex]
+    if (existingItem) {
+      existingItem.quantity += quantity
     } else {
       items.value.push({ product, quantity })
     }
@@ -157,3 +158,4 @@ export const useCartStore = defineStore('cart', () => {
     isInWishlist,
   }
 })
+
