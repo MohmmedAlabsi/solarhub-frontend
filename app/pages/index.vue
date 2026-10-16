@@ -117,6 +117,15 @@ function handleProjectCta() {
               <FileText class="size-4.5 text-solar-navy" />
               <span>طلب استشارة / طرح مشروع</span>
             </button>
+
+            <NuxtLink
+              to="/admin"
+              class="flex items-center gap-2 h-12 px-5 text-sm font-bold rounded-xl bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md transition-all hover:scale-[1.02] active:scale-95 border border-white/10"
+              title="الانتقال إلى لوحة تحكم الأدمن"
+            >
+              <ShieldCheck class="size-4.5 text-solar-yellow stroke-[2.5]" />
+              <span>لوحة تحكم الأدمن</span>
+            </NuxtLink>
           </div>
         </div>
 

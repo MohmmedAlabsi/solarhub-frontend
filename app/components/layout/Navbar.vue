@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LayoutDashboard, LogIn, Menu, Sun, UserPlus, X } from 'lucide-vue-next'
+import { LayoutDashboard, LogIn, Menu, ShieldCheck, Sun, UserPlus, X } from 'lucide-vue-next'
 
 const route = useRoute()
 
@@ -76,6 +76,16 @@ const isMobileOpen = ref(false)
           <LayoutDashboard class="size-4" />
           <span>بوابة العميل</span>
         </NuxtLink>
+
+        <!-- زر الانتقال إلى لوحة تحكم الأدمن -->
+        <NuxtLink
+          to="/admin"
+          class="flex items-center gap-1.5 px-3.5 py-2 text-xs font-black rounded-xl bg-solar-navy text-white hover:bg-solar-navy-dark shadow-sm transition-all hover:scale-[1.02] active:scale-95 ml-1"
+          title="الانتقال إلى لوحة تحكم الأدمن"
+        >
+          <ShieldCheck class="size-4 text-solar-yellow stroke-[2.5]" />
+          <span>لوحة الأدمن</span>
+        </NuxtLink>
       </div>
 
       <!-- زر القائمة للأجهزة الذكية واللوحية -->
@@ -107,13 +117,24 @@ const isMobileOpen = ref(false)
         </li>
 
         <li class="mt-4 pt-4 border-t border-solar-border-card flex flex-col gap-2.5">
-          <NuxtLink
-            to="/customer/dashboard"
-            class="btn-primary w-full text-center py-2.5 text-xs font-black"
-            @click="isMobileOpen = false"
-          >
-            بوابة العميل
-          </NuxtLink>
+          <div class="grid grid-cols-2 gap-2">
+            <NuxtLink
+              to="/customer/dashboard"
+              class="btn-primary w-full text-center py-2.5 text-xs font-black flex items-center justify-center gap-1.5"
+              @click="isMobileOpen = false"
+            >
+              <LayoutDashboard class="size-4" />
+              <span>بوابة العميل</span>
+            </NuxtLink>
+            <NuxtLink
+              to="/admin"
+              class="flex items-center justify-center gap-1.5 w-full text-center py-2.5 text-xs font-black rounded-xl bg-solar-navy text-white hover:bg-solar-navy-dark shadow-sm"
+              @click="isMobileOpen = false"
+            >
+              <ShieldCheck class="size-4 text-solar-yellow stroke-[2.5]" />
+              <span>لوحة الأدمن</span>
+            </NuxtLink>
+          </div>
           <div class="grid grid-cols-2 gap-2">
             <NuxtLink
               to="/auth/login"

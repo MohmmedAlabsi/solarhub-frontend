@@ -1,0 +1,398 @@
+<script setup lang="ts">
+import { Download, Eye, Search } from 'lucide-vue-next'
+import AdminBadge from '../../../components/admin/common/AdminBadge.vue'
+import AdminPagination from '../../../components/admin/common/AdminPagination.vue'
+import OrderDetailsModal from '../../../components/admin/orders/OrderDetailsModal.vue'
+import type { AdminOrder } from '../../../../types/admin'
+
+definePageMeta({ layout: 'admin' })
+useSeoMeta({ title: 'إدارة طلبات الشراء | لوحة الإدارة العامة' })
+
+const searchQuery = ref('')
+const selectedStatus = ref('all')
+const currentPage = ref(1)
+
+const selectedOrder = ref<AdminOrder | null>(null)
+const isDetailsModalOpen = ref(false)
+
+const orders = ref<AdminOrder[]>([
+  {
+    id: '1',
+    orderNumber: 'ORD-2025-401',
+    customerName: 'فيصل العتيبي',
+    customerAvatarText: 'ف ع',
+    city: 'الرياض',
+    address: 'الرياض - حي النرجس، شارع أنس بن مالك',
+    totalAmount: 18450,
+    status: 'قيد المعالجة',
+    createdAt: '2025-05-14',
+    groups: [
+      {
+        supplierId: 'sup-1',
+        supplierName: 'شركة شمس الرياض للمهمات الكهروضوئية',
+        subtotal: 11650,
+        status: 'تم الشحن',
+        deliveryDate: '24 فبراير 2025',
+        customerConfirmation: 'قيد الانتظار',
+        notes: 'تم فحص الشحنة وتغليف الألواح على منصات خشبية مؤمنة',
+        products: [
+          { name: 'لوح شمسي مونوكريستالين Jinko Tiger Pro 585W', quantity: '20 لوح', unitPrice: 485, total: 9700 },
+          { name: 'هياكل تثبيت وقواعد ألومنيوم سداسية', quantity: '1 طقم (20 لوح)', unitPrice: 1950, total: 1950 },
+        ],
+      },
+      {
+        supplierId: 'sup-2',
+        supplierName: 'مؤسسة طاقة المستقبل للبطاريات',
+        subtotal: 6800,
+        status: 'قيد التجهيز',
+        deliveryDate: '26 فبراير 2025',
+        customerConfirmation: 'قيد الانتظار',
+        notes: 'بانتظار وصول بوليصة الشحن من شركة النقل المعتمدة',
+        products: [
+          { name: 'كابلات تيار مستمر 6 ملم نحاس معزول', quantity: '100 متر', unitPrice: 18, total: 1800 },
+          { name: 'قواطع تيار DC ولوحة حماية متكاملة', quantity: '2 طقم', unitPrice: 2500, total: 5000 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2',
+    orderNumber: 'ORD-2025-398',
+    customerName: 'نورة السبيعي',
+    customerAvatarText: 'ن س',
+    city: 'المنطقة الشرقية',
+    address: 'الخبر - حي الشاطئ، طريق الأمير فيصل',
+    totalAmount: 42800,
+    status: 'قيد التجهيز والشحن',
+    createdAt: '2025-05-14',
+    groups: [
+      {
+        supplierId: 'sup-3',
+        supplierName: 'طاقة الصحراء المتقدمة',
+        subtotal: 42800,
+        status: 'قيد التجهيز',
+        deliveryDate: '28 فبراير 2025',
+        customerConfirmation: 'قيد الانتظار',
+        notes: 'يتم تجهيز المنظومة المتكاملة مع الفحص المخبري للبطاريات',
+        products: [
+          { name: 'إنفرتر شمسي هجين Deye Hybrid 8kW ثلاثي الأوجه', quantity: '1 جهاز', unitPrice: 14200, total: 14200 },
+          { name: 'بطارية ليثيوم Pylontech US5000 4.8kWh', quantity: '2 بطارية', unitPrice: 14300, total: 28600 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '3',
+    orderNumber: 'ORD-2025-395',
+    customerName: 'عبدالله الدوسري',
+    customerAvatarText: 'ع د',
+    city: 'مكة المكرمة',
+    address: 'جدة - حي الروضة، شارع الأمير سلطان',
+    totalAmount: 9650,
+    status: 'تم التسليم',
+    createdAt: '2025-05-13',
+    groups: [
+      {
+        supplierId: 'sup-4',
+        supplierName: 'نيرات الحلول للطاقة',
+        subtotal: 9650,
+        status: 'تم التسليم',
+        deliveryDate: '20 فبراير 2025',
+        customerConfirmation: 'تم الاستلام',
+        notes: 'تم التوصيل والتوقيع على إشعار الاستلام من العميل',
+        products: [
+          { name: 'منظم شحن شمسي Victron SmartSolar MPPT 150/70', quantity: '1 جهاز', unitPrice: 3250, total: 3250 },
+          { name: 'ألواح شمسية LONGI Hi-MO 6 Explorer 575W', quantity: '10 ألواح', unitPrice: 640, total: 6400 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '4',
+    orderNumber: 'ORD-2025-391',
+    customerName: 'سارة القحطاني',
+    customerAvatarText: 'س ق',
+    city: 'القصيم',
+    address: 'بريدة - طريق الملك فهد',
+    totalAmount: 31200,
+    status: 'مكتمل',
+    createdAt: '2025-05-13',
+    groups: [
+      {
+        supplierId: 'sup-5',
+        supplierName: 'مجموعة الأمانة الكهروضوئية',
+        subtotal: 31200,
+        status: 'تم التسليم',
+        deliveryDate: '18 فبراير 2025',
+        customerConfirmation: 'تم الاستلام',
+        notes: 'طلب مكتمل وتم تحويل مستحقات المورد',
+        products: [
+          { name: 'مضخة مياه شمسية غاطسة Grundfos SQFlex', quantity: '1 منظومة', unitPrice: 31200, total: 31200 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '5',
+    orderNumber: 'ORD-2025-388',
+    customerName: 'ماجد الغامدي',
+    customerAvatarText: 'م غ',
+    city: 'الرياض',
+    address: 'الرياض - حي الياسمين',
+    totalAmount: 15300,
+    status: 'قيد المعالجة',
+    createdAt: '2025-05-12',
+    groups: [
+      {
+        supplierId: 'sup-1',
+        supplierName: 'شركة شمس الرياض للمهمات الكهروضوئية',
+        subtotal: 15300,
+        status: 'قيد التجهيز',
+        deliveryDate: '01 مارس 2025',
+        customerConfirmation: 'قيد الانتظار',
+        notes: 'قيد مراجعة وتجهيز الفاتورة الضريبية',
+        products: [
+          { name: 'إنفرتر مستقل Growatt SPF 5000 ES', quantity: '2 جهاز', unitPrice: 7650, total: 15300 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '6',
+    orderNumber: 'ORD-2025-384',
+    customerName: 'ريم الحربي',
+    customerAvatarText: 'ر ح',
+    city: 'عسير',
+    address: 'أبها - حي الخالدية',
+    totalAmount: 64500,
+    status: 'ملغي',
+    createdAt: '2025-05-11',
+    groups: [
+      {
+        supplierId: 'sup-2',
+        supplierName: 'المتجر السعودي للبطاريات',
+        subtotal: 64500,
+        status: 'ملغي',
+        deliveryDate: 'غير محدد',
+        customerConfirmation: 'مرفوض',
+        notes: 'تم إلغاء الطلب بناءً على رغبة العميل وإعادة المبلغ للمحفظة',
+        products: [
+          { name: 'بنك بطاريات ليثيوم صناعية 15kWh', quantity: '1 بنك', unitPrice: 64500, total: 64500 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '7',
+    orderNumber: 'ORD-2025-380',
+    customerName: 'خالد الشمري',
+    customerAvatarText: 'خ ش',
+    city: 'القصيم',
+    address: 'عنيزة - حي الفاخرية',
+    totalAmount: 8900,
+    status: 'قيد التجهيز والشحن',
+    createdAt: '2025-05-10',
+    groups: [
+      {
+        supplierId: 'sup-3',
+        supplierName: 'طاقة الصحراء المتقدمة',
+        subtotal: 8900,
+        status: 'قيد التجهيز',
+        deliveryDate: '02 مارس 2025',
+        customerConfirmation: 'قيد الانتظار',
+        notes: 'تم تأكيد التجهيز وجارٍ تسليم الشحنة لمندوب التوصيل',
+        products: [
+          { name: 'هياكل تثبيت أسطح قرميد متطورة', quantity: '4 أطقم', unitPrice: 2225, total: 8900 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '8',
+    orderNumber: 'ORD-2025-376',
+    customerName: 'محمد الشهري',
+    customerAvatarText: 'م ش',
+    city: 'المدينة المنورة',
+    address: 'المدينة المنورة - حي سلطانة',
+    totalAmount: 23750,
+    status: 'تم التسليم',
+    createdAt: '2025-05-09',
+    groups: [
+      {
+        supplierId: 'sup-4',
+        supplierName: 'تقنيات الهجين للتوليد',
+        subtotal: 23750,
+        status: 'تم التسليم',
+        deliveryDate: '15 فبراير 2025',
+        customerConfirmation: 'تم الاستلام',
+        notes: 'استلم العميل كامل المنظومة مع الضمان المعتمد',
+        products: [
+          { name: 'إنفرتر ذكي Huawei SUN2000-10KTL-M1', quantity: '1 جهاز', unitPrice: 16500, total: 16500 },
+          { name: 'قواطع دي سي وحماية صواعق', quantity: '1 طقم', unitPrice: 7250, total: 7250 },
+        ],
+      },
+    ],
+  },
+])
+
+const filteredOrders = computed(() => {
+  return orders.value.filter((item) => {
+    const matchesSearch =
+      !searchQuery.value ||
+      item.orderNumber.includes(searchQuery.value) ||
+      item.customerName.includes(searchQuery.value) ||
+      item.city.includes(searchQuery.value)
+
+    const matchesStatus =
+      selectedStatus.value === 'all' || item.status === selectedStatus.value
+
+    return matchesSearch && matchesStatus
+  })
+})
+
+function openOrderDetails(order: AdminOrder) {
+  selectedOrder.value = order
+  isDetailsModalOpen.value = true
+}
+</script>
+
+<template>
+  <div class="flex flex-col gap-6">
+    <!-- كارد إدارة طلبات الشراء -->
+    <div class="solar-card p-5 sm:p-7">
+      <!-- رأس الصفحة -->
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-solar-border-card/60 pb-6">
+        <div>
+          <h1 class="text-xl sm:text-2xl font-black text-solar-text-heading">إدارة طلبات الشراء</h1>
+          <p class="mt-1 text-xs sm:text-sm text-solar-text-muted">
+            عرض ومتابعة طلبات الشراء متعددة المتاجر، وتفاصيل التوريد والتسليم.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="btn-outline h-11 px-4 text-xs font-bold gap-2 self-start sm:self-auto"
+        >
+          <Download class="size-4" />
+          <span>تصدير القائمة</span>
+        </button>
+      </div>
+
+      <!-- الفلاتر والبحث -->
+      <div class="mt-6 grid gap-3 sm:grid-cols-12">
+        <div class="relative sm:col-span-8">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="ابحث برقم الطلب، اسم العميل، أو المحافظة..."
+            class="solar-input h-11 pr-10 text-xs"
+          />
+          <Search class="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-solar-text-muted" />
+        </div>
+
+        <div class="sm:col-span-4">
+          <select v-model="selectedStatus" class="solar-input h-11 text-xs">
+            <option value="all">كافة الحالات</option>
+            <option value="قيد المعالجة">قيد المعالجة</option>
+            <option value="قيد التجهيز والشحن">قيد التجهيز والشحن</option>
+            <option value="تم التسليم">تم التسليم</option>
+            <option value="مكتمل">مكتمل</option>
+            <option value="ملغي">ملغي</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- جدول الطلبات -->
+      <div class="mt-6 overflow-x-auto rounded-xl border border-solar-border-card/80">
+        <table class="w-full text-right text-xs">
+          <thead class="bg-solar-bg-subtle/70 text-solar-text-muted font-bold border-b border-solar-border-card">
+            <tr>
+              <th class="py-3.5 px-4 font-bold">رقم الطلب</th>
+              <th class="py-3.5 px-4 font-bold">العميل</th>
+              <th class="py-3.5 px-4 font-bold">محافظة التسليم</th>
+              <th class="py-3.5 px-4 font-bold">إجمالي الطلب</th>
+              <th class="py-3.5 px-4 font-bold">عنوان التسليم</th>
+              <th class="py-3.5 px-4 font-bold text-center">حالة الطلب</th>
+              <th class="py-3.5 px-4 font-bold text-center">الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-solar-border-card/60">
+            <tr
+              v-for="item in filteredOrders"
+              :key="item.id"
+              class="transition-colors hover:bg-solar-bg-subtle/30"
+            >
+              <!-- رقم الطلب -->
+              <td class="py-3.5 px-4 font-bold font-mono text-solar-navy-dark">
+                #{{ item.orderNumber }}
+              </td>
+
+              <!-- العميل -->
+              <td class="py-3.5 px-4">
+                <div class="flex items-center gap-2.5">
+                  <div class="flex size-7 shrink-0 items-center justify-center rounded-full bg-solar-yellow/30 text-solar-navy-dark font-black text-[10px]">
+                    {{ item.customerAvatarText }}
+                  </div>
+                  <span class="font-extrabold text-solar-text-heading">{{ item.customerName }}</span>
+                </div>
+              </td>
+
+              <!-- محافظة التسليم -->
+              <td class="py-3.5 px-4 font-medium text-solar-text-body">
+                {{ item.city }}
+              </td>
+
+              <!-- إجمالي الطلب -->
+              <td class="py-3.5 px-4 font-black font-mono text-solar-text-heading">
+                {{ item.totalAmount.toLocaleString() }} ر.س
+              </td>
+
+              <!-- عنوان التسليم -->
+              <td class="py-3.5 px-4 text-solar-text-muted max-w-xs truncate">
+                {{ item.address }}
+              </td>
+
+              <!-- حالة الطلب -->
+              <td class="py-3.5 px-4 text-center">
+                <AdminBadge :status="item.status" />
+              </td>
+
+              <!-- الإجراءات -->
+              <td class="py-3.5 px-4 text-center">
+                <button
+                  type="button"
+                  @click="openOrderDetails(item)"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-bold text-solar-text-heading hover:bg-solar-bg-subtle hover:border-solar-yellow transition-all shadow-2xs"
+                >
+                  <Eye class="size-3.5" />
+                  <span>عرض التفاصيل</span>
+                </button>
+              </td>
+            </tr>
+
+            <tr v-if="!filteredOrders.length">
+              <td colspan="7" class="py-12 text-center text-solar-text-muted">
+                لا توجد طلبات شراء مطابقة للبحث.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- الترقيم والتقدم أسفل الجدول -->
+      <AdminPagination
+        v-model:current-page="currentPage"
+        :total-pages="4"
+        :total-count="48"
+        :page-size="8"
+        item-name="طلب شراء"
+      />
+    </div>
+
+    <!-- نافذة تفاصيل طلب الشراء والموردين -->
+    <OrderDetailsModal
+      v-model="isDetailsModalOpen"
+      :order="selectedOrder"
+    />
+  </div>
+</template>

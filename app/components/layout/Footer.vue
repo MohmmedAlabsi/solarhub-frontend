@@ -6,6 +6,8 @@ const quickLinks = [
   { label: 'كتالوج المنتجات والأنظمة', to: '/products' },
   { label: 'دليل المهندسين المعتمدين', to: '/engineers' },
   { label: 'المتاجر والوكلاء المعتمدون', to: '/stores' },
+  { label: 'بوابة العميل', to: '/customer/dashboard' },
+  { label: 'لوحة تحكم الإدارة (الأدمن)', to: '/admin' },
   { label: 'عن سولار هب ورؤيتنا', to: '/about' },
 ]
 
