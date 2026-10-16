@@ -15,6 +15,12 @@
     overflow-x: clip;
   }
 
+  /* The customer layout owns scrolling, matching main's independent content panel. */
+  .customer-portal {
+    height: 100%;
+    overflow: clip;
+  }
+
   /* تخصيص شريط التمرير (Custom Scrollbar) ليكون عصرياً ونحيفاً ومريحاً للعين */
   ::-webkit-scrollbar {
     width: 6px;

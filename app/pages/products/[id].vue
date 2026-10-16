@@ -20,7 +20,9 @@ const authModal = useAuthModal()
 
 // البحث عن المنتج أو استخدام أول منتج كافتراضي
 const product = computed(() => {
-  return visitorProducts.find(p => p.id === productId) || visitorProducts[0]
+  const match = visitorProducts.find(p => p.id === productId) || visitorProducts[0]
+  if (!match) throw createError({ statusCode: 404, statusMessage: 'Not Found' })
+  return match
 })
 
 useSeoMeta({

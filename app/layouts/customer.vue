@@ -1,103 +1,123 @@
 <script setup lang="ts">
-const route = useRoute()
+import AppToast from '../components/common/AppToast.vue'
+import CustomerFooter from '../components/customer/CustomerFooter.vue'
+import CustomerHeader from '../components/customer/CustomerHeader.vue'
+import CustomerSidebar from '../components/customer/CustomerSidebar.vue'
 
-// حالة طي السايدبار المكتبي
+const route = useRoute()
+const flatShell = computed(() => route.meta.customerShell === 'flat')
+useHead({ htmlAttrs: { class: 'customer-portal' }, bodyAttrs: { class: 'customer-portal' } })
 const isCollapsed = ref(false)
-// حالة فتح الدرج الجانبي في الشاشات الصغيرة
 const isMobileOpen = ref(false)
+const noticeMessage = ref('')
+const drawerPanel = ref<HTMLElement>()
+const contentScroll = ref<HTMLElement>()
+const scrollPositions = new Map<string, number>()
+let returnFocus: HTMLElement | null = null
+let desktopMedia: MediaQueryList | undefined
+let noticeTimeout: ReturnType<typeof setTimeout> | undefined
+
+const handleKeydown = (event: KeyboardEvent) => {
+  if (isMobileOpen.value) {
+    if (event.key === 'Escape') { event.preventDefault(); isMobileOpen.value = false }
+    if (event.key === 'Tab') {
+      const focusable = drawerPanel.value?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex="0"]')
+      const first = focusable?.[0]
+      const last = focusable?.[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+    }
+    return
+  }
+  const editing = event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable="true"]')
+  if (!editing && desktopMedia?.matches && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') {
+    event.preventDefault()
+    toggleSidebar()
+  }
+}
+const handleDesktopChange = () => { if (desktopMedia?.matches) isMobileOpen.value = false }
 
 onMounted(() => {
-  const savedState = localStorage.getItem('solar_sidebar_collapsed')
-  if (savedState !== null) {
-    isCollapsed.value = savedState === 'true'
-  }
-
-  // إغلاق الدرج عند الضغط على زر Esc + اختصار Ctrl+B لطي/توسيع السايدبار
-  const handleKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && isMobileOpen.value) {
-      isMobileOpen.value = false
-    }
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
-      e.preventDefault()
-      toggleSidebar()
-    }
-  }
+  try {
+    const savedState = localStorage.getItem('solar_sidebar_collapsed')
+    if (savedState !== null) isCollapsed.value = savedState === 'true'
+  } catch { /* Layout preferences remain usable when browser storage is unavailable. */ }
+  desktopMedia = window.matchMedia('(min-width: 1024px)')
+  desktopMedia.addEventListener('change', handleDesktopChange)
   window.addEventListener('keydown', handleKeydown)
-  onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 })
 
-// إغلاق الدرج الجانبي تلقائياً عند تغيير الصفحة في الهواتف
-watch(
-  () => route.fullPath,
-  () => {
-    isMobileOpen.value = false
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  desktopMedia?.removeEventListener('change', handleDesktopChange)
+  if (noticeTimeout) clearTimeout(noticeTimeout)
+})
+
+watch(() => route.fullPath, async (path, previous) => {
+  isMobileOpen.value = false
+  const previousTop = contentScroll.value?.scrollTop ?? 0
+  scrollPositions.set(previous, previousTop)
+  await nextTick()
+  const samePage = path.split('?')[0] === previous.split('?')[0]
+  contentScroll.value?.scrollTo({ top: scrollPositions.get(path) ?? (samePage ? previousTop : 0), behavior: 'auto' })
+})
+watch(isMobileOpen, async open => {
+  if (open) {
+    returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    await nextTick()
+    drawerPanel.value?.querySelector<HTMLElement>('[data-drawer-close]')?.focus()
+  } else {
+    await nextTick()
+    returnFocus?.focus()
+    returnFocus = null
   }
-)
+})
 
-function toggleSidebar() {
+const toggleSidebar = () => {
   isCollapsed.value = !isCollapsed.value
-  localStorage.setItem('solar_sidebar_collapsed', String(isCollapsed.value))
+  try { localStorage.setItem('solar_sidebar_collapsed', String(isCollapsed.value)) } catch { /* In-memory preference remains active. */ }
 }
-
-function toggleMobile() {
-  isMobileOpen.value = !isMobileOpen.value
+const toggleMobile = () => { isMobileOpen.value = !isMobileOpen.value }
+const showUnavailable = (label: string) => {
+  noticeMessage.value = `${label} — ستتوفر هذه الصفحة لاحقًا.`
+  if (noticeTimeout) clearTimeout(noticeTimeout)
+  noticeTimeout = setTimeout(() => { noticeMessage.value = '' }, 3500)
 }
 </script>
 
 <template>
-  <div dir="rtl" class="flex h-screen w-full max-w-full overflow-hidden bg-solar-bg-page text-solar-text-heading antialiased selection:bg-solar-yellow selection:text-solar-navy-dark">
-    <!-- 1. السايدبار المكتبي العائم الأنيق الثابت في مكانه (Floating Island Sidebar) -->
-    <div class="hidden lg:block shrink-0 h-screen p-3 z-50 overflow-visible sticky top-0">
-      <CustomerSidebar
-        :is-collapsed="isCollapsed"
-        @toggle="toggleSidebar"
-      />
+  <div dir="rtl" :class="{ 'customer-shell-flat': flatShell }" class="flex h-dvh w-full max-w-full overflow-hidden bg-solar-bg-page text-solar-text-heading antialiased selection:bg-solar-yellow selection:text-solar-navy-dark">
+    <a href="#customer-main" class="sr-only z-[100] rounded-lg bg-solar-navy-dark px-4 py-3 text-white focus:not-sr-only focus:fixed focus:right-4 focus:top-4">تخطي إلى المحتوى</a>
+    <div :inert="isMobileOpen" class="sticky top-0 z-50 hidden h-dvh shrink-0 overflow-visible transition-all duration-300 lg:block" :class="flatShell ? 'p-0' : 'p-3'">
+      <CustomerSidebar :is-collapsed="isCollapsed" :flat="flatShell" @toggle="toggleSidebar" @unavailable="showUnavailable" />
     </div>
 
-    <!-- 2. السايدبار المتجاوب للأجهزة الذكية واللوحية (Mobile/Tablet Drawer) -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition duration-300 ease-out"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition duration-200 ease-in"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
-        <div
-          v-if="isMobileOpen"
-          class="fixed inset-0 z-50 flex lg:hidden"
-        >
-          <!-- خلفية التعتيم الضبابي -->
-          <div
-            class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-            @click="isMobileOpen = false"
-          />
-
-          <!-- لوحة الدرج الجانبي المنزلق من اليمين (RTL) -->
-          <div class="relative flex w-72 max-w-[85vw] flex-col bg-solar-navy shadow-2xl z-10 h-screen overflow-hidden">
-            <CustomerSidebar
-              :is-collapsed="false"
-              :is-mobile="true"
-              @close-mobile="isMobileOpen = false"
-            />
+      <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+        <div v-if="isMobileOpen" id="customer-mobile-navigation" role="dialog" aria-modal="true" aria-label="قائمة تنقل العميل" class="fixed inset-0 z-[60] flex lg:hidden">
+          <button type="button" tabindex="-1" class="fixed inset-0 bg-black/60 backdrop-blur-sm" aria-label="إغلاق القائمة" @click="isMobileOpen = false" />
+          <div ref="drawerPanel" class="relative z-10 flex h-dvh w-72 max-w-[85vw] flex-col overflow-hidden bg-solar-navy shadow-2xl">
+            <CustomerSidebar :is-collapsed="false" :flat="flatShell" is-mobile @close-mobile="isMobileOpen = false" @unavailable="showUnavailable" />
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- 3. جسم الصفحة المتحرك (هو فقط الذي يحتوي على شريط التمرير الرأسي حسب حجم المحتوى) -->
-    <div class="flex flex-1 flex-col h-screen min-w-0 overflow-y-auto overflow-x-hidden">
-      <!-- رأس الصفحة الثابت في أعلى منطقة المحتوى -->
-      <CustomerHeader @toggle-mobile-menu="toggleMobile" />
-
-      <!-- المحتوى الرئيسي المتكيف والقابل للتمرير -->
-      <main class="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-5 md:p-6 lg:p-8">
+    <div ref="contentScroll" :inert="isMobileOpen" class="flex h-dvh min-w-0 flex-1 scroll-pt-20 flex-col overflow-x-hidden overflow-y-auto" :class="{ '[scrollbar-width:none]': flatShell }">
+      <CustomerHeader :flat="flatShell" :is-mobile-open="isMobileOpen" @toggle-mobile-menu="toggleMobile" @unavailable="showUnavailable" />
+      <main id="customer-main" tabindex="-1" class="mx-auto w-full max-w-7xl flex-1 focus:outline-none" :class="flatShell ? 'px-4 pb-6 pt-6 sm:px-6 lg:px-10' : 'p-3 sm:p-5 md:p-6 lg:p-8'">
         <slot />
       </main>
-
-      <!-- تذييل الصفحة من أصل الصفحة نفسها في أسفل المحتوى -->
-      <CustomerFooter class="mt-auto w-full shrink-0" />
+      <CustomerFooter :flat="flatShell" class="mt-auto w-full shrink-0" @unavailable="showUnavailable" />
     </div>
+    <AppToast :message="noticeMessage" />
   </div>
 </template>
+
+<style scoped>
+@font-face { font-family: "SolarHub Service Arabic"; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/ibm-plex-sans-arabic/Bold.ttf') format('truetype'); }
+@font-face { font-family: "SolarHub Service Arabic"; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/ibm-plex-sans-arabic/SemiBold.ttf') format('truetype'); }
+@font-face { font-family: "SolarHub Service Arabic"; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/ibm-plex-sans-arabic/Medium.ttf') format('truetype'); }
+@font-face { font-family: "SolarHub Service Arabic"; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/ibm-plex-sans-arabic/Regular.ttf') format('truetype'); }
+.customer-shell-flat { position: fixed; inset: 0; overflow: clip; font-family: "SolarHub Service Arabic", "IBM Plex Sans Arabic", sans-serif; }
+</style>

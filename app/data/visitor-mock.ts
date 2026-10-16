@@ -48,7 +48,7 @@ export interface VisitorStore {
   legalName: string
   commercialReg: string
   weraLicense: string
-  badge: 'وكيل رسمي' | 'موزع معتمد' | 'متجر متخصص'
+  badge: 'وكيل رسمي' | 'موزع معتمد' | 'متجر متخصص' | 'وكيل معتمد' | 'موزع رئيسي'
   city: string
   address: string
   workingHours: string

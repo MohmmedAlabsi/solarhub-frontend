@@ -16,6 +16,7 @@ import {
   Zap,
 } from 'lucide-vue-next'
 import { useCartStore } from '~~/app/stores/cart.store'
+import type { Product } from '~~/types/ecommerce'
 
 definePageMeta({
   layout: 'customer',
@@ -27,10 +28,11 @@ const cartStore = useCartStore()
 const quantity = ref(1)
 const isAdded = ref(false)
 const showRfqModal = ref(false)
+const routeProductId = Array.isArray(route.params.id) ? (route.params.id[0] ?? '') : (route.params.id ?? '')
 
 // تفاصيل المنتج التجريبية الواقعية
 const product = ref({
-  id: route.params.id,
+  id: routeProductId,
   name: 'لوح طاقة شمسية مونوكريستالين Jinko Tiger Pro 585W ثنائي الأوجه عالي الكفاءة',
   category: 'ألواح كهروضوئية',
   brand: 'Jinko Solar',
@@ -62,8 +64,27 @@ const product = ref({
   },
 })
 
+const cartProduct = computed<Product>(() => ({
+  id: product.value.id,
+  name: product.value.name,
+  category: product.value.category,
+  categoryType: 'panel',
+  brand: product.value.brand,
+  model: product.value.model,
+  storeName: product.value.store.name,
+  storeCity: product.value.store.city,
+  price: product.value.price,
+  currency: product.value.currency,
+  rating: product.value.rating,
+  reviewsCount: product.value.reviewsCount,
+  image: product.value.image,
+  specs: { power: '585W', efficiency: '21.5%', warranty: '30 سنة' },
+  badge: product.value.badge,
+  inStock: true,
+}))
+
 function handleAddToCart() {
-  cartStore.addToCart(product.value as any, quantity.value)
+  cartStore.addToCart(cartProduct.value, quantity.value)
   isAdded.value = true
   setTimeout(() => {
     isAdded.value = false
@@ -132,7 +153,7 @@ function handleAddToCart() {
             <div class="flex items-center gap-2">
               <button
                 type="button"
-                @click="cartStore.toggleWishlist(product as any)"
+                @click="cartStore.toggleWishlist(cartProduct)"
                 class="flex size-9 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-muted hover:text-red-500"
               >
                 <Heart class="size-4" :class="cartStore.isInWishlist(product.id) ? 'fill-red-500 text-red-500' : ''" />
@@ -214,9 +235,11 @@ function handleAddToCart() {
 
     <!-- نافذة طلب عرض السعر -->
     <CustomerEcommerceRfqModal
-      :product="product as any"
+      :product="cartProduct"
       :is-open="showRfqModal"
       @close="showRfqModal = false"
     />
   </div>
 </template>
+
+

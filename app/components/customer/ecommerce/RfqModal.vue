@@ -2,6 +2,13 @@
 import { CheckCircle2, Send, X } from 'lucide-vue-next'
 import type { Product } from '~~/types/ecommerce'
 
+interface RfqSubmission {
+  product: Product | null
+  quantity: number
+  notes: string
+  city: string
+}
+
 const props = defineProps<{
   product: Product | null
   isOpen: boolean
@@ -9,7 +16,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submitted', rfqData: any): void
+  (e: 'submitted', rfqData: RfqSubmission): void
 }>()
 
 const quantity = ref(1)
@@ -120,3 +127,4 @@ function submitRfq() {
     </div>
   </div>
 </template>
+

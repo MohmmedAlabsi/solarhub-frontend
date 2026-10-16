@@ -24,7 +24,9 @@ const engineerId = route.params.id as string
 const authModal = useAuthModal()
 
 const engineer = computed(() => {
-  return visitorEngineers.find(e => e.id === engineerId) || visitorEngineers[0]
+  const match = visitorEngineers.find(e => e.id === engineerId) || visitorEngineers[0]
+  if (!match) throw createError({ statusCode: 404, statusMessage: 'Not Found' })
+  return match
 })
 
 useSeoMeta({

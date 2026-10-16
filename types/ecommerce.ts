@@ -21,6 +21,7 @@ export interface Product {
     power?: string
     efficiency?: string
     voltage?: string
+    current?: string
     capacity?: string
     warranty?: string
     origin?: string
@@ -103,3 +104,4 @@ export interface QuoteRequest {
   notes?: string
   targetLocation?: string
 }
+
