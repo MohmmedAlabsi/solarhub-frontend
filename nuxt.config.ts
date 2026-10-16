@@ -8,21 +8,41 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
   ],
 
-  // ربط ملف التنسيقات العام
-  css: ['~/assets/main.css'],
+  app: {
+    head: {
+      htmlAttrs: { lang: 'ar', dir: 'rtl' },
+      title: 'سولار هب | وجهتك الموثوقة لمنظومات الطاقة الشمسية',
+      meta: [
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'description', content: 'منصة سولار هب تجمع المتاجر والمهندسين المعتمدين ومنتجات الطاقة الشمسية في مكان واحد.' },
+        { name: 'theme-color', content: '#F2B705' },
+      ],
+      link: [
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap' },
+      ],
+    },
+  },
+
+  // ربط ملفات التنسيقات العامة ومتغيرات الهوية
+  css: [
+    '~/assets/design-tokens.css',
+    '~/assets/main.css',
+  ],
 
   // Laravel API المتغيرات البيئية ورابط
   runtimeConfig: {
     public: {
-      // Nuxt سيقوم بتحديث هذه القيمة تلقائياً من ملف .env
       apiBase: 'http://localhost:8000/api',
     }
   },
 
-  // الرندرة الهجينة: SSR للواجهة، و SPA للوحة التحكم
+  // سياسة الرندرة الهجينة (Hybrid Rendering Policy) حسب معايير سولار هب
   routeRules: {
     '/': { prerender: true },
     '/products/**': { swr: 3600 },
+    '/customer/**': { ssr: false },
     '/admin/**': { ssr: false },
     '/profile/**': { ssr: false },
   }
