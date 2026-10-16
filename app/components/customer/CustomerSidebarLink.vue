@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 
-const props = defineProps<{ label: string; to: string; icon: Component; collapsed: boolean; active: boolean }>()
+const props = defineProps<{ label: string; to: string; icon: Component; collapsed: boolean; active: boolean; compact?: boolean }>()
 const emit = defineEmits<{ navigate: [] }>()
 const tooltip = ref<{ top: number; right: number }>()
 function showTooltip(event: Event) {
@@ -14,7 +14,7 @@ watch(() => props.collapsed, hideTooltip)
 </script>
 
 <template>
-  <NuxtLink :to="to" :aria-label="label" :aria-current="active ? 'page' : undefined" class="group relative flex items-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-solar-navy" :class="[collapsed ? 'justify-center rounded-xl p-3' : 'gap-3.5 rounded-lg px-3.5 py-2.5 text-sm font-medium', active ? 'bg-solar-yellow font-bold text-solar-navy-dark shadow-sm' : 'text-white/80 hover:bg-white/10 hover:text-white']" @mouseenter="showTooltip" @mouseleave="hideTooltip" @focus="showTooltip" @blur="hideTooltip" @click="hideTooltip(); emit('navigate')">
+  <NuxtLink :to="to" :aria-label="label" :aria-current="active ? 'page' : undefined" class="group relative flex items-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-solar-navy" :class="[collapsed ? 'justify-center rounded-xl p-3' : compact ? 'h-10 gap-3 rounded-lg px-3.5 text-sm font-normal' : 'gap-3.5 rounded-lg px-3.5 py-2.5 text-sm font-medium', active ? 'bg-solar-yellow font-bold text-solar-navy-dark shadow-sm' : 'text-white/80 hover:bg-white/10 hover:text-white']" @mouseenter="showTooltip" @mouseleave="hideTooltip" @focus="showTooltip" @blur="hideTooltip" @click="hideTooltip(); emit('navigate')">
     <component :is="icon" class="size-5 shrink-0" aria-hidden="true" /><span v-if="!collapsed" class="truncate">{{ label }}</span>
   </NuxtLink>
   <Teleport to="body"><span v-if="collapsed && tooltip" class="pointer-events-none fixed z-[100] -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-solar-navy-dark px-3 py-1.5 text-xs font-bold text-white shadow-2xl drop-shadow-xl" :style="{ top: `${tooltip.top}px`, right: `${tooltip.right}px` }" aria-hidden="true">{{ label }}<span class="absolute -right-1 top-1/2 -translate-y-1/2 border-y-4 border-l-4 border-y-transparent border-l-solar-navy-dark" /></span></Teleport>

@@ -2,7 +2,7 @@
 import { Bell, ChevronDown, Menu, ShoppingCart, User } from 'lucide-vue-next'
 import { useCartStore } from '~~/app/stores/cart.store'
 
-withDefaults(defineProps<{ isMobileOpen?: boolean }>(), { isMobileOpen: false })
+withDefaults(defineProps<{ isMobileOpen?: boolean; flat?: boolean }>(), { isMobileOpen: false, flat: false })
 const emit = defineEmits<{
   (e: 'toggleMobileMenu'): void
   (e: 'unavailable', label: string): void
@@ -24,7 +24,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 flex h-16 sm:h-20 w-full shrink-0 items-center justify-between border-b border-solar-border-card bg-white px-3 sm:px-6 shadow-sm">
+  <header class="sticky top-0 z-30 flex w-full shrink-0 items-center justify-between bg-white px-3 sm:px-6" :class="flat ? 'h-16 shadow-[0_1px_5px_#0c253c04]' : 'h-16 border-b border-solar-border-card shadow-sm sm:h-20'">
     <!-- الجانب الأيمن (زر القائمة للشاشات الصغيرة + عنوان ترحيبي متجاوب) -->
     <div class="flex items-center gap-2 sm:gap-4">
       <button
@@ -38,7 +38,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
         <Menu class="size-5" />
       </button>
 
-      <div class="hidden sm:flex flex-col">
+      <div v-if="!flat" class="hidden sm:flex flex-col">
         <p class="text-sm sm:text-base font-bold text-solar-text-heading leading-tight">بوابة العميل | SolarHub</p>
         <p class="text-[11px] text-solar-text-muted">المنظومات وحلول الطاقة الكهروضوئية المعتمدة</p>
       </div>
@@ -54,7 +54,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
       <!-- زر الإشعارات -->
       <NuxtLink
         to="/customer/notifications"
-        class="relative flex size-9 sm:size-10 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-body transition-colors hover:border-solar-yellow hover:text-solar-text-heading"
+        class="relative flex size-9 sm:size-10 items-center justify-center text-solar-text-body transition-colors hover:text-solar-text-heading" :class="flat ? 'rounded-lg focus-visible:ring-2 focus-visible:ring-solar-yellow' : 'rounded-xl border border-solar-border-card hover:border-solar-yellow'"
         :aria-label="`مركز الإشعارات، ${unreadCount} غير مقروءة`"
       >
         <Bell class="size-4 sm:size-5" />
@@ -64,7 +64,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
       <!-- أيقونة سلة المشتريات التفاعلية مع العداد -->
       <NuxtLink
         to="/customer/cart"
-        class="relative flex size-9 sm:size-10 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-body transition-colors hover:border-solar-yellow hover:text-solar-text-heading"
+        class="relative flex size-9 sm:size-10 items-center justify-center text-solar-text-body transition-colors hover:text-solar-text-heading" :class="flat ? 'rounded-lg focus-visible:ring-2 focus-visible:ring-solar-yellow' : 'rounded-xl border border-solar-border-card hover:border-solar-yellow'"
         aria-label="سلة المشتريات"
       >
         <ShoppingCart class="size-4 sm:size-5" />
@@ -82,11 +82,11 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
           ref="accountButton"
           type="button"
           @click="isUserMenuOpen = !isUserMenuOpen"
-          class="flex items-center gap-1.5 sm:gap-2.5 rounded-xl border border-solar-border-card p-1 sm:p-1.5 pr-2 sm:pr-3 transition-colors hover:border-solar-yellow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow"
+          class="flex items-center gap-1.5 sm:gap-2.5 p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow" :class="flat ? 'rounded-lg' : 'rounded-xl border border-solar-border-card pr-2 hover:border-solar-yellow sm:p-1.5 sm:pr-3'"
           :aria-expanded="isUserMenuOpen"
           aria-controls="customer-account-menu"
         >
-          <div class="flex size-7 sm:size-8 items-center justify-center rounded-lg bg-solar-navy text-white">
+          <div class="flex size-7 sm:size-8 items-center justify-center bg-solar-navy text-white" :class="flat ? 'rounded-full' : 'rounded-lg'">
             <User class="size-3.5 sm:size-4" />
           </div>
           <div class="text-right flex flex-col leading-tight">
