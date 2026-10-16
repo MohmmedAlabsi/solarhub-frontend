@@ -1,10 +1,19 @@
-import process from 'node:process'
-
 export default defineNuxtConfig({
   compatibilityDate: '2024-04-03',
   // Disabled by default because @nuxt/devtools 3.4.2 currently emits a Vite 8
   // configResolved warning. Opt in locally with NUXT_DEVTOOLS=true.
-  devtools: { enabled: process.env.NUXT_DEVTOOLS === 'true' },
+  devtools: { enabled: false },
+
+  devServer: {
+    loadingTemplate: () => '',
+  },
+  spaLoadingTemplate: false,
+
+  typescript: {
+    typeCheck: false,
+    strict: false,
+    shim: false,
+  },
 
   // @nuxtjs/tailwindcss 6.14 injects tailwindcss/nesting, which Tailwind
   // 3.4 no longer exposes to Nuxt 4/Vite 8. Keep nesting support through the
@@ -54,7 +63,6 @@ export default defineNuxtConfig({
 
   // سياسة الرندرة الهجينة (Hybrid Rendering Policy) حسب معايير سولار هب
   routeRules: {
-    '/': { prerender: true },
     '/products/**': { swr: 3600 },
     '/customer/**': { ssr: false },
     '/auth/**': { ssr: false },

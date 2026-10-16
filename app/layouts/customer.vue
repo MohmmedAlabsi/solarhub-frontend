@@ -5,7 +5,6 @@ import CustomerHeader from '../components/customer/CustomerHeader.vue'
 import CustomerSidebar from '../components/customer/CustomerSidebar.vue'
 
 const route = useRoute()
-const flatShell = computed(() => route.meta.customerShell === 'flat')
 useHead({ htmlAttrs: { class: 'customer-portal' }, bodyAttrs: { class: 'customer-portal' } })
 const isCollapsed = ref(false)
 const isMobileOpen = ref(false)
@@ -86,10 +85,10 @@ const showUnavailable = (label: string) => {
 </script>
 
 <template>
-  <div dir="rtl" :class="{ 'customer-shell-flat': flatShell }" class="flex h-dvh w-full max-w-full overflow-hidden bg-solar-bg-page text-solar-text-heading antialiased selection:bg-solar-yellow selection:text-solar-navy-dark">
+  <div dir="rtl" class="flex h-dvh w-full max-w-full overflow-hidden bg-solar-bg-page text-solar-text-heading antialiased selection:bg-solar-yellow selection:text-solar-navy-dark">
     <a href="#customer-main" class="sr-only z-[100] rounded-lg bg-solar-navy-dark px-4 py-3 text-white focus:not-sr-only focus:fixed focus:right-4 focus:top-4">تخطي إلى المحتوى</a>
-    <div :inert="isMobileOpen" class="sticky top-0 z-50 hidden h-dvh shrink-0 overflow-visible transition-all duration-300 lg:block" :class="flatShell ? 'p-0' : 'p-3'">
-      <CustomerSidebar :is-collapsed="isCollapsed" :flat="flatShell" @toggle="toggleSidebar" @unavailable="showUnavailable" />
+    <div :inert="isMobileOpen" class="sticky top-0 z-50 hidden h-dvh shrink-0 overflow-visible transition-all duration-300 lg:block p-3">
+      <CustomerSidebar :is-collapsed="isCollapsed" @toggle="toggleSidebar" @unavailable="showUnavailable" />
     </div>
 
     <Teleport to="body">
@@ -97,27 +96,19 @@ const showUnavailable = (label: string) => {
         <div v-if="isMobileOpen" id="customer-mobile-navigation" role="dialog" aria-modal="true" aria-label="قائمة تنقل العميل" class="fixed inset-0 z-[60] flex lg:hidden">
           <button type="button" tabindex="-1" class="fixed inset-0 bg-black/60 backdrop-blur-sm" aria-label="إغلاق القائمة" @click="isMobileOpen = false" />
           <div ref="drawerPanel" class="relative z-10 flex h-dvh w-72 max-w-[85vw] flex-col overflow-hidden bg-solar-navy shadow-2xl">
-            <CustomerSidebar :is-collapsed="false" :flat="flatShell" is-mobile @close-mobile="isMobileOpen = false" @unavailable="showUnavailable" />
+            <CustomerSidebar :is-collapsed="false" is-mobile @close-mobile="isMobileOpen = false" @unavailable="showUnavailable" />
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <div ref="contentScroll" :inert="isMobileOpen" class="flex h-dvh min-w-0 flex-1 scroll-pt-20 flex-col overflow-x-hidden overflow-y-auto" :class="{ '[scrollbar-width:none]': flatShell }">
-      <CustomerHeader :flat="flatShell" :is-mobile-open="isMobileOpen" @toggle-mobile-menu="toggleMobile" @unavailable="showUnavailable" />
-      <main id="customer-main" tabindex="-1" class="mx-auto w-full max-w-7xl flex-1 focus:outline-none" :class="flatShell ? 'px-4 pb-6 pt-6 sm:px-6 lg:px-10' : 'p-3 sm:p-5 md:p-6 lg:p-8'">
+    <div ref="contentScroll" :inert="isMobileOpen" class="flex h-dvh min-w-0 flex-1 scroll-pt-20 flex-col overflow-x-hidden overflow-y-auto">
+      <CustomerHeader :is-mobile-open="isMobileOpen" @toggle-mobile-menu="toggleMobile" @unavailable="showUnavailable" />
+      <main id="customer-main" tabindex="-1" class="mx-auto w-full max-w-7xl flex-1 focus:outline-none p-3 sm:p-5 md:p-6 lg:p-8">
         <slot />
       </main>
-      <CustomerFooter :flat="flatShell" class="mt-auto w-full shrink-0" @unavailable="showUnavailable" />
+      <CustomerFooter class="mt-auto w-full shrink-0" @unavailable="showUnavailable" />
     </div>
     <AppToast :message="noticeMessage" />
   </div>
 </template>
-
-<style scoped>
-@font-face { font-family: "SolarHub Service Arabic"; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/ibm-plex-sans-arabic/Bold.ttf') format('truetype'); }
-@font-face { font-family: "SolarHub Service Arabic"; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/ibm-plex-sans-arabic/SemiBold.ttf') format('truetype'); }
-@font-face { font-family: "SolarHub Service Arabic"; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/ibm-plex-sans-arabic/Medium.ttf') format('truetype'); }
-@font-face { font-family: "SolarHub Service Arabic"; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/ibm-plex-sans-arabic/Regular.ttf') format('truetype'); }
-.customer-shell-flat { position: fixed; inset: 0; overflow: clip; font-family: "SolarHub Service Arabic", "IBM Plex Sans Arabic", sans-serif; }
-</style>

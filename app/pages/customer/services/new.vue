@@ -2,7 +2,7 @@
 import { Home, Info } from 'lucide-vue-next'
 import ServiceRequestForm from '../../../components/customer/services/ServiceRequestForm.vue'
 
-definePageMeta({ layout: 'customer', customerShell: 'flat' })
+definePageMeta({ layout: 'customer' })
 useSeoMeta({ title: 'طلب خدمة هندسية جديدة | SolarHub' })
 </script>
 
