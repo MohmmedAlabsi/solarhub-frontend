@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckCheck, Send } from 'lucide-vue-next'
+import { CheckCheck } from 'lucide-vue-next'
 import NotificationEmptyState from '../../../components/customer/notifications/NotificationEmptyState.vue'
 import NotificationLoadState from '../../../components/customer/notifications/NotificationLoadState.vue'
 import NotificationItem from '../../../components/customer/notifications/NotificationItem.vue'
@@ -13,7 +13,7 @@ const { notifications, totalCount, unreadCount, sentCount, activeTab, overview, 
 
 <template>
   <div class="flex min-w-0 flex-col gap-6">
-    <div class="flex flex-wrap items-center justify-between gap-3"><nav class="flex items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل"><NuxtLink to="/customer/dashboard">الرئيسية</NuxtLink><span>‹</span><span class="font-bold text-solar-text-heading">مركز الإشعارات</span></nav><NuxtLink v-if="activeTab === 'sent'" to="/customer/services/new" class="btn-dark text-xs"><Send class="size-4" aria-hidden="true" />إرسال طلب جديد</NuxtLink><button v-else-if="showReadAction" type="button" :disabled="!unreadCount" class="btn-dark text-xs disabled:opacity-50" @click="markAllRead"><CheckCheck class="size-4" aria-hidden="true" />تحديد الكل كمقروء</button></div>
+    <div class="flex flex-wrap items-center justify-between gap-3"><nav class="flex items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل"><NuxtLink to="/customer/dashboard">الرئيسية</NuxtLink><span>‹</span><span class="font-bold text-solar-text-heading">مركز الإشعارات</span></nav><button v-if="activeTab !== 'sent' && showReadAction" type="button" :disabled="!unreadCount" class="btn-dark text-xs disabled:opacity-50" @click="markAllRead"><CheckCheck class="size-4" aria-hidden="true" />تحديد الكل كمقروء</button></div>
     <NotificationOverview :summary="overview" />
     <NotificationTabs v-if="showTabs" :active-tab="activeTab" :total-count="totalCount" :unread-count="unreadCount" :sent-count="sentCount" @select="selectTab" />
     <NotificationLoadState v-if="viewState === 'loading' || viewState === 'error'" :status="viewState" @retry="retryNotifications" />
