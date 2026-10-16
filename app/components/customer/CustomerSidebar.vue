@@ -147,11 +147,13 @@ function handleLinkClick() {
         <LogOut class="size-5 shrink-0" />
         <span v-if="!isCollapsed || isMobile" class="truncate">تسجيل الخروج</span>
 
+        <!-- Tooltip لتسجيل الخروج -->
         <div
           v-if="isCollapsed && !isMobile"
-          class="pointer-events-none absolute right-full mr-2 z-50 hidden rounded-md bg-red-950 px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg whitespace-nowrap group-hover:block"
+          class="pointer-events-none absolute right-full mr-3.5 top-1/2 -translate-y-1/2 z-[100] hidden group-hover:flex items-center rounded-lg bg-rose-950 px-3 py-1.5 text-xs font-bold text-rose-100 shadow-2xl border border-rose-500/20 whitespace-nowrap drop-shadow-xl"
         >
-          تسجيل الخروج
+          <span>تسجيل الخروج</span>
+          <span class="absolute -right-1 top-1/2 -translate-y-1/2 border-y-4 border-y-transparent border-l-4 border-l-rose-950" />
         </div>
       </button>
     </div>

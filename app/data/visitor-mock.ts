@@ -1,0 +1,553 @@
+export interface VisitorProduct {
+  id: string
+  name: string
+  category: string
+  categoryType: 'panel' | 'inverter' | 'battery' | 'pump' | 'controller' | 'kit'
+  brand: string
+  model: string
+  sku: string
+  storeName: string
+  storeId: string
+  storeCity: string
+  rating: number
+  reviewsCount: number
+  image: string
+  gallery?: string[]
+  badge?: string
+  tierBadge?: string
+  warranty?: string
+  inStock: boolean
+  stockCount?: number
+  priceEstimate?: string
+  specsTable?: { label: string; value: string }[]
+}
+
+export interface VisitorEngineer {
+  id: string
+  name: string
+  title: string
+  specialty: string
+  city: string
+  experience: string
+  license: string
+  rating: number
+  reviewsCount: number
+  projectsCount: number
+  complianceRate: string
+  responseSpeed: string
+  avatar: string
+  verified: boolean
+  bio: string
+  specialties: { icon: string; title: string; desc: string }[]
+  workflowSteps: { step: number; title: string; desc: string }[]
+}
+
+export interface VisitorStore {
+  id: string
+  name: string
+  legalName: string
+  commercialReg: string
+  weraLicense: string
+  badge: 'وكيل رسمي' | 'موزع معتمد' | 'متجر متخصص' | 'وكيل معتمد' | 'موزع رئيسي'
+  city: string
+  address: string
+  workingHours: string
+  phone: string
+  whatsapp: string
+  rating: number
+  reviewsCount: number
+  productsCount: number
+  inStockCount: number
+  logo: string
+  description: string
+  tags: string[]
+  brands: string[]
+}
+
+export const visitorProducts: VisitorProduct[] = [
+  {
+    id: 'jinko-tiger-pro-585w',
+    name: 'لوح طاقة شمسية Jinko Tiger Pro 585W ثنائي الوجه N-Type',
+    category: 'ألواح كهروضوئية',
+    categoryType: 'panel',
+    brand: 'Jinko Solar',
+    model: 'JKM585M-72HL4-BDVP',
+    sku: 'SH-JNK-585',
+    storeName: 'شركة شمس الرياض للمهمات الكهروضوئية',
+    storeId: 'shams-alriyadh',
+    storeCity: 'الرياض - حي السلي الصناعي',
+    rating: 4.9,
+    reviewsCount: 184,
+    image: '/images/product-panel.png',
+    gallery: ['/images/product-panel.png', '/images/hero-solar.png'],
+    badge: 'كفاءة فائقة N-Type',
+    tierBadge: 'Tier 1 Global',
+    warranty: 'ضمان 25 سنة',
+    inStock: true,
+    stockCount: 1420,
+    priceEstimate: 'تنافسي عند طلب العرض',
+    specsTable: [
+      { label: 'القدرة القصوى الاسمية (Pmax)', value: '585 واط ذروي (Wp)' },
+      { label: 'جهد الدائرة المفتوحة (Voc)', value: '51.48 فولت (V)' },
+      { label: 'نوع وتقنية الخلايا', value: 'N-Type Monocrystalline (TOPCon)' },
+      { label: 'تيار دائرة القصر (Isc)', value: '14.42 أمبير (A)' },
+      { label: 'كفاءة اللوح الشمسي الكلية', value: '22.65%' },
+      { label: 'الأبعاد الفيزيائية', value: '2278 × 1134 × 30 mm' },
+      { label: 'جهد أقصى قدرة (Vmp)', value: '43.15 فولت (V)' },
+      { label: 'الوزن والزجاج', value: '32.0 كجم (زجاج مزدوج مقوّى 2.0+2.0 مم)' },
+      { label: 'تيار أقصى قدرة (Imp)', value: '13.56 أمبير (A)' },
+      { label: 'درجة الحماية والتوصيل', value: 'صندوق IP68 مع وصلات MC4-EVO2' },
+      { label: 'معامل التوليد ثنائي الوجه (Bifaciality)', value: '80% ± 5%' },
+      { label: 'التوافق والاعتماد', value: 'مطابق SASO وكود البناء السعودي' },
+    ],
+  },
+  {
+    id: 'deye-hybrid-8kw',
+    name: 'إنفرتر شمسي هجين Deye Hybrid 8kW ثلاثي الأوجه مع شاشة لمس',
+    category: 'محولات هجينة',
+    categoryType: 'inverter',
+    brand: 'Deye',
+    model: 'SUN-8K-SG04LP3-EU',
+    sku: 'SH-DEY-8K',
+    storeName: 'شركة نبراس الحلول',
+    storeId: 'nebras-solutions',
+    storeCity: 'جدة - المنطقة الصناعية',
+    rating: 4.8,
+    reviewsCount: 63,
+    image: '/images/product-inverter.png',
+    badge: 'ثلاثي الأوجه 3-Phase',
+    tierBadge: 'معتمد كود التوزيع',
+    warranty: 'ضمان 10 سنوات',
+    inStock: true,
+    stockCount: 85,
+    priceEstimate: 'عرض فني ومباشر',
+    specsTable: [
+      { label: 'القدرة المقدرة للخرج AC', value: '8,000 واط (8kW)' },
+      { label: 'أقصى جهد إدخال شمسي DC', value: '800 فولت' },
+      { label: 'عدد متتبعات MPPT', value: '2 مستقلة مزدوجة السلسلة' },
+      { label: 'جهد البطارية المقدر', value: '48V Low Voltage (40-60V)' },
+      { label: 'أقصى تيار شحن وتفريغ', value: '190 أمبير' },
+      { label: 'الكفاءة القصوى', value: '97.6%' },
+    ],
+  },
+  {
+    id: 'pylontech-us5000-48v',
+    name: 'بطارية ليثيوم Pylontech US5000 4.8kWh دورات تفريغ +6000',
+    category: 'تخزين ليثيوم',
+    categoryType: 'battery',
+    brand: 'Pylontech',
+    model: 'US5000 LiFePO4',
+    sku: 'SH-PYL-5000',
+    storeName: 'مؤسسة طاقة الصحراء للتوريدات المتقدمة',
+    storeId: 'desert-energy',
+    storeCity: 'الدمام - طريق الملك فهد',
+    rating: 5.0,
+    reviewsCount: 89,
+    image: '/images/product-battery.png',
+    badge: '+6000 دورة تفريغ',
+    tierBadge: 'LiFePO4 آمنة',
+    warranty: 'ضمان 10 سنوات',
+    inStock: true,
+    stockCount: 210,
+    priceEstimate: 'توريد معتمد فوري',
+    specsTable: [
+      { label: 'السعة الاسمية الإجمالية', value: '4.8 كيلوواط ساعة (kWh)' },
+      { label: 'السعة القابلة للاستخدام', value: '4.56 كيلوواط ساعة (DoD 95%)' },
+      { label: 'الجهد الاسمي للتشغيل', value: '48 فولت DC' },
+      { label: 'تيار الشحن/التفريغ القياسي', value: '50 أمبير (مستمر حتى 100A)' },
+      { label: 'بروتوكولات الاتصال', value: 'CAN, RS485 مدمج لجميع الإنفرترات' },
+    ],
+  },
+  {
+    id: 'longi-himo6-575w',
+    name: 'لوح شمسي Longi Hi-MO 6 Explorer 575W تقنية HPBC المتطورة',
+    category: 'ألواح كهروضوئية',
+    categoryType: 'panel',
+    brand: 'LONGI',
+    model: 'LR5-72HTH-575M',
+    sku: 'SH-LNG-575',
+    storeName: 'شركة شمس الرياض للمهمات الكهروضوئية',
+    storeId: 'shams-alriyadh',
+    storeCity: 'الرياض - السلي الصناعي',
+    rating: 4.9,
+    reviewsCount: 104,
+    image: '/images/product-panel.png',
+    badge: 'تقنية HPBC الجيل الجديد',
+    tierBadge: 'Tier 1 Global',
+    warranty: 'ضمان 25 سنة',
+    inStock: true,
+    stockCount: 960,
+  },
+  {
+    id: 'growatt-spf-5000-es',
+    name: 'إنفرتر مستقل Growatt SPF 5000 ES بقدرة 5kW مدمج بمنظم MPPT',
+    category: 'محولات هجينة',
+    categoryType: 'inverter',
+    brand: 'Growatt',
+    model: 'SPF 5000 ES Off-Grid',
+    sku: 'SH-GRW-5000',
+    storeName: 'مجموعة الأمانة لأنظمة الطاقة والمضخات',
+    storeId: 'amana-energy',
+    storeCity: 'جدة - طريق المدينة',
+    rating: 4.7,
+    reviewsCount: 34,
+    image: '/images/product-inverter.png',
+    badge: 'منظم MPPT مدمج',
+    warranty: 'ضمان 5 سنوات',
+    inStock: true,
+    stockCount: 62,
+  },
+  {
+    id: 'grundfos-sqflex-pump',
+    name: 'مضخة مياه غاطسة شمسية Grundfos SQFlex للآبار والمزارع',
+    category: 'مضخات مياه',
+    categoryType: 'pump',
+    brand: 'Grundfos',
+    model: 'SQFlex Helical Rotor',
+    sku: 'SH-GRN-SQ',
+    storeName: 'مجموعة الأمانة لأنظمة الطاقة والمضخات',
+    storeId: 'amana-energy',
+    storeCity: 'القصيم - بريدة',
+    rating: 4.9,
+    reviewsCount: 51,
+    image: '/images/product-kit.png',
+    badge: 'تحكم ذكي بالتدفق',
+    warranty: 'ضمان سنتين',
+    inStock: true,
+    stockCount: 45,
+  },
+  {
+    id: 'huawei-sun2000-10ktl',
+    name: 'إنفرتر ذكي Huawei SUN2000-10KTL-M1 كفاءة فائقة ومطابق للكود السعودي',
+    category: 'محولات هجينة',
+    categoryType: 'inverter',
+    brand: 'Huawei',
+    model: 'SUN2000-10KTL-M1 High Current',
+    sku: 'SH-HWA-10K',
+    storeName: 'شركة شمس الرياض للمهمات الكهروضوئية',
+    storeId: 'shams-alriyadh',
+    storeCity: 'الرياض',
+    rating: 4.95,
+    reviewsCount: 42,
+    image: '/images/product-inverter.png',
+    badge: 'ذكاء اصطناعي AFCI',
+    warranty: 'ضمان 10 سنوات',
+    inStock: true,
+    stockCount: 38,
+  },
+  {
+    id: 'victron-smartsolar-mppt',
+    name: 'منظم شحن شمسي Victron SmartSolar MPPT 150/70-Tr مدمج بالبلوتوث',
+    category: 'منظمات MPPT',
+    categoryType: 'controller',
+    brand: 'Victron Energy',
+    model: 'SmartSolar MPPT 150/70-Tr',
+    sku: 'SH-VIC-150-70',
+    storeName: 'مؤسسة طاقة الصحراء للتوريدات المتقدمة',
+    storeId: 'desert-energy',
+    storeCity: 'الدمام',
+    rating: 5.0,
+    reviewsCount: 28,
+    image: '/images/product-inverter.png',
+    badge: 'تتبع سريع فائق Ultra Fast',
+    warranty: 'ضمان 5 سنوات',
+    inStock: true,
+    stockCount: 50,
+  },
+]
+
+export const visitorEngineers: VisitorEngineer[] = [
+  {
+    id: 'ahmed-alshammari',
+    name: 'م. أحمد الشمري',
+    title: 'استشاري نظم كهروضوئية وتصميم محطات طاقة شمسية صناعية وتجارية وزراعية معتمدة.',
+    specialty: 'هندسة نظم كهروضوئية وتصميم محطات',
+    city: 'الرياض، المملكة العربية السعودية',
+    experience: 'خبرة 8+ سنوات (On-Grid & Hybrid)',
+    license: 'ترخيص الهيئة السعودية: SCE-849201',
+    rating: 4.9,
+    reviewsCount: 48,
+    projectsCount: 34,
+    complianceRate: '100% مطابقة كود البناء السعودي',
+    responseSpeed: 'ساعتان متوسط سرعة الرد',
+    avatar: '/images/consultant-1.png',
+    verified: true,
+    bio: 'مهندس كهربائي واستشاري معتمد في مجال تصاميم ومحاكاة أنظمة الطاقة الكهروضوئية بخبرة تتجاوز 8 سنوات في السوق السعودي والخليجي. أختص بتقديم دراسات الجدوى الفنية والاقتصادية المتقدمة باستخدام برامج المحاكاة الهندسية المعيارية (PVsyst, Helioscope, AutoCAD)، وإعداد المخططات الأحادية (SLD) ومخططات الربط بشبكات الجهد المنخفض والمتوسط بالتوافق الكامل مع الكود السعودي للبناء ومعايير الشركة السعودية للكهرباء (SEC) وهيئة تنظيم المياه والكهرباء.',
+    specialties: [
+      {
+        icon: 'Zap',
+        title: 'أنظمة الربط مع الشبكة (On-Grid)',
+        desc: 'تصميم وتدقيق محطات الأسقف الصناعية والتجارية وتجهيز ملفات الربط لاعتماد العداد الذكي الصافي.',
+      },
+      {
+        icon: 'FlaskConical',
+        title: 'منظومات الضخ والري الزراعي',
+        desc: 'حساب وتحجيم مضخات الآبار العميقة والغطاسات الذكية للمزارع مع أنظمة VFD لتوفير الديزل بنسبة 100%.',
+      },
+      {
+        icon: 'BatteryCharging',
+        title: 'تخزين الطاقة بالبطاريات (BESS & Hybrid)',
+        desc: 'دراسات استقرار الأحمال وتصميم وحدات الليثيوم LiFePO4 للمواقع السكنية والنائية والمصانع الحساسة للانقطاع.',
+      },
+      {
+        icon: 'ShieldCheck',
+        title: 'الفحص الحراري وتدقيق الأداء (Commissioning)',
+        desc: 'فحص النقاط الساخنة (Hotspots) بالكاميرات الحرارية واختبارات قياس منحنى I-V والعزل الكهربائي الشامل.',
+      },
+    ],
+    workflowSteps: [
+      { step: 1, title: 'استلام بيانات الموقع وقراءات الاستهلاك عبر المنصة.', desc: '' },
+      { step: 2, title: 'إجراء محاكاة PVsyst وإعداد المخططات الفنية المعتمدة.', desc: '' },
+      { step: 3, title: 'تسليم التقرير الهندسي الشامل مع جلسة مناقشة وتوضيح.', desc: '' },
+    ],
+  },
+  {
+    id: 'sara-alqahtani',
+    name: 'م. سارة القحطاني',
+    title: 'استشارية طاقة زراعية وضخ مياه وتصميم شبكات الري المستدامة بالطاقة الشمسية.',
+    specialty: 'استشارية طاقة زراعية وضخ مياه',
+    city: 'القصيم - بريدة',
+    experience: 'خبرة 6+ سنوات',
+    license: 'ترخيص الهيئة السعودية: SCE-772109',
+    rating: 5.0,
+    reviewsCount: 62,
+    projectsCount: 41,
+    complianceRate: '100% مطابقة لمعايير وزارة الزراعة',
+    responseSpeed: 'ساعة ونصف',
+    avatar: '/images/consultant-2.png',
+    verified: true,
+    bio: 'خبرة متميزة في تصميم وتشغيل منظومات الضخ الزراعي لآبار المياه العميقة والأنظمة المعزولة Off-Grid بكفاءة وتوفير عالي للوقود وإدارة الأحمال المتقلبة.',
+    specialties: [
+      { icon: 'FlaskConical', title: 'مضخات الآبار الارتوازية', desc: 'تحجيم واختيار مضخات الأعماق وحساب الفاقد الهيدروليكي بدقة.' },
+      { icon: 'Zap', title: 'أنظمة الري الشمسي الذكي', desc: 'ربط حساسات الضغط وجداول الري المتوافقة مع منحنى السطوع الشمسي.' },
+    ],
+    workflowSteps: [
+      { step: 1, title: 'مراجعة بيانات البئر وعمق المياه والمحصول.', desc: '' },
+      { step: 2, title: 'إعداد الحسابات الهيدروليكية ومنظومة الألواح والإنفرتر.', desc: '' },
+      { step: 3, title: 'اعتماد المخطط وتوجيه الموردين للتوريد الدقيق.', desc: '' },
+    ],
+  },
+  {
+    id: 'khaled-aldossari',
+    name: 'م. خالد الدوسري',
+    title: 'أنظمة هجينة وبطاريات تخزين صناعية وحلول استقرار الأحمال للقطاعات الإنتاجية.',
+    specialty: 'أنظمة هجينة وبطاريات تخزين صناعية',
+    city: 'الدمام - المنطقة الصناعية الثانية',
+    experience: 'خبرة 10+ سنوات',
+    license: 'ترخيص الهيئة السعودية: SCE-620455',
+    rating: 4.95,
+    reviewsCount: 55,
+    projectsCount: 68,
+    complianceRate: '100% مطابقة لكود الشبكة',
+    responseSpeed: 'ساعتان',
+    avatar: '/images/consultant-3.png',
+    verified: true,
+    bio: 'استشاري أنظمة التخزين الكهروكيميائي (BESS)، الإنفرترات الهجينة ثلاثية الأوجه، ومزامنة المولدات والشبكة لتصفير فواتير الذروة وضمان استمرارية التشغيل.',
+    specialties: [
+      { icon: 'BatteryCharging', title: 'بنوك بطاريات الميجاواط', desc: 'دراسة السلامة، التبريد، ودورات الشحن اليومية لمنشآت الإنتاج.' },
+      { icon: 'ShieldCheck', title: 'حلول ذروة الأحمال Peak Shaving', desc: 'تفريغ البطاريات خلال ساعات الذروة لتفادي غرامات معامل القدرة والطلب.' },
+    ],
+    workflowSteps: [
+      { step: 1, title: 'تحليل سجلات استهلاك العداد الدقيقة 15 دقيقة.', desc: '' },
+      { step: 2, title: 'محاكاة الجدوى الاقتصادية وفترة الاسترداد للمشروع.', desc: '' },
+      { step: 3, title: 'تقديم الكراسة الفنية والإشراف على التركيب والاختبار.', desc: '' },
+    ],
+  },
+  {
+    id: 'tariq-alotaibi',
+    name: 'م. طارق العتيبي',
+    title: 'فحص وصيانة وتأهيل الأنظمة الكهروضوئية القائمة، واختبارات العزل والمطابقة.',
+    specialty: 'فحص وصيانة وتأهيل الأنظمة',
+    city: 'جدة - الغربية',
+    experience: 'خبرة 9+ سنوات',
+    license: 'ترخيص الهيئة السعودية: SCE-811904',
+    rating: 4.8,
+    reviewsCount: 39,
+    projectsCount: 52,
+    complianceRate: '100% معتمد لفحص SASO',
+    responseSpeed: '3 ساعات',
+    avatar: '/images/consultant-1.png',
+    verified: true,
+    bio: 'فحص كفاءة الألواح بالحرارة (Thermal Imaging)، تتبع الأعطال، واختبار العزل والحماية للشبكات التجارية وتصحيح العيوب التركيبية.',
+    specialties: [
+      { icon: 'ShieldCheck', title: 'التدقيق الحراري بالأشعة تحت الحمراء', desc: 'كشف الخلايا المعطوبة والوصلات المفكوكة قبل حدوث الحرائق.' },
+      { icon: 'Zap', title: 'قياس أداء المحطات المنخفضة الإنتاج', desc: 'تحديد أسباب تراجع التوليد وإعادة ضبط زوايا التوجيه والتوصيل.' },
+    ],
+    workflowSteps: [
+      { step: 1, title: 'زيارة ميدانية وأخذ القياسات بأجهزة المعايرة المعتمدة.', desc: '' },
+      { step: 2, title: 'إعداد تقرير العيوب والتوصيات التصحيحية.', desc: '' },
+      { step: 3, title: 'إصدار شهادة الفحص والمطابقة الرسمية.', desc: '' },
+    ],
+  },
+]
+
+export const visitorStores: VisitorStore[] = [
+  {
+    id: 'shams-alriyadh',
+    name: 'شركة شمس الرياض للمهمات الكهروضوئية',
+    legalName: 'شركة شمس الرياض للتجارة والمقاولات الكهروضوئية ذ.م.م',
+    commercialReg: '1010789234',
+    weraLicense: 'ترخيص هيئة تنظيم المياه والكهرباء (WERA)',
+    badge: 'وكيل رسمي',
+    city: 'الرياض',
+    address: 'حي السلي الصناعي، شارع هارون الرشيد',
+    workingHours: 'السبت - الخميس: 8:00 ص - 6:00 م',
+    phone: '+966 11 400 0000',
+    whatsapp: '+966 50 123 4567',
+    rating: 4.9,
+    reviewsCount: 145,
+    productsCount: 145,
+    inStockCount: 145,
+    logo: '/images/SH-logo.png',
+    description: 'الوكيل والموزع المعتمد لأحدث أنظمة وحلول الطاقة الشمسية الكهروضوئية في المملكة، متخصصون في توفير الألواح عالية الكفاءة (Tier-1)، ومحولات الطاقة الهجينة المتوافقة مع شبكة سكيكو، وبطاريات الليثيوم LiFePO4 مع ضمانات مصنعية رسمية تصل حتى 25 عاماً.',
+    tags: ['ألواح Solar Jinko', 'محولات Growatt', 'ضمان 25 سنة'],
+    brands: ['Jinko Solar', 'Growatt', 'Huawei', 'LONGI'],
+  },
+  {
+    id: 'desert-energy',
+    name: 'مؤسسة طاقة الصحراء للتوريدات المتقدمة',
+    legalName: 'مؤسسة طاقة الصحراء للتجهيزات والمقاولات',
+    commercialReg: '2050114982',
+    weraLicense: 'ترخيص WERA ومطابقة كود التوزيع',
+    badge: 'موزع معتمد',
+    city: 'الدمام',
+    address: 'طريق الملك فهد، حي الواحة',
+    workingHours: 'السبت - الخميس: 8:00 ص - 5:30 م',
+    phone: '+966 13 800 1234',
+    whatsapp: '+966 55 987 6543',
+    rating: 4.9,
+    reviewsCount: 92,
+    productsCount: 98,
+    inStockCount: 98,
+    logo: '/images/SH-logo.png',
+    description: 'موزع بطاريات Pylontech وأنظمة تخزين الطاقة الذكية وألواح Longi ثنائية الوجه في المنطقة الشرقية وكافة مدن المملكة مع شحن سريع وآمن.',
+    tags: ['بطاريات Pylontech', 'ألواح Longi Hi-MO', 'شحن فوري بالشرقية'],
+    brands: ['Pylontech', 'LONGI', 'Victron Energy'],
+  },
+  {
+    id: 'amana-energy',
+    name: 'مجموعة الأمانة لأنظمة الطاقة والمضخات',
+    legalName: 'مجموعة الأمانة الهندسية المحدودة',
+    commercialReg: '4030284711',
+    weraLicense: 'اعتماد رسمي للمشاريع الزراعية والصناعية',
+    badge: 'وكيل معتمد',
+    city: 'جدة',
+    address: 'طريق المدينة المنورة، بالقرب من كوبري الصالة الشمالية',
+    workingHours: 'السبت - الخميس: 8:30 ص - 6:00 م',
+    phone: '+966 12 654 3210',
+    whatsapp: '+966 54 321 0987',
+    rating: 4.7,
+    reviewsCount: 118,
+    productsCount: 112,
+    inStockCount: 112,
+    logo: '/images/SH-logo.png',
+    description: 'حلول متكاملة للمزارع والآبار العميقة والمنظومات الهجينة للقطاع الزراعي والتجاري في المنطقة الغربية والوسطى.',
+    tags: ['مضخات زراعية غاطسة', 'إنفرترات Deye هجين', 'حلول مزارع'],
+    brands: ['Grundfos', 'Deye', 'Growatt'],
+  },
+  {
+    id: 'nebras-solutions',
+    name: 'شركة نيرات الحلول للطاقة البديلة',
+    legalName: 'شركة نيرات الحلول للطاقة والمقاولات',
+    commercialReg: '4030198274',
+    weraLicense: 'ترخيص وزارة الطاقة والكهرباء',
+    badge: 'وكيل معتمد',
+    city: 'جدة ومكة المكرمة',
+    address: 'حي الرويس، شارع فلسطين',
+    workingHours: 'السبت - الخميس: 9:00 ص - 6:00 م',
+    phone: '+966 12 700 8899',
+    whatsapp: '+966 56 111 2233',
+    rating: 4.8,
+    reviewsCount: 84,
+    productsCount: 84,
+    inStockCount: 84,
+    logo: '/images/SH-logo.png',
+    description: 'توفير كابلات شمسية مسلحة، قواطع شنايدر وABB المعتمدة لكود كهرماء، وقواطع العزل السريع DC/AC الموثوقة.',
+    tags: ['كابلات شمسية مسلحة', 'قواطع Schneider و ABB', 'مطابق SASO'],
+    brands: ['Schneider Electric', 'ABB', 'Top Cable'],
+  },
+  {
+    id: 'saudi-smart-store',
+    name: 'المتجر السعودي للمنظومات الذكية',
+    legalName: 'المتجر السعودي للحلول الكهربائية الذكية',
+    commercialReg: '1010334902',
+    weraLicense: 'اعتماد موزع حلول Victron Energy',
+    badge: 'موزع رئيسي',
+    city: 'الرياض والقصيم',
+    address: 'شارع خالد بن الوليد، مخرج 9',
+    workingHours: 'السبت - الخميس: 8:00 ص - 7:00 م',
+    phone: '+966 11 222 3344',
+    whatsapp: '+966 50 888 7766',
+    rating: 4.8,
+    reviewsCount: 160,
+    productsCount: 120,
+    inStockCount: 120,
+    logo: '/images/SH-logo.png',
+    description: 'أنظمة التخزين المنزلية والمتحركة للكرفانات والمواقع المعزولة بمواصفات هولندية وألمانية مع دعم فني متقدم.',
+    tags: ['أنظمة تخزين منزلية', 'أنظمة Victron Energy', 'دعم فني وتوصيل'],
+    brands: ['Victron Energy', 'Pylontech', 'Fronius'],
+  },
+  {
+    id: 'hybrid-lithium-tech',
+    name: 'تقنيات الهجين للطاقة وتخزين الليثيوم',
+    legalName: 'مؤسسة تقنيات الهجين التجارية',
+    commercialReg: '2050987123',
+    weraLicense: 'سجل معتمد للبطاريات والمهمات الكهروضوئية',
+    badge: 'متجر متخصص',
+    city: 'الدمام - المدينة الصناعية الثانية',
+    address: 'شارع 14، مجمع الصناعات الخفيفة',
+    workingHours: 'السبت - الخميس: 8:00 ص - 5:00 م',
+    phone: '+966 13 888 9900',
+    whatsapp: '+966 53 444 5566',
+    rating: 4.9,
+    reviewsCount: 53,
+    productsCount: 65,
+    inStockCount: 65,
+    logo: '/images/SH-logo.png',
+    description: 'تخصيص بنوك البطاريات الصناعية والإنفرترات الذكية لحماية الأجهزة الحساسة ومصانع الأغذية والبلاستيك.',
+    tags: ['بطاريات LiFePO4', 'إنفرترات هايبرد 15kW', 'ضمان 10 سنوات'],
+    brands: ['Deye', 'Pylontech', 'Felicity Solar'],
+  },
+  {
+    id: 'afaq-energy-pumps',
+    name: 'آفاق الطاقة والمضخات الغاطسة',
+    legalName: 'شركة آفاق الطاقة للتوريدات الزراعية',
+    commercialReg: '1131098432',
+    weraLicense: 'ترخيص معتمد لحلول الطاقة الشمسية الزراعية',
+    badge: 'وكيل معتمد',
+    city: 'بريدة - منطقة القصيم',
+    address: 'طريق الملك عبد العزيز، بالقرب من سوق الخضار المركزي',
+    workingHours: 'السبت - الخميس: 7:30 ص - 6:30 م',
+    phone: '+966 16 333 4455',
+    whatsapp: '+966 55 222 3311',
+    rating: 4.7,
+    reviewsCount: 71,
+    productsCount: 78,
+    inStockCount: 78,
+    logo: '/images/SH-logo.png',
+    description: 'خبراء تجهيز وتوريد مزارع النخيل والقمح بمضخات لورنتز الألمانية وهياكل التثبيت المجلفنة ضد الصدأ والرياح.',
+    tags: ['مضخات Lorentz ألمانية', 'هياكل تثبيت مجلفنة', 'توريد مزارع ونخيل'],
+    brands: ['Lorentz', 'Grundfos', 'Jinko Solar'],
+  },
+  {
+    id: 'clean-vision-store',
+    name: 'مؤسسة الرؤية النظيفة لمعدات الطاقة',
+    legalName: 'مؤسسة الرؤية النظيفة للمقاولات والتوريدات',
+    commercialReg: '4650089123',
+    weraLicense: 'ترخيص توريد معتمد في منطقة المدينة المنورة',
+    badge: 'موزع معتمد',
+    city: 'المدينة المنورة وينبع',
+    address: 'شارع الملك عبد الله، الدائري الثاني',
+    workingHours: 'السبت - الخميس: 8:30 ص - 6:00 م',
+    phone: '+966 14 844 5566',
+    whatsapp: '+966 50 333 9922',
+    rating: 4.8,
+    reviewsCount: 42,
+    productsCount: 56,
+    inStockCount: 56,
+    logo: '/images/SH-logo.png',
+    description: 'توزيع فوري ومباشر في منطقة المدينة المنورة وينبع لألواح ترينا سولار ومحولات سان جرو المعتمدة للمنازل والمنشآت.',
+    tags: ['ألواح Trina Solar', 'محولات Sungrow', 'تسليم فوري بالمدينة'],
+    brands: ['Trina Solar', 'Sungrow', 'Growatt'],
+  },
+]
