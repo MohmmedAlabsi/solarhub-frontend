@@ -39,7 +39,7 @@ const emit = defineEmits<{
 const route = useRoute()
 
 const navItems = [
-  { label: 'الرئيسية', to: '/admin/dashboard', icon: Home, matchPrefixes: ['/admin/dashboard'] },
+  { label: 'الرئيسية', to: '/admin', icon: Home, matchPrefixes: ['/admin/dashboard'] },
   { label: 'إدارة المستخدمين', to: '/admin/users', icon: Users, matchPrefixes: ['/admin/users'] },
   { label: 'إدارة الموردين', to: '/admin/stores', icon: Store, matchPrefixes: ['/admin/stores'] },
   { label: 'إدارة المهندسين', to: '/admin/engineers', icon: UserCheck, matchPrefixes: ['/admin/engineers'] },
@@ -49,7 +49,7 @@ const navItems = [
   { label: 'إدارة طلبات الشراء', to: '/admin/orders', icon: ShoppingBag, matchPrefixes: ['/admin/orders'] },
   { label: 'الإدارة المالية', to: '/admin/finance/payments', icon: CreditCard, matchPrefixes: ['/admin/finance'] },
   { label: 'إدارة الصلاحيات', to: '/admin/roles', icon: ShieldCheck, matchPrefixes: ['/admin/roles', '/admin/permissions'] },
-  { label: 'إدارة التقييمات', to: '/admin/stores/reviews', icon: Star, matchPrefixes: ['/admin/stores/reviews', '/admin/engineers/reviews'] },
+  { label: 'إدارة التقييمات', to: '/admin/reviews', icon: Star, matchPrefixes: ['/admin/reviews'] },
   { label: 'الإشعارات', to: '/admin/notifications', icon: Bell, matchPrefixes: ['/admin/notifications'] },
   { label: 'إعدادات النظام', to: '/admin/settings', icon: Settings, matchPrefixes: ['/admin/settings'] },
 ]

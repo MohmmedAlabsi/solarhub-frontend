@@ -2,9 +2,20 @@
 const props = defineProps<{
   status: string
   showDot?: boolean
+  tone?: 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 }>()
 
 const badgeConfig = computed(() => {
+  if (props.tone) {
+    const tones = {
+      success: {classes:'bg-emerald-50 text-emerald-700 border-emerald-200/80',dotClass:'bg-emerald-500'},
+      warning: {classes:'bg-amber-50 text-amber-700 border-amber-200/80',dotClass:'bg-amber-500'},
+      danger: {classes:'bg-rose-50 text-rose-700 border-rose-200/80',dotClass:'bg-rose-500'},
+      info: {classes:'bg-sky-50 text-sky-700 border-sky-200/80',dotClass:'bg-sky-500'},
+      neutral: {classes:'bg-slate-100 text-slate-600 border-slate-200',dotClass:'bg-slate-400'},
+    }
+    return tones[props.tone]
+  }
   const s = props.status.trim()
   if (s === 'مفعل' || s === 'active' || s === 'تم التسليم' || s === 'مكتمل' || s === 'تم التحقق' || s === 'تم الشحن') {
     return {

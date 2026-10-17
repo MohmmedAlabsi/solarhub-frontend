@@ -34,6 +34,8 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
         @click="emit('toggleMobileMenu')"
         class="flex size-10 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-heading lg:hidden hover:bg-solar-bg-subtle active:scale-95 transition-all"
         aria-label="فتح القائمة الإدارية"
+        aria-controls="admin-mobile-navigation"
+        :aria-expanded="isMobileOpen"
       >
         <Menu class="size-5" />
       </button>

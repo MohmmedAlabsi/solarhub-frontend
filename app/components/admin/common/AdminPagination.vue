@@ -8,9 +8,11 @@ const props = withDefaults(
     totalCount: number
     pageSize?: number
     itemName?: string
+    showProgress?: boolean
   }>(),
   {
     pageSize: 8,
+    showProgress: true,
     itemName: 'عنصر',
   }
 )
@@ -51,7 +53,7 @@ function goToPage(page: number) {
 <template>
   <div class="flex flex-col gap-4 pt-4 border-t border-solar-border-card/60">
     <!-- شريط تقدم التصفح الدقيق كما في الموكاب -->
-    <div class="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+    <div v-if="showProgress" class="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
       <div
         class="h-full rounded-full bg-solar-navy transition-all duration-300"
         :style="{ width: `${progressPercentage}%` }"
@@ -91,7 +93,7 @@ function goToPage(page: number) {
 
         <button
           type="button"
-          :disabled="currentPage === totalPages"
+          :disabled="currentPage >= Math.max(1, totalPages)"
           @click="goToPage(currentPage + 1)"
           class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card bg-white text-solar-text-body transition-colors hover:bg-solar-bg-subtle disabled:opacity-40 disabled:cursor-not-allowed"
           aria-label="الصفحة التالية"
