@@ -1,0 +1,27 @@
+/* Scoped to the newly implemented administrative workspace, leaving other roles and existing admin tables unchanged. */
+.admin-managed { display:flex; min-width:0; flex-direction:column; gap:24px; }
+.admin-managed .admin-table-wrap { max-width:100%; min-width:0; overflow:auto; border:1px solid #e2e8f0; border-radius:12px; background:#fff; }
+.admin-managed table { width:100%; border-collapse:collapse; text-align:right; }
+.admin-managed th { padding:16px 14px; background:#f1f2ff; color:#5a6473; font-size:12px; font-weight:600; line-height:20px; }
+.admin-managed td { padding:18px 14px; border-bottom:1px solid #edf0f9; color:#243b53; font-size:12px; line-height:20px; vertical-align:middle; }
+.admin-managed tbody tr:last-child td { border-bottom:0; }
+.admin-managed .admin-table-footer { padding:16px; border-top:1px solid #edf0f9; }
+.admin-managed .admin-avatar { display:inline-flex; width:34px; height:34px; flex-shrink:0; align-items:center; justify-content:center; border-radius:50%; background:#dce6ff; color:#243b53; font-size:11px; font-weight:700; }
+.admin-managed .admin-search { position:relative; min-width:0; flex:1; }
+.admin-managed .admin-search input { padding-right:40px; min-height:44px; background:#f9f9ff; }
+.admin-managed .admin-search svg { position:absolute; right:14px; top:14px; width:17px; height:17px; color:#727579; }
+.admin-managed .admin-filter { display:flex; min-width:0; flex-wrap:wrap; align-items:center; gap:12px; padding:16px; border:1px solid #edf0f9; border-radius:12px; background:white; }
+.admin-managed .admin-filter select { width:auto; min-height:44px; min-width:160px; background:#f9f9ff; }
+.admin-managed .admin-empty { padding:48px 20px; text-align:center; color:#727579; }
+.admin-managed .admin-demo { font-size:11px; color:#727579; line-height:22px; }
+.admin-detail dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.admin-detail dl>div { min-width:0; padding:16px; border:1px solid #e2e8f0; border-radius:10px; background:#f9f9ff; }
+.admin-detail dt { font-size:12px; line-height:20px; color:#727f91; }
+.admin-detail dd { margin-top:6px; overflow-wrap:anywhere; font-size:13px; line-height:24px; color:#243b53; }
+.admin-detail h3 { margin:22px 0 14px; color:#243b53; font-size:13px; font-weight:700; }
+.admin-detail .admin-detail-block { border:1px solid #e2e8f0; border-radius:12px; padding:16px; font-size:13px; line-height:26px; color:#334e68; }
+.admin-managed[data-density=compact] td,.admin-workspace[data-density=compact] .admin-managed td { padding-top:10px; padding-bottom:10px; }
+@media(max-width:639px){.admin-detail dl{grid-template-columns:minmax(0,1fr)}.admin-managed .admin-filter select,.admin-managed .admin-search{width:100%;flex-basis:100%}.admin-managed{gap:20px}}
+
+.admin-supplier-detail dl>div { background:#f1f2ff; border-color:transparent; }
+.admin-engineer-detail dl>div { background:#fff; }
