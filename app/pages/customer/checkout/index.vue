@@ -37,6 +37,22 @@ const phone = ref('50 123 4567')
 const region = ref('منطقة الرياض')
 const cityDistrict = ref('الرياض - حي الملز')
 const addressLine = ref('شارع صلاح الدين الأيوبي - مبنى 14')
+const deliveryCoordinates = ref<{ lat: number; lng: number } | null>({ lat: 24.6657, lng: 46.7324 })
+const isMapModalOpen = ref(false)
+
+function handleLocationSelected(loc: { address: string; lat: number; lng: number; governorate?: string }) {
+  deliveryCoordinates.value = { lat: loc.lat, lng: loc.lng }
+  addressLine.value = loc.address
+  if (loc.governorate) {
+    region.value = loc.governorate
+  }
+  const parts = loc.address.split('-')
+  if (parts.length > 1) {
+    cityDistrict.value = `${parts[0].trim()} - ${parts[1].trim()}`
+  } else {
+    cityDistrict.value = loc.address
+  }
+}
 
 // طريقة الدفع
 const paymentMethod = ref<'card' | 'apple_pay' | 'sadad'>('card')
@@ -127,9 +143,19 @@ function handlePlaceOrder() {
 
         <!-- الخطوة 2: عنوان التوصيل -->
         <section class="rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm">
-          <div class="flex items-center gap-3 border-b border-solar-border-card pb-4 mb-4">
-            <span class="flex size-7 items-center justify-center rounded-full bg-solar-navy-dark text-xs font-bold text-white">2</span>
-            <h2 class="text-base font-bold text-solar-text-heading">عنوان التوصيل</h2>
+          <div class="flex items-center justify-between border-b border-solar-border-card pb-4 mb-4">
+            <div class="flex items-center gap-3">
+              <span class="flex size-7 items-center justify-center rounded-full bg-solar-navy-dark text-xs font-bold text-white">2</span>
+              <h2 class="text-base font-bold text-solar-text-heading">عنوان التوصيل</h2>
+            </div>
+            <button
+              type="button"
+              @click="isMapModalOpen = true"
+              class="inline-flex items-center gap-1.5 rounded-xl border border-solar-yellow bg-solar-yellow/20 px-3.5 py-1.5 text-xs font-bold text-solar-navy-dark hover:bg-solar-yellow/30 transition-all cursor-pointer shadow-2xs"
+            >
+              <MapPin class="size-4 text-solar-navy-dark" />
+              <span>تحديد الموقع عبر الخريطة</span>
+            </button>
           </div>
 
           <div class="grid gap-4 sm:grid-cols-2">
@@ -376,5 +402,15 @@ function handlePlaceOrder() {
         </div>
       </div>
     </div>
+    <!-- نافذة اختيار موقع التوصيل على الخريطة -->
+    <CommonMapLocationModal
+      :is-open="isMapModalOpen"
+      :current-location="addressLine"
+      :initial-coordinates="deliveryCoordinates || undefined"
+      title="تحديد موقع التوصيل والتسليم بدقة"
+      subtitle="حدد موقع المبنى أو المستودع على الخريطة لضمان سرعة ودقة توصيل الشحنة"
+      @close="isMapModalOpen = false"
+      @select="handleLocationSelected"
+    />
   </div>
 </template>

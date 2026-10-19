@@ -19,6 +19,7 @@ definePageMeta({
 })
 
 const route = useRoute()
+const isMapModalOpen = ref(false)
 
 // بيانات المتجر المطابقة لـ (الملف التعريفي للمتجر - شركة شمس الرياض للمهمات الكهروضوئية .png)
 const store = ref({
@@ -144,10 +145,15 @@ const storeProducts = ref<Product[]>([
 
         <!-- شبكة بيانات الاتصال والسجل والضريبة -->
         <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 border-t border-solar-border-card pt-4 text-xs">
-          <div class="flex items-center gap-2.5 text-solar-text-secondary">
-            <MapPin class="size-4 text-solar-yellow shrink-0" />
-            <span>{{ store.address }}</span>
-          </div>
+          <button
+            type="button"
+            @click="isMapModalOpen = true"
+            class="flex items-center gap-2.5 text-solar-text-secondary hover:text-solar-navy-dark transition-colors cursor-pointer group text-right"
+            title="عرض موقع المتجر على الخريطة التفاعلية"
+          >
+            <MapPin class="size-4 text-solar-yellow shrink-0 group-hover:scale-110 transition-transform" />
+            <span class="underline decoration-dotted truncate">{{ store.address }}</span>
+          </button>
 
           <div class="flex items-center gap-2.5 text-solar-text-secondary">
             <Clock class="size-4 text-solar-yellow shrink-0" />
@@ -182,5 +188,15 @@ const storeProducts = ref<Product[]>([
         />
       </div>
     </div>
+
+    <!-- نافذة استعراض موقع المتجر والمستودع على الخريطة -->
+    <CommonMapLocationModal
+      :is-open="isMapModalOpen"
+      :current-location="store.address"
+      :title="`موقع متجر ${store.name} على الخريطة`"
+      subtitle="الموقع الفعلي للمتجر والمستودعات المعتمدة لاستلام وفحص البضائع وتنسيق الشحن"
+      @close="isMapModalOpen = false"
+      @select="isMapModalOpen = false"
+    />
   </div>
 </template>

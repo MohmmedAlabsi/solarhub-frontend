@@ -58,6 +58,8 @@ function handleStoreQuote() {
 function handleWhatsApp() {
   window.open(`https://wa.me/${store.value.whatsapp.replace(/[^0-9]/g, '')}`, '_blank')
 }
+
+const isMapModalOpen = ref(false)
 </script>
 
 <template>
@@ -122,10 +124,15 @@ function handleWhatsApp() {
 
       <!-- الشريط السفلي للبيانات الميدانية والمواعيد والتقييمات المطابق لـ visitor_8.png -->
       <div class="rounded-xl bg-slate-50 border border-slate-100 p-3 sm:px-5 sm:py-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs sm:text-sm text-solar-text-muted">
-        <div class="flex items-center gap-2">
-          <MapPin class="size-4 text-solar-navy shrink-0" />
-          <span class="truncate">{{ store.address }}</span>
-        </div>
+        <button
+          type="button"
+          @click="isMapModalOpen = true"
+          class="flex items-center gap-2 hover:text-solar-navy-dark transition-colors cursor-pointer group text-right"
+          title="عرض موقع المتجر على الخريطة التفاعلية"
+        >
+          <MapPin class="size-4 text-solar-navy shrink-0 group-hover:text-solar-yellow transition-colors" />
+          <span class="truncate underline decoration-dotted">{{ store.address }}</span>
+        </button>
         <div class="flex items-center gap-2">
           <Clock class="size-4 text-solar-navy shrink-0" />
           <span>{{ store.workingHours }}</span>
@@ -339,5 +346,14 @@ function handleWhatsApp() {
         </div>
       </div>
     </div>
+    <!-- نافذة استعراض موقع المتجر والمستودع على الخريطة -->
+    <CommonMapLocationModal
+      :is-open="isMapModalOpen"
+      :current-location="store.address"
+      :title="`موقع متجر ${store.name} على الخريطة`"
+      subtitle="الموقع الفعلي للمتجر والمستودعات المعتمدة لاستلام وفحص البضائع وتنسيق الشحن"
+      @close="isMapModalOpen = false"
+      @select="isMapModalOpen = false"
+    />
   </div>
 </template>

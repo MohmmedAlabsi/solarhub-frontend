@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Mail, Check, ArrowLeft, ArrowRight, AlertCircle } from 'lucide-vue-next'
-import { useAuthStore } from '~~/app/stores/auth.store'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({
   layout: 'auth',
@@ -97,15 +97,26 @@ function handlePaste(event: ClipboardEvent) {
   inputRefs.value[nextIdx]?.focus()
 }
 
-function handleResend() {
+const resendSuccessMessage = ref('')
+
+async function handleResend() {
   if (countdown.value === 0) {
-    startTimer()
+    errorMessage.value = ''
+    resendSuccessMessage.value = ''
+    const res = await authStore.resendOtp(email.value)
+    if (res.success) {
+      resendSuccessMessage.value = 'تم إرسال رمز تحقق جديد إلى بريدك الإلكتروني.'
+      startTimer()
+    } else {
+      errorMessage.value = res.error || 'تعذر إعادة إرسال الرمز، يرجى المحاولة لاحقاً'
+    }
   }
 }
 
 async function handleVerify() {
   const code = otp.value.join('')
   errorMessage.value = ''
+  resendSuccessMessage.value = ''
 
   if (code.length < 6) {
     errorMessage.value = 'يرجى إدخال رمز التحقق كاملاً المكون من 6 أرقام'
@@ -118,7 +129,17 @@ async function handleVerify() {
   })
 
   if (result.success) {
-    router.push('/customer/dashboard')
+    if (authStore.isAuthenticated) {
+      router.push('/customer/dashboard')
+    } else {
+      router.push({
+        path: '/auth/login',
+        query: {
+          verified: 'true',
+          email: email.value,
+        },
+      })
+    }
   } else {
     errorMessage.value = result.error || 'رمز التحقق غير صحيح، يرجى إعادة المحاولة'
   }
@@ -158,6 +179,15 @@ async function handleVerify() {
       <span class="text-xs sm:text-sm font-black text-solar-navy-dark dir-ltr mb-7">
         {{ email }}
       </span>
+
+      <!-- تنبيه نجاح إعادة الإرسال -->
+      <div
+        v-if="resendSuccessMessage"
+        class="w-full mb-6 flex items-start gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3.5 text-xs font-semibold text-emerald-800 leading-relaxed text-right animate-in fade-in duration-200"
+      >
+        <Check class="size-4.5 shrink-0 text-emerald-600 mt-0.5" />
+        <span class="flex-1">{{ resendSuccessMessage }}</span>
+      </div>
 
       <!-- تنبيه الخطأ -->
       <div

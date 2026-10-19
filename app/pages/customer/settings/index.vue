@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AtSign, Check, Laptop, LockKeyhole, MessageSquareText, Shield, ShieldCheck, UserRound } from 'lucide-vue-next'
+import { AtSign, Check, Laptop, LockKeyhole, MapPin, MessageSquareText, Shield, ShieldCheck, UserRound } from 'lucide-vue-next'
 import FormField from '../../../components/common/FormField.vue'
 import ProfilePasswordField from '../../../components/customer/profile/ProfilePasswordField.vue'
 import ProfileSummaryCard from '../../../components/customer/profile/ProfileSummaryCard.vue'
@@ -9,6 +9,15 @@ useSeoMeta({ title: 'الملف الشخصي وإعدادات الحساب | Sol
 
 const { form, errors, saveState, statusMessage, summary, sessions, terminatingSessions, saveProfile, resetProfile, terminateOtherSessions } = useCustomerProfile()
 const currentSession = computed(() => sessions.find(session => session.isCurrent))
+
+const isMapModalOpen = ref(false)
+
+function handleLocationSelected(loc: { address: string; lat: number; lng: number; governorate?: string }) {
+  form.address = loc.address
+  if (loc.governorate) {
+    form.city = loc.governorate
+  }
+}
 </script>
 
 <template>
@@ -52,7 +61,19 @@ const currentSession = computed(() => sessions.find(session => session.isCurrent
           <FormField label="رقم الجوال" :error="errors.phone" required>
             <span class="flex" dir="ltr"><span class="flex h-11 items-center rounded-l-lg border border-r-0 border-solar-border-input bg-solar-bg-subtle px-3 text-sm text-solar-text-muted">+966</span><input v-model.trim="form.phone" type="tel" inputmode="numeric" autocomplete="tel" class="solar-input h-11 rounded-l-none text-right" :class="errors.phone ? 'border-red-400' : ''" /></span>
           </FormField>
-          <FormField label="العنوان الوطني / موقع التوصيل" :error="errors.address" required class="md:col-span-2"><input v-model.trim="form.address" type="text" autocomplete="street-address" class="solar-input h-11" :class="errors.address ? 'border-red-400' : ''" /></FormField>
+          <FormField label="العنوان الوطني / موقع التوصيل" :error="errors.address" required class="md:col-span-2">
+            <div class="flex gap-2">
+              <input v-model.trim="form.address" type="text" autocomplete="street-address" class="solar-input h-11 flex-1" :class="errors.address ? 'border-red-400' : ''" placeholder="مثال: الرياض - حي الملز - شارع الستين" />
+              <button
+                type="button"
+                @click="isMapModalOpen = true"
+                class="flex items-center gap-1.5 h-11 px-4 rounded-xl border border-solar-yellow bg-solar-yellow/20 text-xs font-bold text-solar-navy-dark hover:bg-solar-yellow/30 transition-all shrink-0 cursor-pointer shadow-2xs"
+              >
+                <MapPin class="size-4 text-solar-navy-dark" />
+                <span>الخريطة</span>
+              </button>
+            </div>
+          </FormField>
         </div>
       </section>
 
@@ -98,5 +119,15 @@ const currentSession = computed(() => sessions.find(session => session.isCurrent
       </div>
       <p class="mt-4 text-[10px] leading-6 text-solar-text-muted">بيانات وإعدادات تجريبية للعرض؛ لا يتم تحديث الحساب أو إعدادات الأمان على الخادم.</p>
     </form>
+
+    <!-- نافذة اختيار وتأكيد العنوان الوطني وموقع التوصيل على الخريطة -->
+    <CommonMapLocationModal
+      :is-open="isMapModalOpen"
+      :current-location="form.address"
+      title="تحديد وتعديل العنوان الوطني / موقع التوصيل"
+      subtitle="اختر موقعك بدقة على الخريطة لتحديث بيانات التوصيل الافتراضية"
+      @close="isMapModalOpen = false"
+      @select="handleLocationSelected"
+    />
   </div>
 </template>
