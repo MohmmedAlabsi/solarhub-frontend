@@ -30,7 +30,10 @@ export interface Category {
   name_en: string;
   slug?: string;
   parent_id?: number | null;
+  icon_url?: string | null;
   children?: Category[];
+  products_count?: number;
+  master_products_count?: number;
 }
 
 export interface Brand {
@@ -38,12 +41,34 @@ export interface Brand {
   name: string;
   logo_url?: string | null;
   website?: string | null;
+  is_active?: boolean;
+  products_count?: number;
+  master_products_count?: number;
+  created_at?: string;
 }
 
 export interface Governorate {
   id: number;
   name_ar: string;
-  name_en: string;
+  name_en?: string | null;
+  is_active?: boolean;
+}
+
+export interface ServiceType {
+  id: number;
+  name: string;
+  description?: string | null;
+  icon?: string | null;
+  is_active?: boolean;
+  completed_orders_count?: number;
+}
+
+export interface Specialization {
+  id: number;
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  engineers_count?: number;
 }
 
 export interface ProductSpecification {

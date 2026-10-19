@@ -69,6 +69,8 @@ export default defineNuxtConfig({
     '/products/**': { swr: 3600 },
     '/admin/products': { ssr: true },
     '/admin/products/**': { ssr: true },
+    '/admin/master-data': { ssr: true },
+    '/admin/master-data/**': { ssr: true },
     '/customer/**': { ssr: false },
     '/auth/**': { ssr: false },
     '/admin/**': { ssr: false },

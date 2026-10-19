@@ -5,115 +5,81 @@ import {
   ClipboardList,
   Droplets,
   Eye,
-  Pencil,
-  Plus,
+  Loader2,
+  RefreshCw,
   Search,
   Sun,
-  Trash2,
+  Wrench,
 } from 'lucide-vue-next'
 import AdminBadge from '../../../components/admin/common/AdminBadge.vue'
 import AdminModal from '../../../components/admin/common/AdminModal.vue'
 import MasterDataTabs from '../../../components/admin/master-data/MasterDataTabs.vue'
-import type { AdminServiceType } from '../../../../types/admin'
+import type { ServiceType } from '../../../../types/api'
 
 definePageMeta({ layout: 'admin' })
 useSeoMeta({ title: 'إدارة البيانات الأساسية — أنواع الخدمات | لوحة الإدارة العامة' })
 
-const isAddModalOpen = ref(false)
+const {
+  serviceTypes,
+  isLoading,
+  fetchServiceTypes,
+} = useAdminMasterData()
 
-const serviceTypes = ref<AdminServiceType[]>([
-  {
-    id: '1',
-    title: 'تصميم ومحاكاة محطات شمسية (On-Grid)',
-    code: 'SRV-01',
-    description: 'دراسة الأحمال، المخططات التنفيذية، نمذجة الإنتاجية عبر PVsyst، وحسابات الكابلات والحماية',
-    completedOrdersCount: 58,
-    status: 'active',
-    iconType: 'solar',
-  },
-  {
-    id: '2',
-    title: 'استشارات أنظمة التخزين والبطاريات (BESS)',
-    code: 'SRV-02',
-    description: 'تحديد سعات بطاريات الليثيوم LiFePO4، وإدارة أحمال الذروة وأنظمة الطاقة الهجينة والمستقلة',
-    completedOrdersCount: 42,
-    status: 'active',
-    iconType: 'battery',
-  },
-  {
-    id: '3',
-    title: 'تصميم مضخات المياه الكهروضوئية',
-    code: 'SRV-03',
-    description: 'حساب تدفق المياه والديناميكا الهيدروليكية ومطابقة محولات VFD للآبار الارتوازية والمزارع',
-    completedOrdersCount: 36,
-    status: 'active',
-    iconType: 'droplet',
-  },
-  {
-    id: '4',
-    title: 'الفحص الميداني والاختبارات الكهروميكانيكية',
-    code: 'SRV-04',
-    description: 'التصوير الحراري بالأشعة تحت الحمراء، وفحص منحنيات I-V، واختبارات العزل والتأريض',
-    completedOrdersCount: 49,
-    status: 'active',
-    iconType: 'search',
-  },
-  {
-    id: '5',
-    title: 'دراسات الربط والتوافق مع كود البناء SBC',
-    code: 'SRV-05',
-    description: 'إعداد تقارير المطابقة لمتطلبات الشركة السعودية للكهرباء وكود البناء السعودي للطاقة المتجددة',
-    completedOrdersCount: 27,
-    status: 'active',
-    iconType: 'clipboard',
-  },
-])
-
-function getServiceIcon(type: string) {
-  switch (type) {
-    case 'solar': return Sun
-    case 'battery': return BatteryCharging
-    case 'droplet': return Droplets
-    case 'search': return Search
-    case 'clipboard': return ClipboardList
-    default: return Briefcase
-  }
-}
-
-const newService = ref({
-  title: '',
-  code: '',
-  description: '',
+// SSR Data Fetching via useAsyncData
+const { refresh, pending } = await useAsyncData('admin-master-service-types', async () => {
+  return await fetchServiceTypes(true)
 })
 
-function handleAddService() {
-  if (!newService.value.title || !newService.value.code) return
-  serviceTypes.value.push({
-    id: String(Date.now()),
-    title: newService.value.title,
-    code: newService.value.code,
-    description: newService.value.description,
-    completedOrdersCount: 0,
-    status: 'active',
-    iconType: 'solar',
-  })
-  isAddModalOpen.value = false
-  newService.value = { title: '', code: '', description: '' }
+const searchQuery = ref('')
+const selectedService = ref<ServiceType | null>(null)
+const isDetailModalOpen = ref(false)
+
+function getServiceIcon(name: string) {
+  const n = (name || '').toLowerCase()
+  if (n.includes('شمس') || n.includes('on-grid') || n.includes('pv') || n.includes('ألواح')) return Sun
+  if (n.includes('بطار') || n.includes('تخزين') || n.includes('bess') || n.includes('ليثيوم')) return BatteryCharging
+  if (n.includes('مضخ') || n.includes('مياه') || n.includes('ري')) return Droplets
+  if (n.includes('فحص') || n.includes('اختبار') || n.includes('صيانة') || n.includes('تدقيق')) return Wrench
+  return Briefcase
 }
 
-function deleteService(id: string) {
-  serviceTypes.value = serviceTypes.value.filter(s => s.id !== id)
+const filteredServiceTypes = computed(() => {
+  if (!searchQuery.value.trim()) return serviceTypes.value
+  const q = searchQuery.value.trim().toLowerCase()
+  return serviceTypes.value.filter(
+    s => s.name.toLowerCase().includes(q) || (s.description && s.description.toLowerCase().includes(q))
+  )
+})
+
+function viewDetails(service: ServiceType) {
+  selectedService.value = service
+  isDetailModalOpen.value = true
 }
 </script>
 
 <template>
   <div class="flex flex-col gap-6">
     <!-- عنوان الصفحة الرئيسي -->
-    <div class="flex flex-col gap-2">
-      <h1 class="text-xl sm:text-2xl font-black text-solar-text-heading">إدارة البيانات الأساسية</h1>
-      <p class="text-xs sm:text-sm text-solar-text-muted">
-        إدارة وتوصيف باقات الخدمات الهندسية والميدانية المتاحة للمستخدمين وتعيينها للمهندسين المعتمدين.
-      </p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-xl sm:text-2xl font-black text-solar-text-heading">إدارة البيانات الأساسية</h1>
+        <p class="text-xs sm:text-sm text-solar-text-muted mt-1">
+          إدارة وتوصيف باقات الخدمات الهندسية والميدانية المتاحة للمستخدمين وتعيينها للمهندسين المعتمدين.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          @click="() => refresh()"
+          :disabled="pending || isLoading"
+          class="btn-outline h-10 px-4 text-xs font-bold gap-2 text-solar-text-body hover:bg-solar-bg-subtle"
+          title="تحديث البيانات من السيرفر"
+        >
+          <RefreshCw class="size-4" :class="{ 'animate-spin': pending || isLoading }" />
+          <span>تحديث</span>
+        </button>
+      </div>
     </div>
 
     <!-- شريط التبويبات -->
@@ -121,109 +87,96 @@ function deleteService(id: string) {
 
     <!-- كارد باقات الخدمات -->
     <div class="solar-card p-5 sm:p-7">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-solar-border-card/60 pb-5">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-solar-border-card/60 pb-5">
         <div class="flex items-center gap-3">
           <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-navy text-white">
             <Briefcase class="size-5" />
           </div>
           <div>
             <h2 class="text-base sm:text-lg font-black text-solar-text-heading">قائمة باقات وأنواع الخدمات الهندسية</h2>
-            <p class="text-xs text-solar-text-muted">تحديد نطاق الأعمال الهندسية والاستشارية والفحص الميداني.</p>
+            <p class="text-xs text-solar-text-muted">
+              إجمالي باقات الخدمات المعتمدة في النظام: {{ serviceTypes.length }} باقة
+            </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          @click="isAddModalOpen = true"
-          class="btn-primary h-10 px-5 text-xs font-bold gap-2 bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md self-start sm:self-auto"
-        >
-          <Plus class="size-4" />
-          <span>إضافة نوع خدمة جديد</span>
-        </button>
+        <!-- البحث -->
+        <div class="relative min-w-[200px] sm:min-w-[280px]">
+          <Search class="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-solar-text-muted" />
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="البحث في مسمى أو وصف الباقة..."
+            class="solar-input h-10 pr-9 pl-4 text-xs w-full"
+          />
+        </div>
+      </div>
+
+      <!-- حالة التحميل -->
+      <div v-if="pending && serviceTypes.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
+        <Loader2 class="size-8 text-solar-navy animate-spin mb-3" />
+        <p class="text-xs font-bold text-solar-text-muted">جاري جلب باقات الخدمات الهندسية من السيرفر...</p>
       </div>
 
       <!-- جدول الخدمات -->
-      <div class="mt-6 overflow-x-auto rounded-xl border border-solar-border-card/80">
+      <div v-else class="mt-6 overflow-x-auto rounded-xl border border-solar-border-card/80">
         <table class="w-full text-right text-xs">
           <thead class="bg-solar-bg-subtle/70 text-solar-text-muted font-bold border-b border-solar-border-card">
             <tr>
-              <th class="py-3.5 px-4 font-bold text-center">الأيقونة</th>
-              <th class="py-3.5 px-4 font-bold">اسم نوع الخدمة</th>
-              <th class="py-3.5 px-4 font-bold font-mono">كود الخدمة</th>
-              <th class="py-3.5 px-4 font-bold">الوصف الهندسي / نطاق العمل</th>
-              <th class="py-3.5 px-4 font-bold text-center">عدد المشاريع والطلبات</th>
-              <th class="py-3.5 px-4 font-bold text-center">حالة التفعيل</th>
+              <th class="py-3.5 px-4 font-bold text-center w-14">الرمز</th>
+              <th class="py-3.5 px-4 font-bold">مسمى باقة الخدمة الهندسية</th>
+              <th class="py-3.5 px-4 font-bold">النطاق الفني وتفاصيل التنفيذ</th>
+              <th class="py-3.5 px-4 font-bold text-center">حالة الخدمة</th>
               <th class="py-3.5 px-4 font-bold text-center">الإجراءات</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-solar-border-card/60">
             <tr
-              v-for="item in serviceTypes"
+              v-for="item in filteredServiceTypes"
               :key="item.id"
               class="transition-colors hover:bg-solar-bg-subtle/30"
             >
               <!-- الأيقونة -->
               <td class="py-4 px-4 text-center">
-                <span class="inline-flex size-10 items-center justify-center rounded-xl bg-amber-50 border border-amber-100 text-amber-700">
-                  <component :is="getServiceIcon(item.iconType)" class="size-5" />
+                <span class="inline-flex size-9 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-navy shadow-2xs">
+                  <component :is="getServiceIcon(item.name)" class="size-4" />
                 </span>
               </td>
 
-              <!-- اسم الخدمة -->
-              <td class="py-4 px-4 font-extrabold text-solar-text-heading text-sm">
-                {{ item.title }}
+              <!-- مسمى الباقة -->
+              <td class="py-4 px-4">
+                <p class="font-extrabold text-solar-text-heading text-sm">{{ item.name }}</p>
+                <p class="font-mono text-[11px] text-solar-text-muted mt-0.5">SRV-0{{ item.id }}</p>
               </td>
 
-              <!-- كود الخدمة -->
-              <td class="py-4 px-4 font-mono font-bold text-solar-navy-dark">
-                <span class="rounded bg-slate-100 px-2 py-0.5">
-                  {{ item.code }}
-                </span>
+              <!-- تفاصيل التنفيذ -->
+              <td class="py-4 px-4 text-solar-text-body leading-relaxed max-w-md">
+                <p class="line-clamp-2 text-xs text-solar-text-muted font-medium">
+                  {{ item.description || 'لا يوجد وصف مدخل لهذه الباقة.' }}
+                </p>
               </td>
 
-              <!-- نطاق العمل -->
-              <td class="py-4 px-4 text-solar-text-muted max-w-sm leading-relaxed text-xs">
-                {{ item.description }}
-              </td>
-
-              <!-- الطلبات المنجزة -->
-              <td class="py-4 px-4 text-center font-bold text-solar-text-heading">
-                <span class="rounded-lg bg-sky-50 text-sky-800 border border-sky-100 px-2.5 py-1 text-xs">
-                  {{ item.completedOrdersCount }} طلب منجز
-                </span>
-              </td>
-
-              <!-- حالة التفعيل -->
+              <!-- حالة الخدمة -->
               <td class="py-4 px-4 text-center">
-                <AdminBadge :status="item.status === 'active' ? 'مفعل' : 'معطل'" />
+                <AdminBadge :status="item.is_active !== false ? 'مفعل' : 'معطل'" />
               </td>
 
               <!-- الإجراءات -->
               <td class="py-4 px-4 text-center">
-                <div class="flex items-center justify-center gap-1">
-                  <button
-                    type="button"
-                    class="flex size-8 items-center justify-center rounded-lg text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-navy transition-colors"
-                    title="معاينة"
-                  >
-                    <Eye class="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    class="flex size-8 items-center justify-center rounded-lg text-solar-text-body hover:bg-solar-bg-subtle hover:text-amber-600 transition-colors"
-                    title="تعديل"
-                  >
-                    <Pencil class="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    @click="deleteService(item.id)"
-                    class="flex size-8 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
-                    title="حذف"
-                  >
-                    <Trash2 class="size-4" />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  @click="viewDetails(item)"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-solar-navy bg-sky-50 hover:bg-sky-100 font-bold text-xs transition-colors"
+                >
+                  <Eye class="size-3.5" />
+                  <span>معاينة التفاصيل</span>
+                </button>
+              </td>
+            </tr>
+
+            <tr v-if="filteredServiceTypes.length === 0">
+              <td colspan="5" class="py-12 text-center text-solar-text-muted">
+                لا توجد خدمات مطابقة لمعايير البحث الحالية.
               </td>
             </tr>
           </tbody>
@@ -231,35 +184,57 @@ function deleteService(id: string) {
       </div>
     </div>
 
-    <!-- نافذة إضافة نوع خدمة جديد -->
+    <!-- نافذة معاينة تفاصيل باقة الخدمة -->
     <AdminModal
-      v-model="isAddModalOpen"
-      title="إضافة نوع خدمة هندسية جديدة"
-      subtitle="تعريف باقة أعمال هندسية جديدة متاحة لطلبات العملاء"
+      v-model="isDetailModalOpen"
+      title="تفاصيل باقة الخدمة الهندسية"
+      subtitle="استعراض النطاق الفني واشتراطات التنفيذ"
       :icon="Briefcase"
       max-width="md"
     >
-      <form @submit.prevent="handleAddService" class="flex flex-col gap-4">
-        <div>
-          <label class="block text-xs font-bold text-solar-text-body mb-1.5">اسم نوع الخدمة *</label>
-          <input v-model="newService.title" type="text" required placeholder="مثال: فحص دوري للمنظومات الصناعية" class="solar-input h-11 text-xs" />
+      <div v-if="selectedService" class="flex flex-col gap-4">
+        <div class="flex items-center gap-3 p-3.5 rounded-xl bg-solar-bg-subtle/80 border border-solar-border-card">
+          <div class="size-11 rounded-xl bg-solar-navy text-white flex items-center justify-center shrink-0">
+            <component :is="getServiceIcon(selectedService.name)" class="size-5" />
+          </div>
+          <div>
+            <h3 class="font-black text-sm text-solar-text-heading">{{ selectedService.name }}</h3>
+            <p class="text-xs text-solar-text-muted font-mono mt-0.5">كود الباقة: SRV-0{{ selectedService.id }}</p>
+          </div>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-solar-text-body mb-1.5">كود الخدمة (Code) *</label>
-          <input v-model="newService.code" type="text" required placeholder="SRV-06" dir="ltr" class="solar-input h-11 text-xs font-mono text-right" />
+          <label class="block text-xs font-bold text-solar-text-heading mb-1.5">نطاق الأعمال والمواصفات الفنية:</label>
+          <div class="p-3.5 rounded-xl border border-solar-border-card bg-white text-xs text-solar-text-body leading-relaxed whitespace-pre-line">
+            {{ selectedService.description || 'لم يتم إدراج مواصفات فنية إضافية.' }}
+          </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-bold text-solar-text-body mb-1.5">الوصف الهندسي لنطاق العمل</label>
-          <textarea v-model="newService.description" rows="3" placeholder="تحديد نطاق الأعمال المشمولة في هذه الخدمة..." class="solar-input p-3 text-xs resize-y" />
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <p class="text-[11px] text-solar-text-muted font-bold">الحالة الإدارية</p>
+            <p class="text-xs font-black text-solar-text-heading mt-1">
+              {{ selectedService.is_active !== false ? 'مفعلة في طلبات العملاء' : 'معطلة مؤقتاً' }}
+            </p>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <p class="text-[11px] text-solar-text-muted font-bold">الربط البرمجي</p>
+            <p class="text-xs font-black text-emerald-600 mt-1">
+              متصل بقاعدة البيانات API
+            </p>
+          </div>
         </div>
 
-        <div class="flex items-center justify-end gap-3 pt-4 border-t border-solar-border-card mt-2">
-          <button type="button" @click="isAddModalOpen = false" class="btn-outline h-10 px-5 text-xs font-bold">إلغاء</button>
-          <button type="submit" class="btn-primary h-10 px-6 text-xs font-bold bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md">حفظ الخدمة</button>
+        <div class="flex justify-end pt-4 border-t border-solar-border-card">
+          <button
+            type="button"
+            @click="isDetailModalOpen = false"
+            class="btn-primary h-10 px-6 text-xs font-bold bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md"
+          >
+            إغلاق
+          </button>
         </div>
-      </form>
+      </div>
     </AdminModal>
   </div>
 </template>
