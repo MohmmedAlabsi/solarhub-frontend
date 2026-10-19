@@ -27,9 +27,9 @@ const {
   deleteCity,
 } = useAdminMasterData()
 
-// SSR Data Fetching via useAsyncData
-const { refresh, pending } = await useAsyncData('admin-master-cities', async () => {
-  return await fetchCities(true)
+// Non-blocking lazy SSR Data Fetching for instant navigation
+const { refresh, pending } = useLazyAsyncData('admin-master-cities', () => fetchCities(false), {
+  default: () => cities.value,
 })
 
 const searchQuery = ref('')

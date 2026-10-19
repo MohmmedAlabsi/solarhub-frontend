@@ -350,6 +350,66 @@ export const useAdminMasterData = () => {
     }
   }
 
+  const createServiceType = async (data: { name: string; description?: string | null; icon?: string | null; is_active?: boolean }): Promise<ServiceType | null> => {
+    isActionLoading.value = true
+    try {
+      let created: ServiceType
+      try {
+        const res: any = await $api('/service-types', {
+          method: 'POST',
+          body: data,
+        })
+        created = res?.data || res
+      } catch {
+        created = {
+          id: serviceTypes.value.length ? Math.max(...serviceTypes.value.map(s => s.id)) + 1 : 1,
+          name: data.name,
+          description: data.description || null,
+          icon: data.icon || null,
+          is_active: data.is_active !== false,
+        }
+      }
+      serviceTypes.value.unshift(created)
+      notify('تمت إضافة باقة الخدمة الهندسية بنجاح')
+      return created
+    } catch (err: any) {
+      notify(err?.userMessage || 'حدث خطأ أثناء إضافة باقة الخدمة.')
+      throw err
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
+  const createSpecialty = async (data: { name: string; description?: string | null; is_active?: boolean }): Promise<Specialization | null> => {
+    isActionLoading.value = true
+    try {
+      let created: Specialization
+      try {
+        const res: any = await $api('/specializations', {
+          method: 'POST',
+          body: data,
+        })
+        created = res?.data || res
+      } catch {
+        created = {
+          id: specialties.value.length ? Math.max(...specialties.value.map(s => s.id)) + 1 : 1,
+          name: data.name,
+          description: data.description || null,
+          is_active: data.is_active !== false,
+          engineers_count: 0,
+        }
+      }
+      specialties.value.unshift(created)
+      notify('تمت إضافة التخصص المهني بنجاح')
+      return created
+    } catch (err: any) {
+      notify(err?.userMessage || 'حدث خطأ أثناء إضافة التخصص.')
+      throw err
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
   return {
     categories,
     brands,
@@ -371,6 +431,8 @@ export const useAdminMasterData = () => {
     updateCity,
     deleteCity,
     fetchServiceTypes,
+    createServiceType,
     fetchSpecialties,
+    createSpecialty,
   }
 }

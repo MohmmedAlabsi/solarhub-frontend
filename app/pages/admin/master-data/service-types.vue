@@ -6,6 +6,7 @@ import {
   Droplets,
   Eye,
   Loader2,
+  Plus,
   RefreshCw,
   Search,
   Sun,
@@ -22,17 +23,26 @@ useSeoMeta({ title: 'إدارة البيانات الأساسية — أنواع
 const {
   serviceTypes,
   isLoading,
+  isActionLoading,
   fetchServiceTypes,
+  createServiceType,
 } = useAdminMasterData()
 
-// SSR Data Fetching via useAsyncData
-const { refresh, pending } = await useAsyncData('admin-master-service-types', async () => {
-  return await fetchServiceTypes(true)
+// Non-blocking lazy SSR Data Fetching for instant navigation
+const { refresh, pending } = useLazyAsyncData('admin-master-service-types', () => fetchServiceTypes(false), {
+  default: () => serviceTypes.value,
 })
 
 const searchQuery = ref('')
 const selectedService = ref<ServiceType | null>(null)
 const isDetailModalOpen = ref(false)
+const isAddModalOpen = ref(false)
+
+const newService = ref({
+  name: '',
+  description: '',
+  is_active: true,
+})
 
 function getServiceIcon(name: string) {
   const n = (name || '').toLowerCase()
@@ -54,6 +64,21 @@ const filteredServiceTypes = computed(() => {
 function viewDetails(service: ServiceType) {
   selectedService.value = service
   isDetailModalOpen.value = true
+}
+
+async function handleAddService() {
+  if (!newService.value.name.trim()) return
+  try {
+    await createServiceType({
+      name: newService.value.name.trim(),
+      description: newService.value.description.trim() || undefined,
+      is_active: newService.value.is_active,
+    })
+    isAddModalOpen.value = false
+    newService.value = { name: '', description: '', is_active: true }
+  } catch {
+    /* error handled in composable */
+  }
 }
 </script>
 
@@ -78,6 +103,15 @@ function viewDetails(service: ServiceType) {
         >
           <RefreshCw class="size-4" :class="{ 'animate-spin': pending || isLoading }" />
           <span>تحديث</span>
+        </button>
+
+        <button
+          type="button"
+          @click="isAddModalOpen = true"
+          class="btn-primary h-10 px-5 text-xs font-bold gap-2 bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md"
+        >
+          <Plus class="size-4" />
+          <span>إضافة خدمة جديدة</span>
         </button>
       </div>
     </div>
@@ -112,7 +146,7 @@ function viewDetails(service: ServiceType) {
         </div>
       </div>
 
-      <!-- حالة التحميل -->
+      <!-- حالة التحميل الأولي فقط -->
       <div v-if="pending && serviceTypes.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
         <Loader2 class="size-8 text-solar-navy animate-spin mb-3" />
         <p class="text-xs font-bold text-solar-text-muted">جاري جلب باقات الخدمات الهندسية من السيرفر...</p>
@@ -183,6 +217,69 @@ function viewDetails(service: ServiceType) {
         </table>
       </div>
     </div>
+
+    <!-- نافذة إضافة خدمة جديدة -->
+    <AdminModal
+      v-model="isAddModalOpen"
+      title="إضافة باقة خدمة هندسية جديدة"
+      subtitle="تحديد نطاق الأعمال الهندسية والاستشارية الجديدة في المنصة"
+      :icon="Briefcase"
+      max-width="md"
+    >
+      <form @submit.prevent="handleAddService" class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs font-bold text-solar-text-body mb-1.5">مسمى باقة الخدمة *</label>
+          <input
+            v-model="newService.name"
+            type="text"
+            required
+            placeholder="مثال: فحص وتدقيق كفاءة الألواح عبر الدرون الحراري"
+            class="solar-input h-11 text-xs w-full"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-solar-text-body mb-1.5">النطاق والوصف الفني للخدمة</label>
+          <textarea
+            v-model="newService.description"
+            rows="3"
+            placeholder="التصوير الحراري بالأشعة تحت الحمراء وفحص منحنيات I-V..."
+            class="solar-input text-xs w-full py-2.5 resize-none"
+          />
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input
+            id="service-active"
+            v-model="newService.is_active"
+            type="checkbox"
+            class="size-4 rounded text-solar-navy focus:ring-solar-navy"
+          />
+          <label for="service-active" class="text-xs font-bold text-solar-text-heading cursor-pointer">
+            تفعيل باقة الخدمة وإتاحتها لطلبات العملاء
+          </label>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-solar-border-card mt-2">
+          <button
+            type="button"
+            @click="isAddModalOpen = false"
+            :disabled="isActionLoading"
+            class="btn-outline h-10 px-5 text-xs font-bold"
+          >
+            إلغاء
+          </button>
+          <button
+            type="submit"
+            :disabled="isActionLoading"
+            class="btn-primary h-10 px-6 text-xs font-bold gap-2 bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md"
+          >
+            <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+            <span>حفظ الخدمة</span>
+          </button>
+        </div>
+      </form>
+    </AdminModal>
 
     <!-- نافذة معاينة تفاصيل باقة الخدمة -->
     <AdminModal

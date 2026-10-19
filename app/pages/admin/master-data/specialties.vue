@@ -5,6 +5,7 @@ import {
   Eye,
   Grid,
   Loader2,
+  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -22,17 +23,26 @@ useSeoMeta({ title: 'إدارة البيانات الأساسية — التخص
 const {
   specialties,
   isLoading,
+  isActionLoading,
   fetchSpecialties,
+  createSpecialty,
 } = useAdminMasterData()
 
-// SSR Data Fetching via useAsyncData
-const { refresh, pending } = await useAsyncData('admin-master-specialties', async () => {
-  return await fetchSpecialties(true)
+// Non-blocking lazy SSR Data Fetching for instant navigation
+const { refresh, pending } = useLazyAsyncData('admin-master-specialties', () => fetchSpecialties(false), {
+  default: () => specialties.value,
 })
 
 const searchQuery = ref('')
 const selectedSpecialty = ref<Specialization | null>(null)
 const isDetailModalOpen = ref(false)
+const isAddModalOpen = ref(false)
+
+const newSpec = ref({
+  name: '',
+  description: '',
+  is_active: true,
+})
 
 function getSpecialtyIcon(name: string) {
   const n = (name || '').toLowerCase()
@@ -55,6 +65,21 @@ const filteredSpecialties = computed(() => {
 function viewDetails(spec: Specialization) {
   selectedSpecialty.value = spec
   isDetailModalOpen.value = true
+}
+
+async function handleAddSpecialty() {
+  if (!newSpec.value.name.trim()) return
+  try {
+    await createSpecialty({
+      name: newSpec.value.name.trim(),
+      description: newSpec.value.description.trim() || undefined,
+      is_active: newSpec.value.is_active,
+    })
+    isAddModalOpen.value = false
+    newSpec.value = { name: '', description: '', is_active: true }
+  } catch {
+    /* error handled in composable */
+  }
 }
 </script>
 
@@ -79,6 +104,15 @@ function viewDetails(spec: Specialization) {
         >
           <RefreshCw class="size-4" :class="{ 'animate-spin': pending || isLoading }" />
           <span>تحديث</span>
+        </button>
+
+        <button
+          type="button"
+          @click="isAddModalOpen = true"
+          class="btn-primary h-10 px-5 text-xs font-bold gap-2 bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md"
+        >
+          <Plus class="size-4" />
+          <span>إضافة تخصص جديد</span>
         </button>
       </div>
     </div>
@@ -113,7 +147,7 @@ function viewDetails(spec: Specialization) {
         </div>
       </div>
 
-      <!-- حالة التحميل -->
+      <!-- حالة التحميل الأولي فقط -->
       <div v-if="pending && specialties.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
         <Loader2 class="size-8 text-solar-navy animate-spin mb-3" />
         <p class="text-xs font-bold text-solar-text-muted">جاري تحميل مجالات التخصص المهني من السيرفر...</p>
@@ -193,6 +227,69 @@ function viewDetails(spec: Specialization) {
         </table>
       </div>
     </div>
+
+    <!-- نافذة إضافة تخصص جديد -->
+    <AdminModal
+      v-model="isAddModalOpen"
+      title="إضافة تخصص مهني جديد"
+      subtitle="تسجيل مجال اعتماد هندسي جديد في المنظومة"
+      :icon="Users"
+      max-width="md"
+    >
+      <form @submit.prevent="handleAddSpecialty" class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs font-bold text-solar-text-body mb-1.5">مسمى التخصص الهندسي *</label>
+          <input
+            v-model="newSpec.name"
+            type="text"
+            required
+            placeholder="مثال: هندسة أنظمة الطاقة الشمسية الهجينة BESS"
+            class="solar-input h-11 text-xs w-full"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-solar-text-body mb-1.5">النطاق والوصف الفني للتخصص</label>
+          <textarea
+            v-model="newSpec.description"
+            rows="3"
+            placeholder="دراسة ومطابقة كود SBC وتصميم منظومات تخزين الطاقة..."
+            class="solar-input text-xs w-full py-2.5 resize-none"
+          />
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input
+            id="spec-active"
+            v-model="newSpec.is_active"
+            type="checkbox"
+            class="size-4 rounded text-solar-navy focus:ring-solar-navy"
+          />
+          <label for="spec-active" class="text-xs font-bold text-solar-text-heading cursor-pointer">
+            تفعيل التخصص واعتماده في ملفات تسجيل المهندسين
+          </label>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-solar-border-card mt-2">
+          <button
+            type="button"
+            @click="isAddModalOpen = false"
+            :disabled="isActionLoading"
+            class="btn-outline h-10 px-5 text-xs font-bold"
+          >
+            إلغاء
+          </button>
+          <button
+            type="submit"
+            :disabled="isActionLoading"
+            class="btn-primary h-10 px-6 text-xs font-bold gap-2 bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md"
+          >
+            <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+            <span>حفظ التخصص</span>
+          </button>
+        </div>
+      </form>
+    </AdminModal>
 
     <!-- نافذة معاينة تفاصيل التخصص -->
     <AdminModal

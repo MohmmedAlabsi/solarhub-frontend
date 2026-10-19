@@ -28,9 +28,9 @@ const {
   deleteBrand,
 } = useAdminMasterData()
 
-// SSR Data Fetching via useAsyncData
-const { refresh, pending } = await useAsyncData('admin-master-brands', async () => {
-  return await fetchBrands(true)
+// Non-blocking lazy SSR Data Fetching for instant navigation
+const { refresh, pending } = useLazyAsyncData('admin-master-brands', () => fetchBrands(false), {
+  default: () => brands.value,
 })
 
 const searchQuery = ref('')

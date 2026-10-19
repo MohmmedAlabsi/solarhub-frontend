@@ -28,9 +28,9 @@ const {
   deleteCategory,
 } = useAdminMasterData()
 
-// SSR Data Fetching via useAsyncData
-const { refresh, pending } = await useAsyncData('admin-master-categories', async () => {
-  return await fetchCategories(true)
+// Non-blocking lazy SSR Data Fetching for instant navigation
+const { refresh, pending } = useLazyAsyncData('admin-master-categories', () => fetchCategories(false), {
+  default: () => categories.value,
 })
 
 const searchQuery = ref('')

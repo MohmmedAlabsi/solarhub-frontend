@@ -48,12 +48,12 @@ const editingProduct = ref<MasterProduct | null>(null)
 const productToDelete = ref<MasterProduct | null>(null)
 const isDeleting = ref(false)
 
-// SSR Data Fetching with useAsyncData
+// Non-blocking SSR Data Fetching with useLazyAsyncData for instant sidebar navigation
 const {
   data: catalogData,
   pending: isLoading,
   refresh: refreshCatalog,
-} = await useAsyncData(
+} = useLazyAsyncData(
   'admin_master_catalog',
   async () => {
     const [productsRes, catList, brandList] = await Promise.all([
