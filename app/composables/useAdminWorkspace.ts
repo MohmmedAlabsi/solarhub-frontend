@@ -1,7 +1,6 @@
 import type { MaybeRefOrGetter } from 'vue'
 import type { AdminApproval, AdminAudience, AdminBroadcast, AdminDisplayPreferences, AdminEngineer, AdminPlatformSettings, AdminReview, AdminServiceRequest, AdminServiceStatus, AdminSupplier, AdminUser, AdminOrder } from '../../types/admin'
 import { adminBroadcasts, adminEngineerReviews, adminEngineers, adminServices, adminSupplierReviews, adminSuppliers, adminUsers } from '../data/admin-workspace'
-import { adminOrderSeed } from '../data/admin-orders'
 
 interface AdminWorkspaceData {
   users: AdminUser[]; suppliers: AdminSupplier[]; engineers: AdminEngineer[]; services: AdminServiceRequest[]
@@ -18,7 +17,10 @@ export function useAdminWorkspace() {
     preferences:{language:'ar',theme:'light',density:'comfortable'},
   }))
 }
-export function useAdminOrders() { return useState<AdminOrder[]>('admin-orders',()=>structuredClone(adminOrderSeed)) }
+export function useAdminOrders() {
+  const { orders } = useAdminOrderManagement()
+  return orders
+}
 export function useAdminNotice() {
   const notice = useState('admin-workspace-notice',()=>({message:'',revision:0}))
   function notify(message:string) {

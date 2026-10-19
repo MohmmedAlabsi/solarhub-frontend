@@ -131,6 +131,28 @@ export interface StoreProduct {
   };
 }
 
+export interface Order {
+  id: number;
+  order_number: string;
+  customer_id: number;
+  delivery_governorate_id: number;
+  total_amount: number;
+  delivery_address: string;
+  delivery_coordinates?: string | null;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'completed' | 'cancelled';
+  created_at: string;
+  updated_at?: string;
+  customer?: {
+    id: number;
+    name: string;
+    phone?: string;
+    email?: string;
+  };
+  governorate?: Governorate;
+  order_stores?: OrderStore[];
+  payments?: OrderPayment[];
+}
+
 export interface OrderItem {
   id: number;
   store_product_id: number;
