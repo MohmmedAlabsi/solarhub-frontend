@@ -6,6 +6,18 @@ import { serviceOptions, serviceRegions } from '../../../composables/useServiceR
 
 const { form, errors, attachments, submitting, submissionState, statusMessage, addAttachments, removeAttachment, submit } = useServiceRequest()
 const controlClass = 'solar-input min-h-11 min-w-0 disabled:opacity-60'
+
+const isMapModalOpen = ref(false)
+
+function handleLocationSelected(loc: { address: string; lat: number; lng: number; governorate?: string }) {
+  form.location = `${loc.address} (إحداثيات: ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)})`
+  if (loc.governorate) {
+    const match = serviceRegions.find(r => r.includes(loc.governorate!) || loc.governorate!.includes(r))
+    if (match) {
+      form.region = match
+    }
+  }
+}
 </script>
 
 <template>
@@ -34,7 +46,17 @@ const controlClass = 'solar-input min-h-11 min-w-0 disabled:opacity-60'
         <p class="mt-3 text-xs leading-4 text-solar-text-muted">اكتب شرحًا وافيًا للأحمال واحتياجات الطاقة لمساعدة المهندس على تقديم عرض دقيق.</p>
       </section>
       <section aria-labelledby="location-heading">
-        <h2 id="location-heading" class="mb-5 flex items-center gap-2 text-lg font-bold text-solar-text-heading"><MapPin class="size-8 rounded-lg bg-solar-status-info-bg p-1.5" aria-hidden="true" />القسم الثالث: معلومات الموقع</h2>
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="location-heading" class="flex items-center gap-2 text-lg font-bold text-solar-text-heading"><MapPin class="size-8 rounded-lg bg-solar-status-info-bg p-1.5" aria-hidden="true" />القسم الثالث: معلومات الموقع</h2>
+          <button
+            type="button"
+            @click="isMapModalOpen = true"
+            class="inline-flex items-center gap-1.5 rounded-xl border border-solar-yellow bg-solar-yellow/20 px-3.5 py-1.5 text-xs font-bold text-solar-navy-dark hover:bg-solar-yellow/30 transition-all cursor-pointer shadow-2xs"
+          >
+            <MapPin class="size-4 text-solar-navy-dark" />
+            <span>تحديد موقع المشروع على الخريطة</span>
+          </button>
+        </div>
         <FormField label="معلومات الموقع والمكان" required :error="errors.location"><textarea v-model="form.location" :class="controlClass" class="h-[102px] min-h-[102px] resize-y" required minlength="10" maxlength="1500" :aria-invalid="!!errors.location" placeholder="مثال: مبنى سكني مكون من دورين وسطح خرساني معزول، أو مزرعة بأرض مستوية، والمدينة والحي بالتحديد..." /></FormField>
         <p class="mt-3 text-xs leading-[18px] text-solar-text-muted">طبيعة المبنى أو الأرض، نوع السطح (خرساني، قرميد، شنكو، أرضي)، وسهولة الوصول للموقع.</p>
       </section>
@@ -49,6 +71,16 @@ const controlClass = 'solar-input min-h-11 min-w-0 disabled:opacity-60'
       <button type="submit" :disabled="submitting || submissionState === 'success'" class="btn-primary h-11 w-full shrink-0 bg-[#ffc019] px-6 text-base font-bold text-[#17232e] shadow-none disabled:cursor-wait sm:w-[200px]">{{ submitting ? 'جارٍ الإرسال التجريبي...' : 'نشر الطلب' }}<ArrowLeft class="size-5" aria-hidden="true" /></button>
     </div>
     <p v-if="statusMessage" class="mt-4 rounded-lg p-4 text-sm leading-7" :class="submissionState === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-800'" role="status" aria-live="polite">{{ statusMessage }}</p>
+
+    <!-- نافذة تحديد موقع المشروع على الخريطة -->
+    <CommonMapLocationModal
+      :is-open="isMapModalOpen"
+      :current-location="form.location"
+      title="تحديد موقع مشروع الطاقة الشمسية على الخريطة"
+      subtitle="حدد موقع السطح أو المزرعة أو المبنى لتمكين المهندسين من دراسة الإشعاع الشمسي وحساب التكاليف بدقة"
+      @close="isMapModalOpen = false"
+      @select="handleLocationSelected"
+    />
   </form>
 </template>
 
