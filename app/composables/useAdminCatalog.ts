@@ -83,7 +83,7 @@ export const useAdminCatalog = () => {
     isLoading.value = true
     try {
       const res: any = await $api(`/master-products/${id}`)
-      return res as MasterProduct
+      return (res?.data ?? res) as MasterProduct
     } catch (err: any) {
       notify(err?.data?.userMessage || 'تعذر جلب تفاصيل المنتج.')
       return null
@@ -103,7 +103,7 @@ export const useAdminCatalog = () => {
         body: payload,
       })
       notify('تمت إضافة المنتج بنجاح إلى الكتالوج المرجعي!')
-      return res as MasterProduct
+      return (res?.data ?? res) as MasterProduct
     } catch (err: any) {
       const msg = err?.data?.userMessage || 'تعذر إضافة المنتج. يرجى مراجعة الحقول.'
       notify(msg)
@@ -125,7 +125,7 @@ export const useAdminCatalog = () => {
         body: payload,
       })
       notify('تم تحديث بيانات المنتج بنجاح!')
-      return res as MasterProduct
+      return (res?.data ?? res) as MasterProduct
     } catch (err: any) {
       const msg = err?.data?.userMessage || 'تعذر تحديث المنتج.'
       notify(msg)

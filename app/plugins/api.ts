@@ -1,106 +1,95 @@
-export default defineNuxtPlugin((nuxtApp) => {
-  const config = useRuntimeConfig();
+export default defineNuxtPlugin(() => {
+  const config = useRuntimeConfig()
 
   // Unified Sanctum Token lookup across SSR and Client
   const tokenCookie = useCookie<string | null>('auth_token', {
     maxAge: 60 * 60 * 24 * 7, // 7 days
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production'
-  });
+    secure: process.env.NODE_ENV === 'production',
+  })
 
   const getActiveToken = (): string | null => {
-    if (tokenCookie.value) return tokenCookie.value;
+    if (tokenCookie.value) return tokenCookie.value
     if (import.meta.client) {
       try {
-        const local = localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token');
-        if (local) return local;
+        const local = localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token')
+        if (local) return local
       } catch {
         /* storage fallback */
       }
     }
-    return null;
-  };
+    return null
+  }
 
-  const api = $fetch.create({
-    baseURL: config.public.apiBase || 'http://localhost:8000/api',
+  const baseURL =
+    (config.public.apiBaseUrl as string) ||
+    (config.public.apiBase as string) ||
+    'http://127.0.0.1:8000/api'
 
-    onRequest({ options }) {
-      options.headers = options.headers || {};
-      const headers = options.headers as Record<string, string>;
-
-      // Ensure JSON accept
-      headers['Accept'] = 'application/json';
-
-      // Attach Sanctum Bearer token if present
-      const token = getActiveToken();
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+  const apiFetcher = $fetch.create({
+    baseURL,
+    headers: {
+      Accept: 'application/json',
     },
 
-    onResponse({ response }) {
-      // Automatically unwrap standard Laravel ApiResponseTrait { status, message, data, meta }
-      if (
-        response._data &&
-        typeof response._data === 'object' &&
-        'status' in response._data &&
-        'data' in response._data
-      ) {
-        const raw = response._data;
-        response._data = raw.data;
-        // Keep meta/pagination and original message if present
-        if (raw.meta) {
-          (response._data as any)._meta = raw.meta;
+    onRequest({ options }) {
+      const token = getActiveToken()
+      if (token) {
+        const headers = new Headers(options.headers)
+        if (!headers.has('Authorization')) {
+          headers.set('Authorization', `Bearer ${token}`)
         }
-        if (raw.message) {
-          (response._data as any)._message = raw.message;
-        }
+        options.headers = headers
       }
     },
 
     onResponseError({ response }) {
-      const status = response.status;
-      const data = response._data;
+      const status = response.status
+      const data = response._data
 
       // 401 Unauthorized: Session expired or invalid token
       if (status === 401) {
-        tokenCookie.value = null;
+        tokenCookie.value = null
         if (import.meta.client) {
           try {
-            localStorage.removeItem('solarhub_token');
-            localStorage.removeItem('solarhub_user');
+            localStorage.removeItem('solarhub_token')
+            localStorage.removeItem('solarhub_user')
+            localStorage.removeItem('auth_token')
           } catch {
             /* ignore */
           }
-          const router = useRouter();
-          router.push('/auth/login');
+
+          const route = useRoute()
+          // Only redirect if not already on auth pages
+          if (!route.path.startsWith('/auth/')) {
+            navigateTo('/auth/login')
+          }
         }
       }
 
-      // Format helpful error message in Arabic
-      let errorMessage = 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.';
+      // Format helpful error message in Arabic for caller components
+      let errorMessage = 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.'
       if (data && typeof data === 'object') {
         if (data.message) {
-          errorMessage = data.message;
+          errorMessage = data.message
         } else if (data.errors && typeof data.errors === 'object') {
-          // Extract first validation error
-          const firstKey = Object.keys(data.errors)[0];
+          const firstKey = Object.keys(data.errors)[0]
           if (firstKey && Array.isArray(data.errors[firstKey])) {
-            errorMessage = data.errors[firstKey][0];
+            errorMessage = data.errors[firstKey][0]
           }
         }
       }
 
       // Attach formatted message for callers
       if (response._data && typeof response._data === 'object') {
-        response._data.userMessage = errorMessage;
+        response._data.userMessage = errorMessage
       }
-    }
-  });
+    },
+  })
 
   return {
     provide: {
-      api
-    }
-  };
-});
+      api: apiFetcher,
+    },
+  }
+})

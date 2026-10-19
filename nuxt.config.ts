@@ -50,6 +50,7 @@ export default defineNuxtConfig({
 
   // ربط ملفات التنسيقات العامة ومتغيرات الهوية
   css: [
+    'leaflet/dist/leaflet.css',
     '~/assets/design-tokens.css',
     '~/assets/main.css',
   ],
@@ -57,7 +58,9 @@ export default defineNuxtConfig({
   // Laravel API المتغيرات البيئية ورابط
   runtimeConfig: {
     public: {
-      apiBase: 'http://localhost:8000/api',
+      apiBase: 'http://127.0.0.1:8000/api',
+      apiBaseUrl: 'http://127.0.0.1:8000/api',
+      appName: 'SolarHub',
     }
   },
 

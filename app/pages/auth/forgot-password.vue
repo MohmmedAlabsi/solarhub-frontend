@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ArrowLeft, AlertCircle, XCircle, CheckCircle2, Mail, HelpCircle } from 'lucide-vue-next'
-import { useAuthStore } from '~~/app/stores/auth.store'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({
   layout: 'auth',
