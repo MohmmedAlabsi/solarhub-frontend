@@ -67,6 +67,8 @@ export default defineNuxtConfig({
   // سياسة الرندرة الهجينة (Hybrid Rendering Policy) حسب معايير سولار هب
   routeRules: {
     '/products/**': { swr: 3600 },
+    '/admin/products': { ssr: true },
+    '/admin/products/**': { ssr: true },
     '/customer/**': { ssr: false },
     '/auth/**': { ssr: false },
     '/admin/**': { ssr: false },

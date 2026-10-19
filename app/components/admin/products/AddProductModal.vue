@@ -5,6 +5,7 @@ import {
   FileCheck,
   FileText,
   Loader2,
+  Pencil,
   Plus,
   Sliders,
   Star,
@@ -13,24 +14,33 @@ import {
   X,
 } from 'lucide-vue-next'
 import AdminModal from '../common/AdminModal.vue'
-import type { Brand, Category, MasterProduct } from '../../../../types/api'
+import type { Brand, Category, MasterProduct, ProductSpecification } from '../../../../types/api'
 
 const props = defineProps<{
   modelValue: boolean
+  editProduct?: MasterProduct | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'created', product: MasterProduct): void
+  (e: 'updated', product: MasterProduct): void
 }>()
 
 const {
   fetchCategories,
   fetchBrands,
+  fetchMasterProduct,
   createMasterProduct,
+  updateMasterProduct,
   addSpecification,
+  deleteSpecification,
   uploadProductImage,
+  deleteProductImage,
+  markImageFeatured,
 } = useAdminCatalog()
+
+const isEditMode = computed(() => Boolean(props.editProduct && props.editProduct.id))
 
 const categories = ref<Category[]>([])
 const brands = ref<Brand[]>([])
@@ -51,10 +61,13 @@ const form = ref({
 
 // Datasheet file
 const datasheetFile = ref<File | null>(null)
-const datasheetInfo = ref<{ name: string; size: string } | null>(null)
+const datasheetInfo = ref<{ name: string; size: string; url?: string } | null>(null)
 const datasheetInputRef = ref<HTMLInputElement | null>(null)
 
-// Product images
+// Existing images from server
+const existingImages = ref<Array<{ id: number; image_url: string; is_featured: boolean }>>([])
+
+// Newly selected local images
 interface LocalImageItem {
   id: string
   file: File
@@ -65,12 +78,20 @@ const localImages = ref<LocalImageItem[]>([])
 const imageInputRef = ref<HTMLInputElement | null>(null)
 
 // Dynamic specifications
-const dynamicSpecs = ref<Array<{ name: string; value: string; unit: string }>>([
+interface SpecItem {
+  id?: number
+  name: string
+  value: string
+  unit: string
+}
+const dynamicSpecs = ref<SpecItem[]>([])
+
+const defaultSpecs: SpecItem[] = [
   { name: 'القدرة القصوى (Pmax)', value: '585', unit: 'W' },
   { name: 'كفاءة اللوح (Module Efficiency)', value: '21.4', unit: '%' },
   { name: 'جهد الدائرة المفتوحة (Voc)', value: '50.15', unit: 'V' },
   { name: 'تيار القصر (Isc)', value: '14.28', unit: 'A' },
-])
+]
 
 onMounted(async () => {
   isLoadingMeta.value = true
@@ -81,23 +102,103 @@ onMounted(async () => {
     ])
     categories.value = catList
     brands.value = brandList
-
-    if (categories.value.length > 0 && !form.value.category_id) {
-      form.value.category_id = categories.value[0].id
-    }
-    if (brands.value.length > 0 && !form.value.brand_id) {
-      form.value.brand_id = brands.value[0].id
-    }
   } finally {
     isLoadingMeta.value = false
   }
 })
 
+// Populate form when editProduct changes or modal opens
+watch(
+  () => [props.modelValue, props.editProduct],
+  async ([isOpen, product]) => {
+    if (!isOpen) return
+
+    errorMessage.value = ''
+    successMsg.value = ''
+    datasheetFile.value = null
+
+    if (product && typeof product === 'object' && 'id' in product) {
+      // Edit mode: fetch full details to ensure specifications and images are complete
+      form.value = {
+        title: product.title || '',
+        category_id: product.category?.id || product.category_id || '',
+        brand_id: product.brand?.id || product.brand_id || '',
+        model_number: product.model_number || '',
+        is_active: !!product.is_active,
+        description: product.description || '',
+      }
+
+      if (product.datasheet_url) {
+        datasheetInfo.value = {
+          name: `${product.model_number || 'product'}_Datasheet.pdf`,
+          size: 'ملف المواصفات الفنية المعتمد (PDF)',
+          url: product.datasheet_url,
+        }
+      } else {
+        datasheetInfo.value = null
+      }
+
+      // Specifications
+      if (product.specifications && product.specifications.length > 0) {
+        dynamicSpecs.value = product.specifications.map(s => ({
+          id: s.id,
+          name: s.name,
+          value: s.value,
+          unit: s.unit || '',
+        }))
+      } else {
+        dynamicSpecs.value = [...defaultSpecs]
+      }
+
+      // Existing images
+      existingImages.value = product.images ? [...product.images] : []
+      localImages.value = []
+
+      // If specifications or images are not loaded in the listing row, fetch full single product
+      if (!product.specifications || !product.images) {
+        const full = await fetchMasterProduct(product.id)
+        if (full) {
+          if (full.specifications && full.specifications.length > 0) {
+            dynamicSpecs.value = full.specifications.map(s => ({
+              id: s.id,
+              name: s.name,
+              value: s.value,
+              unit: s.unit || '',
+            }))
+          }
+          if (full.images && full.images.length > 0) {
+            existingImages.value = [...full.images]
+          }
+          if (full.datasheet_url && !datasheetInfo.value) {
+            datasheetInfo.value = {
+              name: `${full.model_number || 'product'}_Datasheet.pdf`,
+              size: 'ملف المواصفات الفنية المعتمد (PDF)',
+              url: full.datasheet_url,
+            }
+          }
+        }
+      }
+    } else {
+      // Create mode
+      resetForm()
+    }
+  },
+  { immediate: true }
+)
+
 function addSpec() {
   dynamicSpecs.value.push({ name: '', value: '', unit: '' })
 }
 
-function removeSpec(index: number) {
+async function removeSpec(index: number) {
+  const spec = dynamicSpecs.value[index]
+  if (spec.id && isEditMode.value) {
+    try {
+      await deleteSpecification(spec.id)
+    } catch {
+      // ignore
+    }
+  }
   dynamicSpecs.value.splice(index, 1)
 }
 
@@ -113,7 +214,7 @@ function onDatasheetChange(e: Event) {
     const sizeInMb = (file.size / (1024 * 1024)).toFixed(2)
     datasheetInfo.value = {
       name: file.name,
-      size: `${sizeInMb} ميغابايت • تم التحقق الفني`,
+      size: `${sizeInMb} ميغابايت • ملف جديد جاهز للرفع`,
     }
   }
 }
@@ -127,7 +228,7 @@ function onImagesChange(e: Event) {
   if (target.files) {
     const files = Array.from(target.files)
     for (const file of files) {
-      const isFirst = localImages.value.length === 0
+      const isFirst = localImages.value.length === 0 && existingImages.value.length === 0
       localImages.value.push({
         id: Math.random().toString(36).substring(7),
         file,
@@ -138,19 +239,45 @@ function onImagesChange(e: Event) {
   }
 }
 
-function setFeaturedImage(index: number) {
+async function setFeaturedExistingImage(imgId: number) {
+  try {
+    await markImageFeatured(imgId)
+    existingImages.value.forEach(img => {
+      img.is_featured = img.id === imgId
+    })
+    localImages.value.forEach(img => {
+      img.isFeatured = false
+    })
+  } catch {
+    // handled in composable
+  }
+}
+
+function setFeaturedLocalImage(index: number) {
+  existingImages.value.forEach(img => {
+    img.is_featured = false
+  })
   localImages.value.forEach((img, i) => {
     img.isFeatured = i === index
   })
 }
 
-function removeImage(index: number) {
+async function removeExistingImage(index: number) {
+  const img = existingImages.value[index]
+  if (img?.id) {
+    try {
+      await deleteProductImage(img.id)
+      existingImages.value.splice(index, 1)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function removeLocalImage(index: number) {
   const [removed] = localImages.value.splice(index, 1)
   if (removed?.previewUrl) {
     URL.revokeObjectURL(removed.previewUrl)
-  }
-  if (localImages.value.length > 0 && !localImages.value.some(img => img.isFeatured)) {
-    localImages.value[0].isFeatured = true
   }
 }
 
@@ -181,42 +308,79 @@ async function handleSubmit() {
       payload.append('datasheet', datasheetFile.value)
     }
 
-    // 1. Create product in backend
-    const createdProduct = await createMasterProduct(payload)
+    if (isEditMode.value && props.editProduct) {
+      // EDIT MODE
+      payload.append('_method', 'PUT')
+      const updated = await updateMasterProduct(props.editProduct.id, payload)
 
-    // 2. Add specifications
-    const validSpecs = dynamicSpecs.value.filter(s => s.name.trim() && s.value.trim())
-    for (const spec of validSpecs) {
-      try {
-        await addSpecification({
-          product_id: createdProduct.id,
-          name: spec.name.trim(),
-          value: spec.value.trim(),
-          unit: spec.unit?.trim() || null,
-        })
-      } catch (err) {
-        console.warn('Failed to upload spec:', spec.name, err)
+      // Add newly added specifications
+      const newSpecs = dynamicSpecs.value.filter(s => !s.id && s.name.trim() && s.value.trim())
+      for (const spec of newSpecs) {
+        try {
+          await addSpecification({
+            product_id: props.editProduct.id,
+            name: spec.name.trim(),
+            value: spec.value.trim(),
+            unit: spec.unit?.trim() || null,
+          })
+        } catch (err) {
+          console.warn('Failed to add spec:', spec.name, err)
+        }
       }
-    }
 
-    // 3. Upload product images
-    for (const img of localImages.value) {
-      try {
-        await uploadProductImage(createdProduct.id, img.file, img.isFeatured)
-      } catch (err) {
-        console.warn('Failed to upload image:', img.file.name, err)
+      // Upload new images
+      for (const img of localImages.value) {
+        try {
+          await uploadProductImage(props.editProduct.id, img.file, img.isFeatured)
+        } catch (err) {
+          console.warn('Failed to upload image:', img.file.name, err)
+        }
       }
+
+      successMsg.value = 'تم تحديث بيانات المنتج بنجاح!'
+      emit('updated', updated || { ...props.editProduct, ...form.value })
+
+      setTimeout(() => {
+        emit('update:modelValue', false)
+      }, 1000)
+    } else {
+      // CREATE MODE
+      const created = await createMasterProduct(payload)
+
+      // Add specifications
+      const validSpecs = dynamicSpecs.value.filter(s => s.name.trim() && s.value.trim())
+      for (const spec of validSpecs) {
+        try {
+          await addSpecification({
+            product_id: created.id,
+            name: spec.name.trim(),
+            value: spec.value.trim(),
+            unit: spec.unit?.trim() || null,
+          })
+        } catch (err) {
+          console.warn('Failed to upload spec:', spec.name, err)
+        }
+      }
+
+      // Upload images
+      for (const img of localImages.value) {
+        try {
+          await uploadProductImage(created.id, img.file, img.isFeatured)
+        } catch (err) {
+          console.warn('Failed to upload image:', img.file.name, err)
+        }
+      }
+
+      successMsg.value = 'تمت إضافة المنتج بنجاح إلى الكتالوج المرجعي!'
+      emit('created', created)
+
+      setTimeout(() => {
+        emit('update:modelValue', false)
+        resetForm()
+      }, 1000)
     }
-
-    successMsg.value = 'تمت إضافة المنتج بنجاح إلى الكتالوج المرجعي!'
-    emit('created', createdProduct)
-
-    setTimeout(() => {
-      emit('update:modelValue', false)
-      resetForm()
-    }, 1200)
   } catch (err: any) {
-    errorMessage.value = err?.data?.userMessage || 'حدث خطأ أثناء حفظ المنتج، يرجى التحقق من المدخلات.'
+    errorMessage.value = err?.data?.userMessage || 'حدث خطأ أثناء حفظ المنتج، يرجى مراجعة المدخلات.'
   } finally {
     isSubmitting.value = false
   }
@@ -235,6 +399,8 @@ function resetForm() {
   datasheetInfo.value = null
   localImages.value.forEach(img => URL.revokeObjectURL(img.previewUrl))
   localImages.value = []
+  existingImages.value = []
+  dynamicSpecs.value = [...defaultSpecs]
   errorMessage.value = ''
   successMsg.value = ''
 }
@@ -243,9 +409,9 @@ function resetForm() {
 <template>
   <AdminModal
     :model-value="modelValue"
-    title="إضافة منتج جديد للكتالوج المرجعي"
-    subtitle="تعريف المواصفات القياسية للمنتج المرجعي لإتاحته للموردين في المنصة"
-    :icon="Boxes"
+    :title="isEditMode ? `تعديل المنتج: ${form.title || 'بيانات الكتالوج'}` : 'إضافة منتج جديد للكتالوج المرجعي'"
+    :subtitle="isEditMode ? 'تحديث وتعديل المواصفات الفنية والمرفقات للمنتج المعتمد' : 'تعريف المواصفات القياسية للمنتج المرجعي لإتاحته للموردين في المنصة'"
+    :icon="isEditMode ? Pencil : Boxes"
     max-width="3xl"
     @update:model-value="emit('update:modelValue', $event)"
   >
@@ -280,14 +446,6 @@ function resetForm() {
               <option v-for="cat in categories" :key="cat.id" :value="cat.id">
                 {{ cat.name_ar }} {{ cat.name_en ? `(${cat.name_en})` : '' }}
               </option>
-              <!-- Fallback if categories still loading or empty -->
-              <template v-if="!categories.length">
-                <option value="1">الألواح الكهروضوئية (Solar PV Panels)</option>
-                <option value="2">الإنفرترات والمحولات (Inverters)</option>
-                <option value="3">بطاريات التخزين (Solar Batteries)</option>
-                <option value="4">مضخات المياه الشمسية (Solar Pumps)</option>
-                <option value="5">منظمات الشحن (Charge Controllers)</option>
-              </template>
             </select>
           </div>
 
@@ -300,17 +458,6 @@ function resetForm() {
               <option v-for="b in brands" :key="b.id" :value="b.id">
                 {{ b.name }}
               </option>
-              <!-- Fallback if brands empty -->
-              <template v-if="!brands.length">
-                <option value="1">Jinko Solar</option>
-                <option value="2">LONGI Solar</option>
-                <option value="3">Deye</option>
-                <option value="4">Huawei</option>
-                <option value="5">Victron Energy</option>
-                <option value="6">Growatt</option>
-                <option value="7">Pylontech</option>
-                <option value="8">Grundfos</option>
-              </template>
             </select>
           </div>
         </div>
@@ -401,6 +548,14 @@ function resetForm() {
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <a
+              v-if="datasheetInfo.url"
+              :href="datasheetInfo.url"
+              target="_blank"
+              class="rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-bold text-solar-navy hover:bg-solar-bg-subtle transition-colors shadow-2xs"
+            >
+              عرض الملف الحالي
+            </a>
             <button
               type="button"
               @click="triggerDatasheetPicker"
@@ -450,10 +605,49 @@ function resetForm() {
         />
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <!-- الصور الموجودة مسبقاً في السيرفر (في حالة التعديل) -->
+          <div
+            v-for="(img, idx) in existingImages"
+            :key="'existing-' + img.id"
+            class="relative flex flex-col items-center justify-center rounded-xl p-2 aspect-square group transition-all"
+            :class="[
+              img.is_featured
+                ? 'border-2 border-solar-navy bg-white shadow-sm ring-2 ring-amber-400/40'
+                : 'border border-solar-border-card bg-solar-bg-subtle'
+            ]"
+          >
+            <span
+              v-if="img.is_featured"
+              class="absolute top-2 right-2 rounded-md bg-solar-navy px-1.5 py-0.5 text-[9px] font-black text-white flex items-center gap-1 shadow-xs"
+            >
+              <Star class="size-2.5 fill-solar-yellow text-solar-yellow" /> المميزة
+            </span>
+            <button
+              v-else
+              type="button"
+              @click="setFeaturedExistingImage(img.id)"
+              class="absolute top-2 right-2 text-slate-400 hover:text-amber-500 transition-colors p-1"
+              title="تعيين كصورة مميزة"
+            >
+              <Star class="size-4" />
+            </button>
+
+            <button
+              type="button"
+              @click="removeExistingImage(idx)"
+              class="absolute top-2 left-2 text-rose-500 hover:bg-rose-100/80 rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="حذف الصورة"
+            >
+              <Trash2 class="size-3.5" />
+            </button>
+
+            <img :src="img.image_url" alt="صورة المنتج" class="h-20 w-20 object-contain" />
+          </div>
+
           <!-- الصور المختارة محلياً -->
           <div
             v-for="(img, idx) in localImages"
-            :key="img.id"
+            :key="'local-' + img.id"
             class="relative flex flex-col items-center justify-center rounded-xl p-2 aspect-square group transition-all"
             :class="[
               img.isFeatured
@@ -470,7 +664,7 @@ function resetForm() {
             <button
               v-else
               type="button"
-              @click="setFeaturedImage(idx)"
+              @click="setFeaturedLocalImage(idx)"
               class="absolute top-2 right-2 text-slate-400 hover:text-amber-500 transition-colors p-1"
               title="تعيين كصورة مميزة"
             >
@@ -479,7 +673,7 @@ function resetForm() {
 
             <button
               type="button"
-              @click="removeImage(idx)"
+              @click="removeLocalImage(idx)"
               class="absolute top-2 left-2 text-rose-500 hover:bg-rose-100/80 rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity"
               title="حذف الصورة"
             >
@@ -581,7 +775,7 @@ function resetForm() {
           class="btn-primary h-11 px-8 text-xs font-bold bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md flex items-center gap-2"
         >
           <Loader2 v-if="isSubmitting" class="size-4 animate-spin" />
-          <span>{{ isSubmitting ? 'جارٍ الحفظ والرفع...' : 'حفظ ونشر في الكتالوج' }}</span>
+          <span>{{ isSubmitting ? 'جارٍ الحفظ...' : (isEditMode ? 'حفظ التعديلات' : 'حفظ ونشر في الكتالوج') }}</span>
         </button>
       </div>
     </form>

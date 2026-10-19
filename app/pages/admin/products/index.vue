@@ -15,7 +15,6 @@ import {
   Trash2,
   Zap,
 } from 'lucide-vue-next'
-import AdminBadge from '../../../components/admin/common/AdminBadge.vue'
 import AdminPagination from '../../../components/admin/common/AdminPagination.vue'
 import AddProductModal from '../../../components/admin/products/AddProductModal.vue'
 import type { Brand, Category, MasterProduct, PaginationMeta } from '../../../../types/api'
@@ -24,176 +23,105 @@ import { downloadAdminCsv } from '../../../composables/useAdminWorkspace'
 definePageMeta({ layout: 'admin' })
 useSeoMeta({ title: 'إدارة المنتجات والكتالوج | لوحة الإدارة العامة' })
 
+const route = useRoute()
 const router = useRouter()
+
 const {
   fetchCategories,
   fetchBrands,
   fetchMasterProducts,
   toggleProductStatus,
   deleteMasterProduct,
-  isLoading,
-  isActionLoading,
 } = useAdminCatalog()
 
-const isAddModalOpen = ref(false)
-const searchQuery = ref('')
-const selectedCategory = ref<string | number>('all')
+// Query states synced with URL for SSR & bookmarking
+const page = computed(() => Number(route.query.page) || 1)
+const searchQuery = ref((route.query.search as string) || '')
+const selectedCategory = ref<string | number>((route.query.category_id as string) || 'all')
 const selectedStatus = ref<'all' | 'active' | 'inactive'>('all')
-const currentPage = ref(1)
 
-const categories = ref<Category[]>([])
-const brands = ref<Brand[]>([])
-const products = ref<MasterProduct[]>([])
-const paginationMeta = ref<PaginationMeta>({
-  current_page: 1,
-  last_page: 1,
-  per_page: 8,
-  total: 0,
-})
+// Modal state
+const isProductModalOpen = ref(false)
+const editingProduct = ref<MasterProduct | null>(null)
 
 // Delete modal confirmation state
 const productToDelete = ref<MasterProduct | null>(null)
 const isDeleting = ref(false)
 
-// Initial fallback products in case database is freshly created without seeders
-const defaultCatalog: MasterProduct[] = [
-  {
-    id: 1,
-    title: 'لوح شمسي Jinko Tiger Pro 585W ثنائي الوجه',
-    description: 'خلية Monocrystalline عالية الكفاءة 21.4%',
-    category: { id: 1, name_ar: 'الألواح الكهروضوئية', name_en: 'Solar Panels' },
-    brand: { id: 1, name: 'Jinko Solar' },
-    model_number: 'JKM585M-7RL3-TV',
-    is_active: true,
-  },
-  {
-    id: 2,
-    title: 'إنفرتر شمسي هجين Deye Hybrid 8kW ثلاثي الأوجه',
-    description: 'شاشة لمس ملونة مدمجة مع دعم بطاريات 48V',
-    category: { id: 2, name_ar: 'الإنفرترات والمحولات', name_en: 'Inverters' },
-    brand: { id: 2, name: 'Deye' },
-    model_number: 'SUN-8K-SG04LP3-EU',
-    is_active: true,
-  },
-  {
-    id: 3,
-    title: 'بطارية ليثيوم Pylontech US5000 4.8kWh دورات 6000+',
-    description: 'نظام حماية BMS ذكي متكامل جهد 48V',
-    category: { id: 3, name_ar: 'بطاريات التخزين', name_en: 'Batteries' },
-    brand: { id: 3, name: 'Pylontech' },
-    model_number: 'US5000-48V-100AH',
-    is_active: true,
-  },
-  {
-    id: 4,
-    title: 'لوح شمسي LONGI Hi-MO 6 Explorer 575W تقنية HPBC',
-    description: 'تصميم بدون خطوط واجهة أمامية لكفاءة 22.3%',
-    category: { id: 1, name_ar: 'الألواح الكهروضوئية', name_en: 'Solar Panels' },
-    brand: { id: 4, name: 'LONGI Solar' },
-    model_number: 'LR5-72HTH-575M',
-    is_active: true,
-  },
-  {
-    id: 5,
-    title: 'إنفرتر مستقل Growatt SPF 5000 ES مدمج MPPT',
-    description: 'مخصص للمنظومات المعزولة Off-Grid بقدرة 5kW',
-    category: { id: 2, name_ar: 'الإنفرترات والمحولات', name_en: 'Inverters' },
-    brand: { id: 5, name: 'Growatt' },
-    model_number: 'SPF-5000-ES',
-    is_active: true,
-  },
-  {
-    id: 6,
-    title: 'منظم شحن شمسي Victron SmartSolar MPPT 150/70-Tr',
-    description: 'تحكم ذكي متقدم بتقنية البلوتوث المدمج وتتبع فائق',
-    category: { id: 5, name_ar: 'منظمات الشحن', name_en: 'Charge Controllers' },
-    brand: { id: 6, name: 'Victron Energy' },
-    model_number: 'SCC115070210',
-    is_active: true,
-  },
-  {
-    id: 7,
-    title: 'مضخة مياه شمسية غاطسة Grundfos SQFlex 3-SQF-2',
-    description: 'محرك ذكي تيار مستمر ومتناوب للآبار العميقة',
-    category: { id: 4, name_ar: 'مضخات المياه الشمسية', name_en: 'Solar Pumps' },
-    brand: { id: 7, name: 'Grundfos' },
-    model_number: '95027325',
-    is_active: true,
-  },
-  {
-    id: 8,
-    title: 'إنفرتر ذكي Huawei SUN2000-10KTL-M1 كفاءة فائقة',
-    description: 'طراز ثلاثي الأوجه معتمد لكود الربط مع SEC',
-    category: { id: 2, name_ar: 'الإنفرترات والمحولات', name_en: 'Inverters' },
-    brand: { id: 8, name: 'Huawei' },
-    model_number: 'SUN2000-10KTL-M1',
-    is_active: true,
-  },
-]
+// SSR Data Fetching with useAsyncData
+const {
+  data: catalogData,
+  pending: isLoading,
+  refresh: refreshCatalog,
+} = await useAsyncData(
+  'admin_master_catalog',
+  async () => {
+    const [productsRes, catList, brandList] = await Promise.all([
+      fetchMasterProducts({
+        page: page.value,
+        category_id: selectedCategory.value !== 'all' ? selectedCategory.value : undefined,
+        search: searchQuery.value.trim() || undefined,
+      }),
+      fetchCategories(),
+      fetchBrands(),
+    ])
 
-async function loadData() {
-  const [catList, brandList] = await Promise.all([
-    fetchCategories(),
-    fetchBrands(),
-  ])
-  categories.value = catList
-  brands.value = brandList
-
-  await loadProducts()
-}
-
-async function loadProducts() {
-  const result = await fetchMasterProducts({
-    page: currentPage.value,
-    category_id: selectedCategory.value !== 'all' ? selectedCategory.value : undefined,
-    search: searchQuery.value,
-  })
-
-  if (result.products && result.products.length > 0) {
-    products.value = result.products
-    paginationMeta.value = result.meta
-  } else if (!searchQuery.value && selectedCategory.value === 'all') {
-    // If backend returns empty, provide initial catalog so UI remains fully functional
-    products.value = [...defaultCatalog]
-    paginationMeta.value = {
-      current_page: 1,
-      last_page: 1,
-      per_page: 8,
-      total: defaultCatalog.length,
+    return {
+      products: productsRes.products,
+      meta: productsRes.meta,
+      categories: catList,
+      brands: brandList,
     }
-  } else {
-    products.value = []
-    paginationMeta.value = {
-      current_page: 1,
-      last_page: 1,
-      per_page: 8,
-      total: 0,
-    }
+  },
+  {
+    watch: [page],
   }
-}
+)
 
-onMounted(() => {
-  loadData()
+const categories = computed<Category[]>(() => catalogData.value?.categories || [])
+const brands = computed<Brand[]>(() => catalogData.value?.brands || [])
+const products = computed<MasterProduct[]>(() => catalogData.value?.products || [])
+const paginationMeta = computed<PaginationMeta>(() => catalogData.value?.meta || {
+  current_page: page.value,
+  last_page: 5,
+  per_page: 20,
+  total: 100,
 })
 
-// Debounced search watcher
+// Debounced search watcher to sync URL query
 let searchDebounce: ReturnType<typeof setTimeout> | undefined
-watch(searchQuery, () => {
+watch(searchQuery, (newVal) => {
   if (searchDebounce) clearTimeout(searchDebounce)
   searchDebounce = setTimeout(() => {
-    currentPage.value = 1
-    loadProducts()
+    updateQuery({ search: newVal.trim() || undefined, page: 1 })
   }, 400)
 })
 
-watch([selectedCategory, selectedStatus], () => {
-  currentPage.value = 1
-  loadProducts()
+// Watch category selection to sync URL query
+watch(selectedCategory, (newCat) => {
+  updateQuery({
+    category_id: newCat !== 'all' ? newCat : undefined,
+    page: 1,
+  })
 })
 
-watch(currentPage, () => {
-  loadProducts()
-})
+function updateQuery(newParams: Record<string, any>) {
+  const current = { ...route.query }
+  Object.keys(newParams).forEach((key) => {
+    if (newParams[key] === undefined || newParams[key] === null || newParams[key] === '') {
+      delete current[key]
+    } else {
+      current[key] = String(newParams[key])
+    }
+  })
+  router.push({ query: current })
+  // Trigger async refresh if query changes
+  setTimeout(() => refreshCatalog(), 50)
+}
+
+function onPageChange(newPage: number) {
+  updateQuery({ page: newPage })
+}
 
 const displayedProducts = computed(() => {
   if (selectedStatus.value === 'all') return products.value
@@ -215,6 +143,26 @@ async function handleToggleStatus(item: MasterProduct) {
   await toggleProductStatus(item)
 }
 
+// Open modal for editing with product data populated
+function openEditModal(item: MasterProduct) {
+  editingProduct.value = item
+  isProductModalOpen.value = true
+}
+
+// Open modal for adding a new product
+function openCreateModal() {
+  editingProduct.value = null
+  isProductModalOpen.value = true
+}
+
+function handleProductCreated(newProduct: MasterProduct) {
+  refreshCatalog()
+}
+
+function handleProductUpdated(updatedProduct: MasterProduct) {
+  refreshCatalog()
+}
+
 function confirmDelete(item: MasterProduct) {
   productToDelete.value = item
 }
@@ -225,22 +173,17 @@ async function executeDelete() {
   try {
     const success = await deleteMasterProduct(productToDelete.value.id)
     if (success) {
-      products.value = products.value.filter(p => p.id !== productToDelete.value!.id)
       productToDelete.value = null
+      await refreshCatalog()
     }
   } finally {
     isDeleting.value = false
   }
 }
 
-function handleProductCreated(newProduct: MasterProduct) {
-  products.value.unshift(newProduct)
-  paginationMeta.value.total += 1
-}
-
 function exportCatalogCsv() {
   const headers = ['رقم المعرف', 'اسم المنتج', 'التصنيف', 'العلامة التجارية', 'رقم الموديل', 'الحالة']
-  const rows = products.value.map(p => [
+  const rows = displayedProducts.value.map(p => [
     p.id,
     p.title,
     p.category?.name_ar || 'غير محدد',
@@ -248,7 +191,7 @@ function exportCatalogCsv() {
     p.model_number || '---',
     p.is_active ? 'مفعل' : 'معطل',
   ])
-  downloadAdminCsv('كتالوج_المنتجات_المرجعية_SolarHub', headers, rows)
+  downloadAdminCsv(`كتالوج_المنتجات_المرجعية_SolarHub_صفحة_${page.value}`, headers, rows)
 }
 </script>
 
@@ -270,19 +213,20 @@ function exportCatalogCsv() {
             type="button"
             @click="exportCatalogCsv"
             class="btn-outline h-11 px-4 text-xs font-bold gap-2"
-            title="تصدير بيانات الكتالوج المرجعي كملف CSV"
+            title="تصدير بيانات الصفحة الحالية كملف CSV"
           >
             <Download class="size-4" />
             <span>تصدير الكتالوج</span>
           </button>
 
-          <NuxtLink
-            to="/admin/products/new"
+          <button
+            type="button"
+            @click="openCreateModal"
             class="btn-primary h-11 px-5 text-xs font-bold gap-2 bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md flex items-center"
           >
             <Plus class="size-4" />
             <span>إضافة منتج</span>
-          </NuxtLink>
+          </button>
         </div>
       </div>
 
@@ -302,16 +246,8 @@ function exportCatalogCsv() {
           <select v-model="selectedCategory" class="solar-input h-11 text-xs">
             <option value="all">كافة التصنيفات (الكل)</option>
             <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-              {{ cat.name_ar }}
+              {{ cat.name_ar }} {{ cat.name_en ? `(${cat.name_en})` : '' }}
             </option>
-            <!-- Fallbacks -->
-            <template v-if="!categories.length">
-              <option value="الألواح الكهروضوئية">الألواح الكهروضوئية</option>
-              <option value="الإنفرترات والمحولات">الإنفرترات والمحولات</option>
-              <option value="بطاريات التخزين">بطاريات التخزين</option>
-              <option value="منظمات الشحن">منظمات الشحن</option>
-              <option value="مضخات المياه الشمسية">مضخات المياه الشمسية</option>
-            </template>
           </select>
         </div>
 
@@ -324,8 +260,8 @@ function exportCatalogCsv() {
         </div>
       </div>
 
-      <!-- مؤشر التحميل -->
-      <div v-if="isLoading" class="py-12 flex flex-col items-center justify-center gap-3 text-solar-text-muted">
+      <!-- مؤشر التحميل أثناء تحديث البيانات -->
+      <div v-if="isLoading" class="py-16 flex flex-col items-center justify-center gap-3 text-solar-text-muted">
         <Loader2 class="size-8 animate-spin text-solar-navy" />
         <span class="text-xs font-bold">جارٍ جلب وتحديث منتجات الكتالوج...</span>
       </div>
@@ -394,19 +330,22 @@ function exportCatalogCsv() {
                   <button
                     v-else
                     type="button"
+                    @click="openEditModal(item)"
                     class="flex size-8 items-center justify-center rounded-lg text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-navy transition-colors"
                     title="معاينة المنتج"
                   >
                     <Eye class="size-4" />
                   </button>
 
-                  <NuxtLink
-                    :to="`/admin/products/new?edit=${item.id}`"
-                    class="flex size-8 items-center justify-center rounded-lg text-solar-text-body hover:bg-solar-bg-subtle hover:text-amber-600 transition-colors"
-                    title="تعديل المنتج"
+                  <!-- زر التعديل المباشر: يقوم بتعبئة واجهة التعديل ببيانات السجل -->
+                  <button
+                    type="button"
+                    @click="openEditModal(item)"
+                    class="flex size-8 items-center justify-center rounded-lg text-solar-text-body hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                    title="تعديل بيانات المنتج"
                   >
                     <Pencil class="size-4" />
-                  </NuxtLink>
+                  </button>
 
                   <button
                     type="button"
@@ -439,13 +378,14 @@ function exportCatalogCsv() {
         </table>
       </div>
 
-      <!-- الترقيم والتقدم أسفل الجدول -->
+      <!-- الترقيم وشريط التقدم الديناميكي مع دعم كامل للتنقل بين الصفحات -->
       <AdminPagination
-        v-model:current-page="currentPage"
+        :current-page="paginationMeta.current_page || 1"
         :total-pages="paginationMeta.last_page || 1"
-        :total-count="paginationMeta.total || displayedProducts.length"
-        :page-size="paginationMeta.per_page || 8"
+        :total-count="paginationMeta.total || 100"
+        :page-size="paginationMeta.per_page || 20"
         item-name="منتج مسجل بالكتالوج"
+        @update:current-page="onPageChange"
       />
     </div>
 
@@ -501,10 +441,12 @@ function exportCatalogCsv() {
       </Transition>
     </Teleport>
 
-    <!-- نافذة إضافة منتج جديد (مودال سريع) -->
+    <!-- نافذة إضافة / تعديل منتج (يتم تعبئتها ببيانات السجل تلقائياً عند النقر على أيقونة التعديل) -->
     <AddProductModal
-      v-model="isAddModalOpen"
+      v-model="isProductModalOpen"
+      :edit-product="editingProduct"
       @created="handleProductCreated"
+      @updated="handleProductUpdated"
     />
   </div>
 </template>
