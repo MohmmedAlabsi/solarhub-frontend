@@ -36,6 +36,17 @@ const { refresh, pending } = useLazyAsyncData('admin-master-categories', () => f
 const searchQuery = ref('')
 const selectedType = ref<'all' | 'parent' | 'sub'>('all')
 
+const isRefreshing = ref(false)
+
+async function handleRefreshCurrentTab() {
+  isRefreshing.value = true
+  try {
+    await fetchCategories(true)
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
 // Flatten categories for table view (parents + sub-categories)
 interface FlatCategory {
   id: number
@@ -187,7 +198,6 @@ async function handleSaveCategory() {
       await updateCategory(editingId.value, formData)
     }
     isModalOpen.value = false
-    await refresh()
   } catch {
     /* error handled by composable */
   }
@@ -208,7 +218,6 @@ async function executeDelete() {
   if (success) {
     isDeleteModalOpen.value = false
     categoryToDelete.value = null
-    await refresh()
   }
 }
 </script>
@@ -227,12 +236,12 @@ async function executeDelete() {
       <div class="flex items-center gap-2">
         <button
           type="button"
-          @click="() => refresh()"
-          :disabled="pending || isLoading"
+          @click="handleRefreshCurrentTab"
+          :disabled="isRefreshing || pending || isLoading"
           class="btn-outline h-10 px-4 text-xs font-bold gap-2 text-solar-text-body hover:bg-solar-bg-subtle"
-          title="تحديث البيانات من السيرفر"
+          title="تحديث بيانات التصنيفات من السيرفر"
         >
-          <RefreshCw class="size-4" :class="{ 'animate-spin': pending || isLoading }" />
+          <RefreshCw class="size-4" :class="{ 'animate-spin': isRefreshing || pending || isLoading }" />
           <span>تحديث</span>
         </button>
 

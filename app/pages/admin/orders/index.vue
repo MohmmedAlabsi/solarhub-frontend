@@ -20,9 +20,20 @@ const {
 } = useAdminOrderManagement()
 
 // Non-blocking lazy SSR Data Fetching for instant navigation
-const { refresh, pending } = useLazyAsyncData('admin_management_orders', () => fetchOrders(false), {
+const { pending } = useLazyAsyncData('admin_management_orders', () => fetchOrders(false), {
   default: () => orders.value,
 })
+
+const isRefreshing = ref(false)
+
+async function handleRefreshOrders() {
+  isRefreshing.value = true
+  try {
+    await fetchOrders(true)
+  } finally {
+    isRefreshing.value = false
+  }
+}
 
 const searchQuery = ref((route.query.search as string) || '')
 const selectedStatus = ref(String(route.query.status ?? 'all'))
@@ -101,12 +112,12 @@ async function handleStatusUpdate(orderId: string, newStatus: AdminOrder['status
         <div class="flex items-center gap-2 self-start sm:self-auto">
           <button
             type="button"
-            @click="() => refresh()"
-            :disabled="pending || isLoading"
+            @click="handleRefreshOrders"
+            :disabled="isRefreshing || pending || isLoading"
             class="btn-outline h-10 px-4 text-xs font-bold gap-2 text-solar-text-body hover:bg-solar-bg-subtle"
-            title="تحديث قائمة الطلبات"
+            title="تحديث قائمة الطلبات من السيرفر"
           >
-            <RefreshCw class="size-4" :class="{ 'animate-spin': pending || isLoading }" />
+            <RefreshCw class="size-4" :class="{ 'animate-spin': isRefreshing || pending || isLoading }" />
             <span>تحديث</span>
           </button>
 

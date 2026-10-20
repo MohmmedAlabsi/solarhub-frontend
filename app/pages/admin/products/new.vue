@@ -14,7 +14,7 @@ import {
   UploadCloud,
   X,
 } from 'lucide-vue-next'
-import type { Brand, Category, MasterProduct } from '../../../types/api'
+import type { Brand, Category, MasterProduct } from '../../../../types/api'
 
 definePageMeta({ layout: 'admin' })
 

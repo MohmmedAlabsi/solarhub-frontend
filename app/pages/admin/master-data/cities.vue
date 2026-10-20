@@ -28,9 +28,20 @@ const {
 } = useAdminMasterData()
 
 // Non-blocking lazy SSR Data Fetching for instant navigation
-const { refresh, pending } = useLazyAsyncData('admin-master-cities', () => fetchCities(false), {
+const { pending } = useLazyAsyncData('admin-master-cities', () => fetchCities(false), {
   default: () => cities.value,
 })
+
+const isRefreshing = ref(false)
+
+async function handleRefreshCurrentTab() {
+  isRefreshing.value = true
+  try {
+    await fetchCities(true)
+  } finally {
+    isRefreshing.value = false
+  }
+}
 
 const searchQuery = ref('')
 const statusFilter = ref<'all' | 'active' | 'inactive'>('all')
@@ -101,7 +112,6 @@ async function handleSaveCity() {
       await updateCity(editingId.value, payload)
     }
     isModalOpen.value = false
-    await refresh()
   } catch {
     /* error handled by composable */
   }
@@ -122,7 +132,6 @@ async function executeDelete() {
   if (success) {
     isDeleteModalOpen.value = false
     cityToDelete.value = null
-    await refresh()
   }
 }
 </script>
@@ -141,12 +150,12 @@ async function executeDelete() {
       <div class="flex items-center gap-2">
         <button
           type="button"
-          @click="() => refresh()"
-          :disabled="pending || isLoading"
+          @click="handleRefreshCurrentTab"
+          :disabled="isRefreshing || pending || isLoading"
           class="btn-outline h-10 px-4 text-xs font-bold gap-2 text-solar-text-body hover:bg-solar-bg-subtle"
-          title="تحديث البيانات من السيرفر"
+          title="تحديث بيانات المحافظات من السيرفر"
         >
-          <RefreshCw class="size-4" :class="{ 'animate-spin': pending || isLoading }" />
+          <RefreshCw class="size-4" :class="{ 'animate-spin': isRefreshing || pending || isLoading }" />
           <span>تحديث</span>
         </button>
 

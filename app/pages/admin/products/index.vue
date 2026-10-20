@@ -10,6 +10,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   Sun,
   Trash2,
@@ -156,11 +157,21 @@ function openCreateModal() {
 }
 
 function handleProductCreated(newProduct: MasterProduct) {
-  refreshCatalog()
+  if (catalogData.value?.products) {
+    catalogData.value.products.unshift(newProduct)
+    if (catalogData.value.meta) {
+      catalogData.value.meta.total = (catalogData.value.meta.total || 0) + 1
+    }
+  }
 }
 
 function handleProductUpdated(updatedProduct: MasterProduct) {
-  refreshCatalog()
+  if (catalogData.value?.products) {
+    const idx = catalogData.value.products.findIndex(p => p.id === updatedProduct.id)
+    if (idx !== -1) {
+      catalogData.value.products[idx] = { ...catalogData.value.products[idx], ...updatedProduct }
+    }
+  }
 }
 
 function confirmDelete(item: MasterProduct) {
@@ -170,11 +181,17 @@ function confirmDelete(item: MasterProduct) {
 async function executeDelete() {
   if (!productToDelete.value) return
   isDeleting.value = true
+  const id = productToDelete.value.id
   try {
-    const success = await deleteMasterProduct(productToDelete.value.id)
+    const success = await deleteMasterProduct(id)
     if (success) {
+      if (catalogData.value?.products) {
+        catalogData.value.products = catalogData.value.products.filter(p => p.id !== id)
+        if (catalogData.value.meta) {
+          catalogData.value.meta.total = Math.max(0, (catalogData.value.meta.total || 1) - 1)
+        }
+      }
       productToDelete.value = null
-      await refreshCatalog()
     }
   } finally {
     isDeleting.value = false
@@ -208,7 +225,18 @@ function exportCatalogCsv() {
           </p>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="() => refreshCatalog()"
+            :disabled="isLoading"
+            class="btn-outline h-11 px-4 text-xs font-bold gap-2 text-solar-text-body hover:bg-solar-bg-subtle"
+            title="تحديث بيانات الكتالوج من السيرفر"
+          >
+            <RefreshCw class="size-4" :class="{ 'animate-spin': isLoading }" />
+            <span>تحديث</span>
+          </button>
+
           <button
             type="button"
             @click="exportCatalogCsv"

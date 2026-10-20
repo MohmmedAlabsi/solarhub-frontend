@@ -338,7 +338,13 @@ async function handleSubmit() {
       }
 
       successMsg.value = 'تم تحديث بيانات المنتج بنجاح!'
-      emit('updated', updated || { ...props.editProduct, ...form.value })
+      const fallbackProduct: MasterProduct = {
+        ...props.editProduct,
+        ...form.value,
+        category_id: Number(form.value.category_id),
+        brand_id: Number(form.value.brand_id),
+      }
+      emit('updated', updated || fallbackProduct)
 
       setTimeout(() => {
         emit('update:modelValue', false)

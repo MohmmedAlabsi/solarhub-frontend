@@ -2,14 +2,15 @@
 import {
   BatteryCharging,
   Briefcase,
-  ClipboardList,
   Droplets,
   Eye,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
   Sun,
+  Trash2,
   Wrench,
 } from 'lucide-vue-next'
 import AdminBadge from '../../../components/admin/common/AdminBadge.vue'
@@ -26,19 +27,34 @@ const {
   isActionLoading,
   fetchServiceTypes,
   createServiceType,
+  updateServiceType,
+  deleteServiceType,
 } = useAdminMasterData()
 
-// Non-blocking lazy SSR Data Fetching for instant navigation
-const { refresh, pending } = useLazyAsyncData('admin-master-service-types', () => fetchServiceTypes(false), {
+// Non-blocking lazy SSR Data Fetching
+const { pending } = useLazyAsyncData('admin-master-service-types', () => fetchServiceTypes(false), {
   default: () => serviceTypes.value,
 })
 
+const isRefreshing = ref(false)
 const searchQuery = ref('')
+
+// Selected service for modals
 const selectedService = ref<ServiceType | null>(null)
 const isDetailModalOpen = ref(false)
 const isAddModalOpen = ref(false)
+const isEditModalOpen = ref(false)
+const isDeleteModalOpen = ref(false)
 
+// Forms
 const newService = ref({
+  name: '',
+  description: '',
+  is_active: true,
+})
+
+const editService = ref({
+  id: 0,
   name: '',
   description: '',
   is_active: true,
@@ -61,9 +77,35 @@ const filteredServiceTypes = computed(() => {
   )
 })
 
+// Action Handlers
+async function handleRefreshCurrentTab() {
+  isRefreshing.value = true
+  try {
+    await fetchServiceTypes(true)
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
 function viewDetails(service: ServiceType) {
   selectedService.value = service
   isDetailModalOpen.value = true
+}
+
+function openEditModal(service: ServiceType) {
+  selectedService.value = service
+  editService.value = {
+    id: service.id,
+    name: service.name,
+    description: service.description || '',
+    is_active: service.is_active !== false,
+  }
+  isEditModalOpen.value = true
+}
+
+function openDeleteModal(service: ServiceType) {
+  selectedService.value = service
+  isDeleteModalOpen.value = true
 }
 
 async function handleAddService() {
@@ -76,6 +118,31 @@ async function handleAddService() {
     })
     isAddModalOpen.value = false
     newService.value = { name: '', description: '', is_active: true }
+  } catch {
+    /* error handled in composable */
+  }
+}
+
+async function handleUpdateService() {
+  if (!editService.value.name.trim() || !editService.value.id) return
+  try {
+    await updateServiceType(editService.value.id, {
+      name: editService.value.name.trim(),
+      description: editService.value.description.trim() || undefined,
+      is_active: editService.value.is_active,
+    })
+    isEditModalOpen.value = false
+  } catch {
+    /* error handled in composable */
+  }
+}
+
+async function executeDelete() {
+  if (!selectedService.value) return
+  try {
+    await deleteServiceType(selectedService.value.id)
+    isDeleteModalOpen.value = false
+    selectedService.value = null
   } catch {
     /* error handled in composable */
   }
@@ -96,12 +163,12 @@ async function handleAddService() {
       <div class="flex items-center gap-2">
         <button
           type="button"
-          @click="() => refresh()"
-          :disabled="pending || isLoading"
+          @click="handleRefreshCurrentTab"
+          :disabled="isRefreshing || pending || isLoading"
           class="btn-outline h-10 px-4 text-xs font-bold gap-2 text-solar-text-body hover:bg-solar-bg-subtle"
-          title="تحديث البيانات من السيرفر"
+          title="تحديث بيانات باقات الخدمات من السيرفر"
         >
-          <RefreshCw class="size-4" :class="{ 'animate-spin': pending || isLoading }" />
+          <RefreshCw class="size-4" :class="{ 'animate-spin': isRefreshing || pending || isLoading }" />
           <span>تحديث</span>
         </button>
 
@@ -147,7 +214,7 @@ async function handleAddService() {
       </div>
 
       <!-- حالة التحميل الأولي فقط -->
-      <div v-if="pending && serviceTypes.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
+      <div v-if="(pending || isRefreshing) && serviceTypes.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
         <Loader2 class="size-8 text-solar-navy animate-spin mb-3" />
         <p class="text-xs font-bold text-solar-text-muted">جاري جلب باقات الخدمات الهندسية من السيرفر...</p>
       </div>
@@ -195,16 +262,39 @@ async function handleAddService() {
                 <AdminBadge :status="item.is_active !== false ? 'مفعل' : 'معطل'" />
               </td>
 
-              <!-- الإجراءات -->
+              <!-- الإجراءات (أيقونة التعديل، أيقونة الحذف، وأيقونة المعاينة) -->
               <td class="py-4 px-4 text-center">
-                <button
-                  type="button"
-                  @click="viewDetails(item)"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-solar-navy bg-sky-50 hover:bg-sky-100 font-bold text-xs transition-colors"
-                >
-                  <Eye class="size-3.5" />
-                  <span>معاينة التفاصيل</span>
-                </button>
+                <div class="inline-flex items-center justify-center gap-1.5">
+                  <!-- أيقونة التعديل -->
+                  <button
+                    type="button"
+                    @click="openEditModal(item)"
+                    class="size-8 inline-flex items-center justify-center rounded-lg text-solar-navy bg-sky-50 hover:bg-sky-100 hover:text-solar-navy-dark transition-colors border border-sky-100"
+                    title="تعديل باقة الخدمة"
+                  >
+                    <Pencil class="size-3.5" />
+                  </button>
+
+                  <!-- أيقونة الحذف -->
+                  <button
+                    type="button"
+                    @click="openDeleteModal(item)"
+                    class="size-8 inline-flex items-center justify-center rounded-lg text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 transition-colors border border-red-100"
+                    title="حذف باقة الخدمة"
+                  >
+                    <Trash2 class="size-3.5" />
+                  </button>
+
+                  <!-- أيقونة المعاينة -->
+                  <button
+                    type="button"
+                    @click="viewDetails(item)"
+                    class="size-8 inline-flex items-center justify-center rounded-lg text-solar-text-muted bg-solar-bg-subtle hover:bg-slate-200 hover:text-solar-text-heading transition-colors border border-solar-border-card"
+                    title="معاينة التفاصيل"
+                  >
+                    <Eye class="size-3.5" />
+                  </button>
+                </div>
               </td>
             </tr>
 
@@ -279,6 +369,105 @@ async function handleAddService() {
           </button>
         </div>
       </form>
+    </AdminModal>
+
+    <!-- نافذة تعديل باقة خدمة موجودة -->
+    <AdminModal
+      v-model="isEditModalOpen"
+      title="تعديل باقة الخدمة الهندسية"
+      subtitle="تحديث مسمى ووصف وحالة باقة الخدمة"
+      :icon="Pencil"
+      max-width="md"
+    >
+      <form @submit.prevent="handleUpdateService" class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs font-bold text-solar-text-body mb-1.5">مسمى باقة الخدمة *</label>
+          <input
+            v-model="editService.name"
+            type="text"
+            required
+            placeholder="مسمى الخدمة..."
+            class="solar-input h-11 text-xs w-full"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-solar-text-body mb-1.5">النطاق والوصف الفني للخدمة</label>
+          <textarea
+            v-model="editService.description"
+            rows="3"
+            placeholder="وصف وتفاصيل الخدمة..."
+            class="solar-input text-xs w-full py-2.5 resize-none"
+          />
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input
+            id="edit-service-active"
+            v-model="editService.is_active"
+            type="checkbox"
+            class="size-4 rounded text-solar-navy focus:ring-solar-navy"
+          />
+          <label for="edit-service-active" class="text-xs font-bold text-solar-text-heading cursor-pointer">
+            تفعيل باقة الخدمة وإتاحتها لطلبات العملاء
+          </label>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-solar-border-card mt-2">
+          <button
+            type="button"
+            @click="isEditModalOpen = false"
+            :disabled="isActionLoading"
+            class="btn-outline h-10 px-5 text-xs font-bold"
+          >
+            إلغاء
+          </button>
+          <button
+            type="submit"
+            :disabled="isActionLoading"
+            class="btn-primary h-10 px-6 text-xs font-bold gap-2 bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md"
+          >
+            <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+            <span>حفظ التعديلات</span>
+          </button>
+        </div>
+      </form>
+    </AdminModal>
+
+    <!-- نافذة تأكيد حذف باقة خدمة -->
+    <AdminModal
+      v-model="isDeleteModalOpen"
+      title="تأكيد حذف باقة الخدمة"
+      subtitle="هذا الإجراء يؤدي إلى إزالة الخدمة من قائمة الخدمات الهندسية"
+      :icon="Trash2"
+      max-width="sm"
+    >
+      <div v-if="selectedService" class="flex flex-col gap-4">
+        <p class="text-xs text-solar-text-body leading-relaxed">
+          هل أنت متأكد من رغبتك في حذف باقة الخدمة:
+          <span class="font-extrabold text-solar-text-heading">"{{ selectedService.name }}"</span>؟
+        </p>
+
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-solar-border-card mt-2">
+          <button
+            type="button"
+            @click="isDeleteModalOpen = false"
+            :disabled="isActionLoading"
+            class="btn-outline h-10 px-5 text-xs font-bold"
+          >
+            إلغاء
+          </button>
+          <button
+            type="button"
+            @click="executeDelete"
+            :disabled="isActionLoading"
+            class="btn-primary h-10 px-6 text-xs font-bold gap-2 bg-red-600 text-white hover:bg-red-700 shadow-md"
+          >
+            <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+            <span>تأكيد الحذف</span>
+          </button>
+        </div>
+      </div>
     </AdminModal>
 
     <!-- نافذة معاينة تفاصيل باقة الخدمة -->

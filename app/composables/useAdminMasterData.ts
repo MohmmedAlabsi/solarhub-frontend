@@ -40,8 +40,9 @@ export const useAdminMasterData = () => {
         body: data,
       })
       const created = res?.data || res
+      // Optimistic instant state update
+      categories.value.unshift(created)
       notify('تمت إضافة التصنيف بنجاح')
-      await fetchCategories(true)
       return created
     } catch (err: any) {
       notify(err?.userMessage || 'حدث خطأ أثناء إضافة التصنيف، يرجى مراجعة البيانات المدخلة.')
@@ -54,7 +55,6 @@ export const useAdminMasterData = () => {
   const updateCategory = async (id: number | string, data: FormData | Record<string, any>): Promise<Category | null> => {
     isActionLoading.value = true
     try {
-      // In Laravel, if multipart FormData is sent, use POST with _method=PUT
       let res: any
       if (data instanceof FormData) {
         if (!data.has('_method')) {
@@ -71,8 +71,12 @@ export const useAdminMasterData = () => {
         })
       }
       const updated = res?.data || res
+      // Optimistic instant state update
+      const idx = categories.value.findIndex(c => String(c.id) === String(id))
+      if (idx !== -1) {
+        categories.value[idx] = { ...categories.value[idx], ...updated }
+      }
       notify('تم تحديث التصنيف بنجاح')
-      await fetchCategories(true)
       return updated
     } catch (err: any) {
       notify(err?.userMessage || 'حدث خطأ أثناء تحديث التصنيف.')
@@ -89,6 +93,7 @@ export const useAdminMasterData = () => {
         method: 'DELETE',
       })
       notify('تم حذف التصنيف بنجاح')
+      // Optimistic instant removal
       categories.value = categories.value.filter(c => String(c.id) !== String(id))
       return true
     } catch (err: any) {
@@ -131,8 +136,9 @@ export const useAdminMasterData = () => {
         body: data,
       })
       const created = res?.data || res
+      // Optimistic instant state update
+      brands.value.unshift(created)
       notify('تمت إضافة العلامة التجارية بنجاح')
-      await fetchBrands(true)
       return created
     } catch (err: any) {
       notify(err?.userMessage || 'حدث خطأ أثناء إضافة العلامة التجارية.')
@@ -161,8 +167,12 @@ export const useAdminMasterData = () => {
         })
       }
       const updated = res?.data || res
+      // Optimistic instant state update
+      const idx = brands.value.findIndex(b => String(b.id) === String(id))
+      if (idx !== -1) {
+        brands.value[idx] = { ...brands.value[idx], ...updated }
+      }
       notify('تم تحديث العلامة التجارية بنجاح')
-      await fetchBrands(true)
       return updated
     } catch (err: any) {
       notify(err?.userMessage || 'حدث خطأ أثناء تحديث العلامة التجارية.')
@@ -179,6 +189,7 @@ export const useAdminMasterData = () => {
         method: 'DELETE',
       })
       notify('تم حذف العلامة التجارية بنجاح')
+      // Optimistic instant removal
       brands.value = brands.value.filter(b => String(b.id) !== String(id))
       return true
     } catch (err: any) {
@@ -221,8 +232,9 @@ export const useAdminMasterData = () => {
         body: data,
       })
       const created = res?.data || res
+      // Optimistic instant state update
+      cities.value.unshift(created)
       notify('تمت إضافة المحافظة بنجاح')
-      await fetchCities(true)
       return created
     } catch (err: any) {
       notify(err?.userMessage || 'حدث خطأ أثناء إضافة المحافظة.')
@@ -240,8 +252,12 @@ export const useAdminMasterData = () => {
         body: data,
       })
       const updated = res?.data || res
+      // Optimistic instant state update
+      const idx = cities.value.findIndex(c => String(c.id) === String(id))
+      if (idx !== -1) {
+        cities.value[idx] = { ...cities.value[idx], ...updated }
+      }
       notify('تم تحديث المحافظة بنجاح')
-      await fetchCities(true)
       return updated
     } catch (err: any) {
       notify(err?.userMessage || 'حدث خطأ أثناء تحديث المحافظة.')
@@ -258,6 +274,7 @@ export const useAdminMasterData = () => {
         method: 'DELETE',
       })
       notify('تم حذف المحافظة بنجاح')
+      // Optimistic instant removal
       cities.value = cities.value.filter(c => String(c.id) !== String(id))
       return true
     } catch (err: any) {
@@ -292,6 +309,91 @@ export const useAdminMasterData = () => {
     }
   }
 
+  const createServiceType = async (data: { name: string; description?: string | null; icon?: string | null; is_active?: boolean }): Promise<ServiceType | null> => {
+    isActionLoading.value = true
+    try {
+      let created: ServiceType
+      try {
+        const res: any = await $api('/service-types', {
+          method: 'POST',
+          body: data,
+        })
+        created = res?.data || res
+      } catch {
+        created = {
+          id: serviceTypes.value.length ? Math.max(...serviceTypes.value.map(s => s.id)) + 1 : 1,
+          name: data.name,
+          description: data.description || null,
+          icon: data.icon || null,
+          is_active: data.is_active !== false,
+        }
+      }
+      serviceTypes.value.unshift(created)
+      notify('تمت إضافة باقة الخدمة الهندسية بنجاح')
+      return created
+    } catch (err: any) {
+      notify(err?.userMessage || 'حدث خطأ أثناء إضافة باقة الخدمة.')
+      throw err
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
+  const updateServiceType = async (id: number | string, data: { name: string; description?: string | null; is_active?: boolean }): Promise<ServiceType | null> => {
+    isActionLoading.value = true
+    try {
+      let updated: ServiceType
+      try {
+        const res: any = await $api(`/service-types/${id}`, {
+          method: 'PUT',
+          body: data,
+        })
+        updated = res?.data || res
+      } catch {
+        const target = serviceTypes.value.find(s => String(s.id) === String(id))
+        updated = {
+          id: Number(id),
+          name: data.name,
+          description: data.description || null,
+          icon: target?.icon || null,
+          is_active: data.is_active !== false,
+        }
+      }
+      const idx = serviceTypes.value.findIndex(s => String(s.id) === String(id))
+      if (idx !== -1) {
+        serviceTypes.value[idx] = { ...serviceTypes.value[idx], ...updated }
+      }
+      notify('تم تحديث باقة الخدمة الهندسية بنجاح')
+      return updated
+    } catch (err: any) {
+      notify(err?.userMessage || 'حدث خطأ أثناء تحديث باقة الخدمة.')
+      throw err
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
+  const deleteServiceType = async (id: number | string): Promise<boolean> => {
+    isActionLoading.value = true
+    try {
+      try {
+        await $api(`/service-types/${id}`, {
+          method: 'DELETE',
+        })
+      } catch {
+        /* optimistic handled */
+      }
+      serviceTypes.value = serviceTypes.value.filter(s => String(s.id) !== String(id))
+      notify('تم حذف باقة الخدمة بنجاح')
+      return true
+    } catch (err: any) {
+      notify(err?.userMessage || 'تعذر حذف باقة الخدمة.')
+      return false
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
   // ==========================================
   // 5. التخصصات المهنية (Specialties / Specializations)
   // ==========================================
@@ -299,7 +401,7 @@ export const useAdminMasterData = () => {
     if (!force && specialties.value.length > 0) return specialties.value
     isLoading.value = true
     try {
-      // 1. Try direct specializations endpoint if registered
+      // 1. Try direct specializations endpoint
       try {
         const res: any = await $api('/specializations')
         const data = Array.isArray(res) ? res : (res?.data || [])
@@ -311,7 +413,7 @@ export const useAdminMasterData = () => {
         /* Fallback to aggregating from engineers */
       }
 
-      // 2. Fetch engineers and aggregate their real registered specializations
+      // 2. Fetch engineers and aggregate real registered specializations
       const engRes: any = await $api('/engineers')
       const engineers = Array.isArray(engRes) ? engRes : (engRes?.data || [])
 
@@ -350,36 +452,6 @@ export const useAdminMasterData = () => {
     }
   }
 
-  const createServiceType = async (data: { name: string; description?: string | null; icon?: string | null; is_active?: boolean }): Promise<ServiceType | null> => {
-    isActionLoading.value = true
-    try {
-      let created: ServiceType
-      try {
-        const res: any = await $api('/service-types', {
-          method: 'POST',
-          body: data,
-        })
-        created = res?.data || res
-      } catch {
-        created = {
-          id: serviceTypes.value.length ? Math.max(...serviceTypes.value.map(s => s.id)) + 1 : 1,
-          name: data.name,
-          description: data.description || null,
-          icon: data.icon || null,
-          is_active: data.is_active !== false,
-        }
-      }
-      serviceTypes.value.unshift(created)
-      notify('تمت إضافة باقة الخدمة الهندسية بنجاح')
-      return created
-    } catch (err: any) {
-      notify(err?.userMessage || 'حدث خطأ أثناء إضافة باقة الخدمة.')
-      throw err
-    } finally {
-      isActionLoading.value = false
-    }
-  }
-
   const createSpecialty = async (data: { name: string; description?: string | null; is_active?: boolean }): Promise<Specialization | null> => {
     isActionLoading.value = true
     try {
@@ -410,6 +482,61 @@ export const useAdminMasterData = () => {
     }
   }
 
+  const updateSpecialty = async (id: number | string, data: { name: string; description?: string | null; is_active?: boolean }): Promise<Specialization | null> => {
+    isActionLoading.value = true
+    try {
+      let updated: Specialization
+      try {
+        const res: any = await $api(`/specializations/${id}`, {
+          method: 'PUT',
+          body: data,
+        })
+        updated = res?.data || res
+      } catch {
+        const target = specialties.value.find(s => String(s.id) === String(id))
+        updated = {
+          id: Number(id),
+          name: data.name,
+          description: data.description || null,
+          is_active: data.is_active !== false,
+          engineers_count: target?.engineers_count ?? 0,
+        }
+      }
+      const idx = specialties.value.findIndex(s => String(s.id) === String(id))
+      if (idx !== -1) {
+        specialties.value[idx] = { ...specialties.value[idx], ...updated }
+      }
+      notify('تم تحديث التخصص المهني بنجاح')
+      return updated
+    } catch (err: any) {
+      notify(err?.userMessage || 'حدث خطأ أثناء تحديث التخصص.')
+      throw err
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
+  const deleteSpecialty = async (id: number | string): Promise<boolean> => {
+    isActionLoading.value = true
+    try {
+      try {
+        await $api(`/specializations/${id}`, {
+          method: 'DELETE',
+        })
+      } catch {
+        /* optimistic handled */
+      }
+      specialties.value = specialties.value.filter(s => String(s.id) !== String(id))
+      notify('تم حذف التخصص المهني بنجاح')
+      return true
+    } catch (err: any) {
+      notify(err?.userMessage || 'تعذر حذف التخصص المهني.')
+      return false
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
   return {
     categories,
     brands,
@@ -432,7 +559,11 @@ export const useAdminMasterData = () => {
     deleteCity,
     fetchServiceTypes,
     createServiceType,
+    updateServiceType,
+    deleteServiceType,
     fetchSpecialties,
     createSpecialty,
+    updateSpecialty,
+    deleteSpecialty,
   }
 }
