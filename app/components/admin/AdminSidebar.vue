@@ -37,22 +37,31 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
+const { hasPermission } = useAdminPermissions()
 
 const navItems = [
   { label: 'الرئيسية', to: '/admin', icon: Home, matchPrefixes: ['/admin/dashboard'] },
-  { label: 'إدارة المستخدمين', to: '/admin/users', icon: Users, matchPrefixes: ['/admin/users'] },
-  { label: 'إدارة الموردين', to: '/admin/stores', icon: Store, matchPrefixes: ['/admin/stores'] },
-  { label: 'إدارة المهندسين', to: '/admin/engineers', icon: UserCheck, matchPrefixes: ['/admin/engineers'] },
-  { label: 'إدارة المنتجات والكتالوج', to: '/admin/products', icon: Package, matchPrefixes: ['/admin/products'] },
-  { label: 'إدارة البيانات الأساسية', to: '/admin/master-data/categories', icon: Database, matchPrefixes: ['/admin/master-data'] },
-  { label: 'إدارة طلبات الخدمات', to: '/admin/services', icon: FileText, matchPrefixes: ['/admin/services'] },
-  { label: 'إدارة طلبات الشراء', to: '/admin/orders', icon: ShoppingBag, matchPrefixes: ['/admin/orders'] },
-  { label: 'الإدارة المالية', to: '/admin/finance/payments', icon: CreditCard, matchPrefixes: ['/admin/finance'] },
-  { label: 'إدارة الصلاحيات', to: '/admin/roles', icon: ShieldCheck, matchPrefixes: ['/admin/roles', '/admin/permissions'] },
-  { label: 'إدارة التقييمات', to: '/admin/reviews', icon: Star, matchPrefixes: ['/admin/reviews'] },
-  { label: 'الإشعارات', to: '/admin/notifications', icon: Bell, matchPrefixes: ['/admin/notifications'] },
-  { label: 'إعدادات النظام', to: '/admin/settings', icon: Settings, matchPrefixes: ['/admin/settings'] },
+  { label: 'إدارة المستخدمين', to: '/admin/users', icon: Users, matchPrefixes: ['/admin/users'], permission: 'users.manage' },
+  { label: 'إدارة الموردين', to: '/admin/stores', icon: Store, matchPrefixes: ['/admin/stores'], permission: 'stores.view-pending' },
+  { label: 'إدارة المهندسين', to: '/admin/engineers', icon: UserCheck, matchPrefixes: ['/admin/engineers'], permission: 'engineers.view-pending' },
+  { label: 'إدارة المنتجات والكتالوج', to: '/admin/products', icon: Package, matchPrefixes: ['/admin/products'], permission: 'catalog.manage' },
+  { label: 'إدارة البيانات الأساسية', to: '/admin/master-data/categories', icon: Database, matchPrefixes: ['/admin/master-data'], permission: 'catalog.manage' },
+  { label: 'إدارة طلبات الخدمات', to: '/admin/services', icon: FileText, matchPrefixes: ['/admin/services'], permission: 'service-requests.view-open' },
+  { label: 'إدارة طلبات الشراء', to: '/admin/orders', icon: ShoppingBag, matchPrefixes: ['/admin/orders'], permission: 'orders.view' },
+  { label: 'الإدارة المالية', to: '/admin/finance/payments', icon: CreditCard, matchPrefixes: ['/admin/finance'], permission: 'order-payments.verify' },
+  { label: 'إدارة الصلاحيات', to: '/admin/roles', icon: ShieldCheck, matchPrefixes: ['/admin/roles', '/admin/permissions'], permission: 'users.manage' },
+  { label: 'إدارة التقييمات', to: '/admin/reviews', icon: Star, matchPrefixes: ['/admin/reviews'], permission: 'store-ratings.update' },
+  { label: 'الإشعارات', to: '/admin/notifications', icon: Bell, matchPrefixes: ['/admin/notifications'], permission: 'notification-templates.manage' },
+  { label: 'إعدادات النظام', to: '/admin/settings', icon: Settings, matchPrefixes: ['/admin/settings'], permission: 'settings.manage' },
 ]
+
+// تطبيق وتصفية الروابط الجانبية ديناميكياً وفق الصلاحيات الحية للأدمن
+const filteredNavItems = computed(() => {
+  return navItems.filter((item) => {
+    if (!item.permission) return true
+    return hasPermission(item.permission)
+  })
+})
 
 function isLinkActive(item: typeof navItems[0]) {
   if (route.path === item.to) return true
@@ -123,11 +132,11 @@ function handleLinkClick() {
       </NuxtLink>
     </div>
 
-    <!-- قائمة الروابط الإدارية -->
+    <!-- قائمة الروابط الإدارية النشطة وفق الصلاحيات -->
     <nav class="flex-1 min-h-0 flex flex-col gap-1 overflow-y-auto p-2 sm:p-3 scrollbar-thin scrollbar-thumb-white/10" aria-label="التنقل في لوحة الإدارة">
       <div class="flex flex-col gap-1">
         <AdminSidebarLink
-          v-for="item in navItems"
+          v-for="item in filteredNavItems"
           :key="item.to"
           :label="item.label"
           :to="item.to"

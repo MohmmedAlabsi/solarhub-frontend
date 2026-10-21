@@ -142,12 +142,20 @@ export interface AdminPermissionGroup {
 }
 
 export interface AdminRoleUser {
-  id: string
+  id: string | number
   name: string
   role: string
-  roleTitle: string
-  avatarText: string
-  permissions: string[]
+  roleTitle?: string
+  role_title?: string
+  email?: string
+  phone?: string
+  status?: string
+  direct_permissions?: string[]
+  all_permissions?: string[]
+  roles?: string[]
+  created_at?: string
+  avatarText?: string
+  permissions?: string[]
 }
 
 export type AdminApproval = 'approved' | 'pending' | 'rejected'

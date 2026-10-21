@@ -6,218 +6,120 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   CreditCard,
+  Database,
+  FileText,
   HardHat,
+  Loader2,
   Package,
+  RefreshCw,
   RotateCcw,
   Save,
+  Search,
   Shield,
+  ShieldAlert,
   ShieldCheck,
+  ShoppingBag,
   Sliders,
   Store,
   User,
   UserCheck,
+  UserPlus,
   Users,
 } from 'lucide-vue-next'
-import type { AdminPermissionGroup, AdminRoleUser } from '../../../../types/admin'
+import type { AdminPermissionGroup } from '../../../../types/admin'
 
 definePageMeta({ layout: 'admin' })
 useSeoMeta({ title: 'إدارة الصلاحيات والأدوار | لوحة الإدارة العامة' })
 
-// قائمة المشرفين / المستخدمين المستهدفين
-const targetUsers: AdminRoleUser[] = [
-  {
-    id: 'user-1',
-    name: 'م. أنس نايف علي',
-    role: 'system_admin',
-    roleTitle: 'مسؤول نظام',
-    avatarText: 'أ ن',
-    permissions: ['users.view_logs', 'orders.view_records'],
-  },
-  {
-    id: 'user-2',
-    name: 'م. فهد السديري',
-    role: 'super_admin',
-    roleTitle: 'مدير عام المنصة',
-    avatarText: 'ف س',
-    permissions: [
-      'users.view_logs',
-      'users.create_account',
-      'users.edit_data',
-      'users.delete_account',
-      'users.assign_roles',
-      'suppliers.view_profiles',
-      'suppliers.approve_records',
-      'suppliers.manage_catalog',
-      'suppliers.add_product',
-      'suppliers.edit_pricing',
-      'engineers.view_list',
-      'engineers.verify_accreditation',
-      'engineers.dispatch_requests',
-      'engineers.review_quotes',
-      'orders.view_records',
-      'orders.update_shipping',
-      'orders.cancel_refund',
-      'finance.view_payments',
-      'finance.approve_payouts',
-      'finance.edit_vat_settings',
-      'finance.export_reports',
-      'system.send_notifications',
-      'system.manage_master_data',
-      'system.edit_platform_settings',
-      'system.moderate_reviews',
-    ],
-  },
-  {
-    id: 'user-3',
-    name: 'سارة القحطاني',
-    role: 'finance_officer',
-    roleTitle: 'مشرف العمليات المالية',
-    avatarText: 'س ق',
-    permissions: [
-      'orders.view_records',
-      'finance.view_payments',
-      'finance.approve_payouts',
-      'finance.edit_vat_settings',
-      'finance.export_reports',
-    ],
-  },
-  {
-    id: 'user-4',
-    name: 'عبدالله الغامدي',
-    role: 'catalog_manager',
-    roleTitle: 'مشرف الكتالوج والمخزون',
-    avatarText: 'ع غ',
-    permissions: [
-      'suppliers.view_profiles',
-      'suppliers.manage_catalog',
-      'suppliers.add_product',
-      'suppliers.edit_pricing',
-    ],
-  },
-  {
-    id: 'user-5',
-    name: 'م. ريم الشمري',
-    role: 'engineering_director',
-    roleTitle: 'مشرف اعتماد المهندسين',
-    avatarText: 'ر ش',
-    permissions: [
-      'engineers.view_list',
-      'engineers.verify_accreditation',
-      'engineers.dispatch_requests',
-      'engineers.review_quotes',
-    ],
-  },
-]
+const {
+  permissions,
+  adminUsers,
+  selectedUserId,
+  currentPermissions,
+  permissionGroups,
+  isLoading,
+  isSaving,
+  fetchPermissions,
+  fetchAdmins,
+  selectUser,
+  togglePermission,
+  saveUserPermissions,
+  assignRole,
+} = useAdminPermissions()
 
-const selectedUserId = ref('user-1')
-const selectedUser = computed(() => {
-  return targetUsers.find(u => u.id === selectedUserId.value) || targetUsers[0]
+// جلب الصلاحيات والمشرفين بالـ SSR المتفائل فائق السرعة
+const { pending } = useLazyAsyncData('admin-roles-init', async () => {
+  await Promise.all([
+    fetchPermissions(false),
+    fetchAdmins(false),
+  ])
+  return true
 })
 
-// مجموعات الصلاحيات الست المعتمدة في التصميم
-const permissionGroups = ref<AdminPermissionGroup[]>([
-  {
-    id: 'users_roles',
-    title: 'إدارة المستخدمين والأدوار',
-    icon: 'users',
-    expanded: true,
-    items: [
-      { id: 'users.view_logs', label: 'عرض المستخدمين وسجلات الدخول', checked: true },
-      { id: 'users.create_account', label: 'إنشاء حساب مستخدم جديد', checked: false },
-      { id: 'users.edit_data', label: 'تعديل بيانات المستخدم والبريد وكلمات المرور', checked: false },
-      { id: 'users.delete_account', label: 'حذف أو تعطيل حسابات المستخدمين', checked: false },
-      { id: 'users.assign_roles', label: 'تعيين وإسناد الأدوار والصلاحيات للمشرفين', checked: false },
-    ],
-  },
-  {
-    id: 'suppliers_catalog',
-    title: 'إدارة الموردين والكتالوج',
-    icon: 'store',
-    expanded: true,
-    items: [
-      { id: 'suppliers.view_profiles', label: 'استعراض قائمة الموردين وملفاتهم التجارية', checked: false },
-      { id: 'suppliers.approve_records', label: 'اعتماد ورفض السجلات التجارية لحسابات الموردين', checked: false },
-      { id: 'suppliers.manage_catalog', label: 'إدارة ومراجعة منتجات الكتالوج الشمسي', checked: false },
-      { id: 'suppliers.add_product', label: 'إضافة منتج جديد للكتالوج وتحديد المواصفات الفنية', checked: false },
-      { id: 'suppliers.edit_pricing', label: 'تعديل أسعار الكتالوج، الخصومات وحالات التوفر', checked: false },
-    ],
-  },
-  {
-    id: 'engineers_services',
-    title: 'إدارة المهندسين والخدمات',
-    icon: 'userCheck',
-    expanded: true,
-    items: [
-      { id: 'engineers.view_list', label: 'استعراض قائمة المهندسين والاستشاريين المعتمدين', checked: false },
-      { id: 'engineers.verify_accreditation', label: 'التحقق من الاعتماد المهني، هيئة المهندسين والتراخيص', checked: false },
-      { id: 'engineers.dispatch_requests', label: 'إدارة وتوزيع طلبات المعاينة والتصميم الهندسي', checked: false },
-      { id: 'engineers.review_quotes', label: 'مراجعة عروض الأسعار والدراسات الفنية المقدمة للعملاء', checked: false },
-    ],
-  },
-  {
-    id: 'orders_sales',
-    title: 'إدارة طلبات الشراء والمبيعات',
-    icon: 'shoppingBag',
-    expanded: true,
-    items: [
-      { id: 'orders.view_records', label: 'استعراض سجل طلبات الشراء وحالات الدفع', checked: true },
-      { id: 'orders.update_shipping', label: 'تحديث حالة الطلبات والشحن وجدولة التوصيل', checked: false },
-      { id: 'orders.cancel_refund', label: 'إلغاء الطلبات المتأخرة وإرجاع المبالغ للمحافظ', checked: false },
-    ],
-  },
-  {
-    id: 'finance_operations',
-    title: 'الإدارة المالية والعمليات',
-    icon: 'creditCard',
-    expanded: true,
-    items: [
-      { id: 'finance.view_payments', label: 'استعراض سجل المدفوعات والتحصيلات وبوابات الدفع', checked: false },
-      { id: 'finance.approve_payouts', label: 'مراجعة واعتماد صرف مستحقات الموردين والمهندسين', checked: false },
-      { id: 'finance.edit_vat_settings', label: 'تعديل نسب ضريبة القيمة المضافة والإعدادات المالية للمنصة', checked: false },
-      { id: 'finance.export_reports', label: 'تصدير التقارير المالية التفصيلية وكشوفات الحساب البنكي', checked: false },
-    ],
-  },
-  {
-    id: 'system_notifications',
-    title: 'إدارة النظام والإشعارات',
-    icon: 'sliders',
-    expanded: true,
-    items: [
-      { id: 'system.send_notifications', label: 'إرسال الإشعارات الفورية والتعاميم الجماعية للمستخدمين', checked: false },
-      { id: 'system.manage_master_data', label: 'إدارة البيانات الأساسية (التصنيفات، العلامات التجارية، التخصصات، المحافظات)', checked: false },
-      { id: 'system.edit_platform_settings', label: 'تعديل إعدادات وسياسات المنصة التقنية وسجلات النظام', checked: false },
-      { id: 'system.moderate_reviews', label: 'مراجعة والتحكم في تقييمات وتعليقات العملاء المنشورة', checked: false },
-    ],
-  },
-])
+const isRefreshing = ref(false)
+const searchQuery = ref('')
 
-// تتبع وحفظ الحالة الأصلية لتفعيل زر الإلغاء
-const initialPermissionsSnapshot = ref<string[]>([])
+async function handleRefresh() {
+  isRefreshing.value = true
+  try {
+    await Promise.all([
+      fetchPermissions(true),
+      fetchAdmins(true),
+    ])
+    showToast('تم تحديث الصلاحيات والمشرفين من قاعدة البيانات')
+  } finally {
+    isRefreshing.value = false
+  }
+}
 
-function loadUserPermissions() {
-  const current = selectedUser.value
-  const activeIds = new Set(current.permissions)
-  initialPermissionsSnapshot.value = [...current.permissions]
+// المشرف المختار حالياً
+const selectedUser = computed(() => {
+  return adminUsers.value.find(u => String(u.id) === String(selectedUserId.value)) || adminUsers.value[0] || {
+    id: 1,
+    name: 'مدير النظام',
+    email: 'admin@solarhub.com',
+    role: 'admin',
+    role_title: 'مدير نظام عام (Super Admin)',
+    direct_permissions: [],
+    all_permissions: [],
+  }
+})
 
-  permissionGroups.value.forEach(group => {
-    group.items.forEach(item => {
-      item.checked = activeIds.has(item.id)
-    })
+// حالة توسيع وطي المجموعات
+const expandedGroups = ref<Record<string, boolean>>({
+  users_roles: true,
+  catalog_products: true,
+  suppliers_stores: true,
+  engineers_accreditation: true,
+  orders_sales: true,
+  services_offers: true,
+  finance_wallets: true,
+  system_settings: true,
+})
+
+function toggleGroupExpand(groupId: string) {
+  expandedGroups.value[groupId] = !expandedGroups.value[groupId]
+}
+
+function expandAllGroups() {
+  Object.keys(expandedGroups.value).forEach(k => {
+    expandedGroups.value[k] = true
   })
 }
 
-// تحميل الصلاحيات للمستخدم المختار عند البداية أو عند تغيير المستخدم
-watch(selectedUserId, () => {
-  loadUserPermissions()
-}, { immediate: true })
+function collapseAllGroups() {
+  Object.keys(expandedGroups.value).forEach(k => {
+    expandedGroups.value[k] = false
+  })
+}
 
-// إجمالي الصلاحيات المختارة
+// حساب إجمالي الصلاحيات
 const totalPermissionsCount = computed(() => {
-  return permissionGroups.value.reduce((acc, g) => acc + g.items.length, 0)
+  return permissions.value.length
 })
 
 const selectedPermissionsCount = computed(() => {
-  return permissionGroups.value.reduce((acc, g) => acc + g.items.filter(i => i.checked).length, 0)
+  return currentPermissions.value.length
 })
 
 // حالة تحديد الكل
@@ -226,48 +128,59 @@ const isAllSelected = computed({
     return selectedPermissionsCount.value === totalPermissionsCount.value && totalPermissionsCount.value > 0
   },
   set(val: boolean) {
-    permissionGroups.value.forEach(group => {
-      group.items.forEach(item => {
-        item.checked = val
-      })
-    })
+    if (val) {
+      currentPermissions.value = permissions.value.map(p => p.name)
+    } else {
+      currentPermissions.value = []
+    }
   },
 })
 
-function toggleGroupExpand(group: AdminPermissionGroup) {
-  group.expanded = !group.expanded
+// فحص تحديد مجموعة بالكامل
+function isGroupAllSelected(group: AdminPermissionGroup) {
+  if (group.items.length === 0) return false
+  return group.items.every(i => currentPermissions.value.includes(i.id))
 }
 
-function expandAllGroups() {
-  permissionGroups.value.forEach(g => {
-    g.expanded = true
-  })
-}
+function toggleGroupSelection(group: AdminPermissionGroup) {
+  const allInGroup = group.items.map(i => i.id)
+  const isAll = isGroupAllSelected(group)
 
-function collapseAllGroups() {
-  permissionGroups.value.forEach(g => {
-    g.expanded = false
-  })
-}
-
-function togglePermission(item: { id: string; checked: boolean }) {
-  item.checked = !item.checked
-}
-
-// التحقق من وجود تعديلات لم تحفظ بعد
-const hasUnsavedChanges = computed(() => {
-  const currentChecked = new Set<string>()
-  permissionGroups.value.forEach(group => {
-    group.items.forEach(item => {
-      if (item.checked) currentChecked.add(item.id)
+  if (isAll) {
+    // إلغاء تحديد عناصر المجموعة
+    currentPermissions.value = currentPermissions.value.filter(p => !allInGroup.includes(p))
+  } else {
+    // إضافة عناصر المجموعة غير المحددة
+    allInGroup.forEach(id => {
+      if (!currentPermissions.value.includes(id)) {
+        currentPermissions.value.push(id)
+      }
     })
-  })
+  }
+}
 
-  if (currentChecked.size !== initialPermissionsSnapshot.value.length) return true
-  return initialPermissionsSnapshot.value.some(id => !currentChecked.has(id))
+// تصفية المجموعات حسب البحث
+const filteredGroups = computed(() => {
+  if (!searchQuery.value.trim()) return permissionGroups.value
+
+  const q = searchQuery.value.trim().toLowerCase()
+  return permissionGroups.value
+    .map(group => {
+      const filteredItems = group.items.filter(item => {
+        return item.label.toLowerCase().includes(q) ||
+               (item.description && item.description.toLowerCase().includes(q)) ||
+               item.id.toLowerCase().includes(q)
+      })
+      return {
+        ...group,
+        items: filteredItems,
+        expanded: filteredItems.length > 0,
+      }
+    })
+    .filter(group => group.items.length > 0)
 })
 
-// إشعار الحفظ والإلغاء
+// إشعار الحفظ
 const saveToastMessage = ref('')
 const isToastVisible = ref(false)
 
@@ -280,37 +193,42 @@ function showToast(msg: string) {
 }
 
 function cancelChanges() {
-  loadUserPermissions()
-  showToast('تم إلغاء التغييرات واستعادة الصلاحيات الأصلية')
+  selectUser(selectedUserId.value)
+  showToast('تم إلغاء التغييرات واستعادة الصلاحيات المسجلة لهذا المستخدم')
 }
 
-function savePermissions() {
-  const checkedIds: string[] = []
-  permissionGroups.value.forEach(group => {
-    group.items.forEach(item => {
-      if (item.checked) checkedIds.push(item.id)
-    })
-  })
-
-  selectedUser.value.permissions = checkedIds
-  initialPermissionsSnapshot.value = [...checkedIds]
-  showToast(`تم حفظ وتحديث صلاحيات (${selectedUser.value.name}) بنجاح (${checkedIds.length} صلاحية مسندة)`)
+async function handleSavePermissions() {
+  if (!selectedUser.value) return
+  const success = await saveUserPermissions(selectedUser.value.id, currentPermissions.value)
+  if (success) {
+    showToast(`تم حفظ وتطبيق صلاحيات (${selectedUser.value.name}) بنجاح (${currentPermissions.value.length} صلاحية مسندة)`)
+  }
 }
 
-// دالة لجلب أيقونة القسم
+// تعيين الدور كمدير نظام
+async function handlePromoteToAdmin() {
+  if (!selectedUser.value) return
+  await assignRole(selectedUser.value.id, 'admin')
+}
+
+// أيقونات المجموعات
 function getGroupIcon(iconName: string) {
   switch (iconName) {
     case 'users':
       return Users
+    case 'package':
+      return Package
     case 'store':
       return Store
     case 'userCheck':
       return UserCheck
     case 'shoppingBag':
-      return Package
+      return ShoppingBag
+    case 'fileText':
+      return FileText
     case 'creditCard':
-      return Building2
-    case 'sliders':
+      return CreditCard
+    case 'settings':
       return Sliders
     default:
       return Shield
@@ -341,9 +259,9 @@ function getGroupIcon(iconName: string) {
     </transition>
 
     <!-- شريط العنوان الرئيسي للواجهة -->
-    <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-center gap-3">
-        <div class="flex size-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 border border-sky-100 shadow-xs">
+        <div class="flex size-11 items-center justify-center rounded-xl bg-sky-50 text-solar-navy border border-sky-100 shadow-xs">
           <ShieldCheck class="size-6 stroke-[2.2]" />
         </div>
         <div>
@@ -351,10 +269,22 @@ function getGroupIcon(iconName: string) {
             إدارة الصلاحيات والأدوار
           </h1>
           <p class="text-xs text-solar-text-muted mt-0.5">
-            تخصيص مستويات الوصول وتعيين الصلاحيات الإجرائية للمشرفين والمسؤولين
+            تخصيص مستويات الوصول وتعيين الصلاحيات الإجرائية للمشرفين والمسؤولين متصلة بـ API وقاعدة البيانات
           </p>
         </div>
       </div>
+
+      <!-- زر تحديث الصلاحيات من السيرفر -->
+      <button
+        type="button"
+        @click="handleRefresh"
+        :disabled="isRefreshing || isLoading"
+        class="btn-outline h-10 px-4 text-xs font-bold gap-2 text-solar-text-body hover:bg-solar-bg-subtle self-start sm:self-auto"
+        title="تحديث قائمة الصلاحيات والمشرفين من قاعدة البيانات"
+      >
+        <RefreshCw class="size-4" :class="{ 'animate-spin': isRefreshing || isLoading || pending }" />
+        <span>تحديث الصلاحيات</span>
+      </button>
     </div>
 
     <!-- بطاقة التصفية واختيار المستخدم وإجراءات الحفظ -->
@@ -362,18 +292,19 @@ function getGroupIcon(iconName: string) {
       <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <!-- الجانب الأيمن: اختيار المستخدم المستهدف والدور الحالي -->
         <div class="flex flex-wrap items-center gap-4 sm:gap-6">
-          <!-- اختيار المستخدم المستهدف -->
-          <div class="w-full sm:w-auto min-w-[240px]">
+          <!-- اختيار المستخدم المستهدف من قاعدة البيانات -->
+          <div class="w-full sm:w-auto min-w-[260px]">
             <label class="block text-[11px] font-bold text-solar-text-muted mb-1.5">
-              اختيار المستخدم المستهدف
+              المشرف / الحساب الإداري المستهدف
             </label>
             <div class="relative">
               <select
-                v-model="selectedUserId"
+                :value="selectedUserId"
+                @change="selectUser(($event.target as HTMLSelectElement).value)"
                 class="solar-input h-11 w-full pl-9 pr-10 text-xs font-bold text-solar-text-heading appearance-none bg-white cursor-pointer hover:border-solar-navy/30 transition-colors"
               >
-                <option v-for="user in targetUsers" :key="user.id" :value="user.id">
-                  {{ user.name }}
+                <option v-for="user in adminUsers" :key="user.id" :value="user.id">
+                  {{ user.name }} ({{ user.email }})
                 </option>
               </select>
               <div class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 text-solar-navy">
@@ -386,20 +317,38 @@ function getGroupIcon(iconName: string) {
           <!-- الدور المسند حالياً -->
           <div>
             <label class="block text-[11px] font-bold text-solar-text-muted mb-1.5">
-              الدور المسند حالياً
+              الدور المسند في النظام
             </label>
-            <div class="flex items-center gap-2 h-11 px-4 rounded-xl bg-amber-100/70 border border-amber-300 text-amber-900 text-xs font-black select-none">
-              <Shield class="size-4 text-amber-700" />
-              <span>{{ selectedUser.roleTitle }}</span>
+            <div class="flex items-center gap-2 h-11 px-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-black select-none">
+              <Shield class="size-4 text-amber-600" />
+              <span>{{ selectedUser.role_title || selectedUser.roleTitle || 'مشرف إداري' }}</span>
             </div>
+          </div>
+
+          <!-- زر ترقية للدور الإداري إذا لم يكن أدمن -->
+          <div v-if="selectedUser.role !== 'admin'">
+            <label class="block text-[11px] font-bold text-solar-text-muted mb-1.5">
+              ترقية الدور
+            </label>
+            <button
+              type="button"
+              @click="handlePromoteToAdmin"
+              :disabled="isSaving"
+              class="h-11 px-3.5 rounded-xl border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 text-xs font-bold flex items-center gap-1.5 transition-colors"
+              title="ترقية المستخدم إلى مدير نظام (Admin) ومنحه كافة الصلاحيات"
+            >
+              <UserPlus class="size-4" />
+              <span>ترقية لمدير نظام</span>
+            </button>
           </div>
         </div>
 
-        <!-- الجانب الأيسر: زرا إلغاء التغييرات وحفظ الصلاحيات -->
+        <!-- الجانب الأيسر: زرا إلغاء التغييرات وحفظ الصلاحيات الحية -->
         <div class="flex items-center gap-3 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
           <button
             type="button"
             @click="cancelChanges"
+            :disabled="isSaving"
             class="btn-outline h-11 px-4 text-xs font-bold gap-2 text-slate-700 hover:text-solar-navy border-slate-200 bg-white hover:bg-slate-50 active:scale-98 transition-all"
           >
             <RotateCcw class="size-4 text-slate-500" />
@@ -408,18 +357,37 @@ function getGroupIcon(iconName: string) {
 
           <button
             type="button"
-            @click="savePermissions"
-            class="btn-primary h-11 px-5 text-xs font-bold gap-2 bg-solar-navy text-white hover:bg-solar-navy-dark shadow-sm active:scale-98 transition-all"
+            @click="handleSavePermissions"
+            :disabled="isSaving"
+            class="btn-primary h-11 px-6 text-xs font-bold gap-2 bg-solar-navy text-white hover:bg-solar-navy-dark shadow-sm active:scale-98 transition-all"
           >
-            <Save class="size-4" />
-            <span>حفظ الصلاحيات</span>
+            <Loader2 v-if="isSaving" class="size-4 animate-spin" />
+            <Save v-else class="size-4" />
+            <span>{{ isSaving ? 'جارٍ الحفظ والتطبيق...' : 'حفظ الصلاحيات وتطبيقها' }}</span>
           </button>
         </div>
       </div>
     </section>
 
+    <!-- شريط البحث السريع عن الصلاحيات -->
+    <div class="relative">
+      <Search class="absolute right-3.5 top-1/2 -translate-y-1/2 size-4 text-solar-text-muted" />
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="البحث في الصلاحيات الـ 48 المسجلة في النظام (بالاسم أو الشرح أو الكود البرمجي)..."
+        class="solar-input h-11 pr-10 pl-4 text-xs w-full bg-white shadow-xs"
+      />
+    </div>
+
+    <!-- حالة التحميل الأولي -->
+    <div v-if="pending && permissions.length === 0" class="flex flex-col items-center justify-center py-16 text-center solar-card">
+      <Loader2 class="size-8 text-solar-navy animate-spin mb-3" />
+      <p class="text-xs font-bold text-solar-text-muted">جاري تحميل الصلاحيات والمشرفين من قاعدة البيانات...</p>
+    </div>
+
     <!-- بطاقة مصفوفة الصلاحيات الشاملة -->
-    <section class="solar-card p-4 sm:p-6 bg-white rounded-2xl border border-solar-border-card shadow-xs">
+    <section v-else class="solar-card p-4 sm:p-6 bg-white rounded-2xl border border-solar-border-card shadow-xs">
       <!-- الشريط العلوي للتحكم في الصلاحيات: تحديد الكل + التوسيع والطي -->
       <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
         <!-- خيار تحديد كافة الصلاحيات المتاحة -->
@@ -432,8 +400,8 @@ function getGroupIcon(iconName: string) {
           <span class="text-xs sm:text-sm font-extrabold text-solar-navy group-hover:text-solar-navy-dark transition-colors">
             تحديد كافة الصلاحيات المتاحة
           </span>
-          <span class="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-            {{ selectedPermissionsCount }} من {{ totalPermissionsCount }}
+          <span class="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+            {{ selectedPermissionsCount }} من {{ totalPermissionsCount }} مسندة
           </span>
         </label>
 
@@ -459,76 +427,101 @@ function getGroupIcon(iconName: string) {
         </div>
       </div>
 
-      <!-- قائمة المجموعات الست من الصلاحيات (Accordions) -->
+      <!-- قائمة المجموعات من الصلاحيات (Accordions) -->
       <div class="divide-y divide-slate-100">
         <div
-          v-for="group in permissionGroups"
+          v-for="group in filteredGroups"
           :key="group.id"
           class="py-4 first:pt-4 last:pb-1"
         >
           <!-- رأس المجموعة (Group Header) -->
-          <div
-            @click="toggleGroupExpand(group)"
-            class="flex items-center justify-between py-2 cursor-pointer select-none group"
-          >
-            <div class="flex items-center gap-3">
-              <div class="flex size-8 items-center justify-center rounded-lg bg-slate-100 text-solar-navy group-hover:bg-solar-navy group-hover:text-white transition-colors">
+          <div class="flex items-center justify-between py-2 cursor-pointer select-none group">
+            <div @click="toggleGroupExpand(group.id)" class="flex items-center gap-3 flex-1">
+              <div class="flex size-9 items-center justify-center rounded-xl bg-slate-100 text-solar-navy group-hover:bg-solar-navy group-hover:text-white transition-colors shadow-2xs">
                 <component :is="getGroupIcon(group.icon)" class="size-4.5 stroke-[2]" />
               </div>
-              <h2 class="text-xs sm:text-sm font-black text-solar-navy group-hover:text-solar-navy-dark transition-colors">
-                {{ group.title }}
-              </h2>
+              <div>
+                <h2 class="text-xs sm:text-sm font-black text-solar-navy group-hover:text-solar-navy-dark transition-colors">
+                  {{ group.title }}
+                </h2>
+                <p class="text-[10px] text-solar-text-muted mt-0.5">
+                  {{ group.items.length }} صلاحية في هذا القسم
+                </p>
+              </div>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
+              <!-- زر تحديد/إلغاء الكل للمجموعة -->
+              <button
+                type="button"
+                @click.stop="toggleGroupSelection(group)"
+                class="text-[10px] sm:text-[11px] font-bold px-2 py-1 rounded-md transition-colors"
+                :class="isGroupAllSelected(group) ? 'bg-sky-100 text-sky-800 hover:bg-sky-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                title="تحديد أو إلغاء كافة صلاحيات هذه المجموعة"
+              >
+                {{ isGroupAllSelected(group) ? 'إلغاء المجموعة' : 'تحديد المجموعة' }}
+              </button>
+
               <!-- مؤشر عدد الصلاحيات المحددة داخل المجموعة -->
-              <span class="text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-md">
-                {{ group.items.filter(i => i.checked).length }} / {{ group.items.length }}
+              <span class="text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-md font-mono">
+                {{ group.items.filter(i => currentPermissions.includes(i.id)).length }} / {{ group.items.length }}
               </span>
 
               <!-- سهم الفتح والإغلاق -->
-              <ChevronDown
-                class="size-4 text-slate-400 group-hover:text-solar-navy transition-transform duration-200"
-                :class="{ 'rotate-180': group.expanded }"
-              />
+              <button type="button" @click.stop="toggleGroupExpand(group.id)" class="p-1">
+                <ChevronDown
+                  class="size-4 text-slate-400 group-hover:text-solar-navy transition-transform duration-200"
+                  :class="{ 'rotate-180': expandedGroups[group.id] }"
+                />
+              </button>
             </div>
           </div>
 
-          <!-- قائمة عناصر الصلاحيات الفردية (Accordion Items) -->
+          <!-- قائمة عناصر الصلاحيات الفردية -->
           <transition
             enter-active-class="transition duration-200 ease-out"
             enter-from-class="transform -translate-y-1 opacity-0 max-h-0 overflow-hidden"
-            enter-to-class="transform translate-y-0 opacity-100 max-h-[500px]"
+            enter-to-class="transform translate-y-0 opacity-100 max-h-[800px]"
             leave-active-class="transition duration-150 ease-in"
-            leave-from-class="transform translate-y-0 opacity-100 max-h-[500px]"
+            leave-from-class="transform translate-y-0 opacity-100 max-h-[800px]"
             leave-to-class="transform -translate-y-1 opacity-0 max-h-0 overflow-hidden"
           >
-            <div v-if="group.expanded" class="mt-2 pr-11 space-y-2">
+            <div v-if="expandedGroups[group.id]" class="mt-2 pr-0 sm:pr-12 space-y-2">
               <div
                 v-for="item in group.items"
                 :key="item.id"
-                @click="togglePermission(item)"
-                class="flex items-center justify-between p-2.5 sm:p-3 rounded-xl border border-transparent hover:border-slate-200 hover:bg-slate-50/80 cursor-pointer select-none transition-all group/item"
-                :class="{ 'bg-slate-50/50': item.checked }"
+                @click="togglePermission(item.id, !currentPermissions.includes(item.id))"
+                class="flex items-center justify-between p-3 rounded-xl border border-transparent hover:border-slate-200 hover:bg-slate-50/80 cursor-pointer select-none transition-all group/item"
+                :class="{ 'bg-slate-50/70 border-slate-200/60': currentPermissions.includes(item.id) }"
               >
-                <!-- اسم الصلاحية -->
-                <span
-                  class="text-xs sm:text-sm font-semibold transition-colors"
-                  :class="item.checked ? 'text-solar-navy font-bold' : 'text-slate-600 group-hover/item:text-solar-navy'"
-                >
-                  {{ item.label }}
-                </span>
+                <!-- اسم الصلاحية وكودها ووصفها -->
+                <div class="flex-1 pl-4">
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="text-xs sm:text-sm font-semibold transition-colors"
+                      :class="currentPermissions.includes(item.id) ? 'text-solar-navy font-bold' : 'text-slate-600 group-hover/item:text-solar-navy'"
+                    >
+                      {{ item.label }}
+                    </span>
+                    <span class="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                      {{ item.id }}
+                    </span>
+                  </div>
+                  <p v-if="item.description" class="text-[11px] text-solar-text-muted mt-0.5">
+                    {{ item.description }}
+                  </p>
+                </div>
 
-                <!-- مربع التحديد المطابق للصورة تماماً -->
+                <!-- مربع التحديد المطابق للتصميم -->
                 <div
                   class="flex size-5 shrink-0 items-center justify-center rounded transition-all"
                   :class="[
-                    item.checked
+                    currentPermissions.includes(item.id)
                       ? 'bg-solar-navy text-white shadow-xs'
                       : 'border-2 border-slate-300 bg-white group-hover/item:border-slate-400'
                   ]"
                 >
-                  <Check v-if="item.checked" class="size-3.5 stroke-[3]" />
+                  <Check v-if="currentPermissions.includes(item.id)" class="size-3.5 stroke-[3]" />
                 </div>
               </div>
             </div>
