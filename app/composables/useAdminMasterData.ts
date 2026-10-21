@@ -558,7 +558,7 @@ export const useAdminMasterData = () => {
     }
   }
 
-  const createWalletProvider = async (data: { code: string; name_ar: string; name_en?: string | null; is_active?: boolean; logo_path?: string | null }): Promise<WalletProvider | null> => {
+  const createWalletProvider = async (data: { code: string; name_ar: string; name_en?: string | null; is_active?: boolean; logo_path?: string | null; logo_base64?: string | null; logo_filename?: string | null }): Promise<WalletProvider | null> => {
     isActionLoading.value = true
     try {
       const res: any = await $fetch('/api/admin/wallet-providers', {
@@ -577,7 +577,7 @@ export const useAdminMasterData = () => {
     }
   }
 
-  const updateWalletProvider = async (id: number | string, data: { code?: string; name_ar?: string; name_en?: string | null; is_active?: boolean; logo_path?: string | null }): Promise<WalletProvider | null> => {
+  const updateWalletProvider = async (id: number | string, data: { code?: string; name_ar?: string; name_en?: string | null; is_active?: boolean; logo_path?: string | null; logo_base64?: string | null; logo_filename?: string | null }): Promise<WalletProvider | null> => {
     isActionLoading.value = true
     try {
       const res: any = await $fetch(`/api/admin/wallet-providers/${id}`, {

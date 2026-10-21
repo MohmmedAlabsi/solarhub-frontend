@@ -98,6 +98,12 @@ try {
                 'orderPayments'
             ])->orderBy('id')->get();
 
+            $storage = app(\App\Services\SupabaseStorageService::class);
+            $providers->transform(function ($provider) use ($storage) {
+                $provider->logo_url = $provider->logo_path ? $storage->publicUrl($provider->logo_path) : null;
+                return $provider;
+            });
+
             echo json_encode(['status' => 'success', 'data' => $providers], JSON_UNESCAPED_UNICODE);
             exit(0);
 
@@ -109,7 +115,7 @@ try {
             $logoPath = $payload['logo_path'] ?? null;
 
             if (!$code || !$nameAr) {
-                echo json_encode(['status' => 'error', 'message' => 'Code and Arabic name are required'], JSON_UNESCAPED_UNICODE);
+                echo json_encode(['status' => 'error', 'message' => 'رمز المحفظة والاسم العربي مطلوبان'], JSON_UNESCAPED_UNICODE);
                 exit(1);
             }
 
@@ -119,6 +125,16 @@ try {
                 exit(1);
             }
 
+            // رفع الشعار إلى Supabase عند توفر ملف base64
+            if (!empty($payload['logo_base64'])) {
+                $fileData = base64_decode($payload['logo_base64']);
+                $ext = pathinfo($payload['logo_filename'] ?? 'logo.png', PATHINFO_EXTENSION) ?: 'png';
+                $cleanExt = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $ext)) ?: 'png';
+                $path = 'wallet-providers/' . \Illuminate\Support\Str::uuid() . '.' . $cleanExt;
+                \Illuminate\Support\Facades\Storage::disk('supabase_public')->put($path, $fileData);
+                $logoPath = $path;
+            }
+
             $provider = \App\Models\WalletProvider::create([
                 'code' => $code,
                 'name_ar' => $nameAr,
@@ -126,6 +142,9 @@ try {
                 'is_active' => $isActive,
                 'logo_path' => $logoPath ?: null,
             ]);
+
+            $storage = app(\App\Services\SupabaseStorageService::class);
+            $provider->logo_url = $provider->logo_path ? $storage->publicUrl($provider->logo_path) : null;
 
             echo json_encode(['status' => 'success', 'data' => $provider], JSON_UNESCAPED_UNICODE);
             exit(0);
@@ -148,9 +167,30 @@ try {
             if (isset($payload['name_ar'])) $updateData['name_ar'] = trim($payload['name_ar']);
             if (isset($payload['name_en'])) $updateData['name_en'] = trim($payload['name_en']);
             if (isset($payload['is_active'])) $updateData['is_active'] = (bool)$payload['is_active'];
-            if (isset($payload['logo_path'])) $updateData['logo_path'] = $payload['logo_path'];
+
+            // استبدال الشعار في Supabase: حذف القديم وتخزين الجديد لتوفير المساحة
+            if (!empty($payload['logo_base64'])) {
+                $storage = app(\App\Services\SupabaseStorageService::class);
+                // 1. حذف الشعار القديم إن وُجد
+                if ($provider->logo_path) {
+                    $storage->deletePublic($provider->logo_path);
+                }
+
+                // 2. رفع الشعار الجديد إلى سحابة Supabase
+                $fileData = base64_decode($payload['logo_base64']);
+                $ext = pathinfo($payload['logo_filename'] ?? 'logo.png', PATHINFO_EXTENSION) ?: 'png';
+                $cleanExt = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $ext)) ?: 'png';
+                $newPath = 'wallet-providers/' . \Illuminate\Support\Str::uuid() . '.' . $cleanExt;
+                \Illuminate\Support\Facades\Storage::disk('supabase_public')->put($newPath, $fileData);
+                $updateData['logo_path'] = $newPath;
+            } elseif (array_key_exists('logo_path', $payload)) {
+                $updateData['logo_path'] = $payload['logo_path'];
+            }
 
             $provider->update($updateData);
+
+            $storage = app(\App\Services\SupabaseStorageService::class);
+            $provider->logo_url = $provider->logo_path ? $storage->publicUrl($provider->logo_path) : null;
 
             echo json_encode(['status' => 'success', 'data' => $provider], JSON_UNESCAPED_UNICODE);
             exit(0);
@@ -169,15 +209,22 @@ try {
             }
 
             if ($provider->userWallets()->exists() || $provider->orderPayments()->exists()) {
-                // If in use, deactivate instead of deleting to maintain database integrity
+                // في حال وجود ارتباطات سابقة، يتم تعطيل المحفظة فقط للحفاظ على التكامل المالي
                 $provider->is_active = false;
                 $provider->save();
+                $storage = app(\App\Services\SupabaseStorageService::class);
+                $provider->logo_url = $provider->logo_path ? $storage->publicUrl($provider->logo_path) : null;
                 echo json_encode([
                     'status' => 'success',
                     'message' => 'المحفظة مرتبطة بمعاملات سابقة، تم تعطيلها بدلاً من الحذف للحفاظ على سلامة القيود المالية.',
                     'data' => $provider
                 ], JSON_UNESCAPED_UNICODE);
                 exit(0);
+            }
+
+            // حذف الشعار من Supabase عند الحذف النهائي
+            if ($provider->logo_path) {
+                app(\App\Services\SupabaseStorageService::class)->deletePublic($provider->logo_path);
             }
 
             $provider->delete();

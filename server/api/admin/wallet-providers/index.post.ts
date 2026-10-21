@@ -11,7 +11,8 @@ export default defineEventHandler(async (event) => {
     const payloadStr = JSON.stringify(body || {})
     const { stdout } = await execFileAsync('php', [scriptPath, 'create_wallet_provider', payloadStr], {
       cwd: 'G:\\solarhub-api',
-      timeout: 10000,
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 20000,
     })
 
     return JSON.parse(stdout.trim())

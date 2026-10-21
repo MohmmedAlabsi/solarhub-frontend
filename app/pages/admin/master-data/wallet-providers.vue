@@ -45,7 +45,7 @@ const isAddModalOpen = ref(false)
 const isEditModalOpen = ref(false)
 const isDeleteModalOpen = ref(false)
 
-// Forms
+// Forms & Logo state
 const newProvider = ref({
   code: '',
   name_ar: '',
@@ -53,6 +53,8 @@ const newProvider = ref({
   logo_path: '',
   is_active: true,
 })
+const newLogoFile = ref<File | null>(null)
+const newProviderLogoPreview = ref<string | null>(null)
 
 const editProvider = ref({
   id: 0,
@@ -60,8 +62,71 @@ const editProvider = ref({
   name_ar: '',
   name_en: '',
   logo_path: '',
+  current_logo_url: '' as string | null,
   is_active: true,
 })
+const editLogoFile = ref<File | null>(null)
+const editProviderLogoPreview = ref<string | null>(null)
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const res = reader.result as string
+      const base64 = res.split(',')[1] || res
+      resolve(base64)
+    }
+    reader.onerror = err => reject(err)
+    reader.readAsDataURL(file)
+  })
+}
+
+function handleNewLogoChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  if (target.files && target.files[0]) {
+    const file = target.files[0]
+    newLogoFile.value = file
+    newProviderLogoPreview.value = URL.createObjectURL(file)
+  }
+}
+
+function handleEditLogoChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  if (target.files && target.files[0]) {
+    const file = target.files[0]
+    editLogoFile.value = file
+    editProviderLogoPreview.value = URL.createObjectURL(file)
+  }
+}
+
+function openAddModal() {
+  newProvider.value = {
+    code: '',
+    name_ar: '',
+    name_en: '',
+    logo_path: '',
+    is_active: true,
+  }
+  newLogoFile.value = null
+  newProviderLogoPreview.value = null
+  isAddModalOpen.value = true
+}
+
+function openEditModal(provider: WalletProvider) {
+  selectedProvider.value = provider
+  editProvider.value = {
+    id: provider.id,
+    code: provider.code,
+    name_ar: provider.name_ar,
+    name_en: provider.name_en || '',
+    logo_path: provider.logo_path || '',
+    current_logo_url: provider.logo_url || null,
+    is_active: provider.is_active !== false,
+  }
+  editLogoFile.value = null
+  editProviderLogoPreview.value = null
+  isEditModalOpen.value = true
+}
 
 const filteredProviders = computed(() => {
   return walletProviders.value.filter((p) => {
@@ -92,19 +157,6 @@ function viewDetails(provider: WalletProvider) {
   isDetailModalOpen.value = true
 }
 
-function openEditModal(provider: WalletProvider) {
-  selectedProvider.value = provider
-  editProvider.value = {
-    id: provider.id,
-    code: provider.code,
-    name_ar: provider.name_ar,
-    name_en: provider.name_en || '',
-    logo_path: provider.logo_path || '',
-    is_active: provider.is_active !== false,
-  }
-  isEditModalOpen.value = true
-}
-
 function openDeleteModal(provider: WalletProvider) {
   selectedProvider.value = provider
   isDeleteModalOpen.value = true
@@ -113,15 +165,27 @@ function openDeleteModal(provider: WalletProvider) {
 async function handleAddProvider() {
   if (!newProvider.value.code.trim() || !newProvider.value.name_ar.trim()) return
   try {
+    let logoBase64: string | undefined = undefined
+    let logoFilename: string | undefined = undefined
+
+    if (newLogoFile.value) {
+      logoBase64 = await fileToBase64(newLogoFile.value)
+      logoFilename = newLogoFile.value.name
+    }
+
     await createWalletProvider({
       code: newProvider.value.code.trim().toUpperCase(),
       name_ar: newProvider.value.name_ar.trim(),
       name_en: newProvider.value.name_en.trim() || undefined,
       logo_path: newProvider.value.logo_path.trim() || undefined,
+      logo_base64: logoBase64,
+      logo_filename: logoFilename,
       is_active: newProvider.value.is_active,
     })
     isAddModalOpen.value = false
     newProvider.value = { code: '', name_ar: '', name_en: '', logo_path: '', is_active: true }
+    newLogoFile.value = null
+    newProviderLogoPreview.value = null
   } catch {
     /* error handled in composable */
   }
@@ -130,14 +194,26 @@ async function handleAddProvider() {
 async function handleUpdateProvider() {
   if (!editProvider.value.code.trim() || !editProvider.value.name_ar.trim() || !editProvider.value.id) return
   try {
+    let logoBase64: string | undefined = undefined
+    let logoFilename: string | undefined = undefined
+
+    if (editLogoFile.value) {
+      logoBase64 = await fileToBase64(editLogoFile.value)
+      logoFilename = editLogoFile.value.name
+    }
+
     await updateWalletProvider(editProvider.value.id, {
       code: editProvider.value.code.trim().toUpperCase(),
       name_ar: editProvider.value.name_ar.trim(),
       name_en: editProvider.value.name_en.trim() || undefined,
       logo_path: editProvider.value.logo_path.trim() || undefined,
+      logo_base64: logoBase64,
+      logo_filename: logoFilename,
       is_active: editProvider.value.is_active,
     })
     isEditModalOpen.value = false
+    editLogoFile.value = null
+    editProviderLogoPreview.value = null
   } catch {
     /* error handled in composable */
   }
@@ -180,7 +256,7 @@ async function executeDelete() {
 
         <button
           type="button"
-          @click="isAddModalOpen = true"
+          @click="openAddModal"
           class="btn-primary h-10 px-5 text-xs font-bold gap-2 bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md"
         >
           <Plus class="size-4" />
@@ -238,7 +314,7 @@ async function executeDelete() {
         <table class="w-full text-right text-xs">
           <thead class="bg-solar-bg-subtle/70 text-solar-text-muted font-bold border-b border-solar-border-card">
             <tr>
-              <th class="py-3.5 px-4 font-bold text-center w-14">الرمز</th>
+              <th class="py-3.5 px-4 font-bold text-center w-16">الشعار</th>
               <th class="py-3.5 px-4 font-bold">اسم المحفظة الإلكترونية</th>
               <th class="py-3.5 px-4 font-bold">الكود التعريفي (Code)</th>
               <th class="py-3.5 px-4 font-bold text-center">المحافظ المرتبطة</th>
@@ -252,10 +328,13 @@ async function executeDelete() {
               :key="item.id"
               class="transition-colors hover:bg-solar-bg-subtle/30"
             >
-              <!-- الأيقونة -->
+              <!-- الشعار -->
               <td class="py-4 px-4 text-center">
-                <span class="inline-flex size-9 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-navy shadow-2xs font-bold text-xs font-mono">
-                  <CreditCard class="size-4" />
+                <div v-if="item.logo_url" class="size-10 mx-auto rounded-xl border border-solar-border-card/70 bg-white flex items-center justify-center p-1.5 shadow-2xs">
+                  <img :src="item.logo_url" :alt="item.name_ar" class="max-h-full max-w-full object-contain" />
+                </div>
+                <span v-else class="inline-flex size-10 mx-auto items-center justify-center rounded-xl bg-solar-bg-subtle border border-solar-border-card text-solar-navy font-black text-xs font-mono">
+                  {{ item.code.slice(0, 3) }}
                 </span>
               </td>
 
@@ -375,15 +454,23 @@ async function executeDelete() {
           />
         </div>
 
+        <!-- رفع شعار المحفظة من ملفات الجهاز إلى Supabase -->
         <div>
-          <label class="block text-xs font-bold text-solar-text-body mb-1.5">مسار الشعار (Logo Path)</label>
-          <input
-            v-model="newProvider.logo_path"
-            type="text"
-            dir="ltr"
-            placeholder="مثال: wallets/kurimi.png"
-            class="solar-input h-11 text-xs w-full text-left"
-          />
+          <label class="block text-xs font-bold text-solar-text-body mb-1.5">شعار المحفظة الإلكترونية (Logo)</label>
+          <div class="flex items-center gap-3">
+            <div v-if="newProviderLogoPreview" class="size-12 shrink-0 rounded-xl border border-solar-border-card p-1.5 bg-white flex items-center justify-center shadow-2xs">
+              <img :src="newProviderLogoPreview" alt="معاينة الشعار" class="max-h-full max-w-full object-contain" />
+            </div>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml,image/webp"
+              @change="handleNewLogoChange"
+              class="solar-input h-11 text-xs py-2 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-solar-navy file:text-white cursor-pointer w-full"
+            />
+          </div>
+          <p class="text-[11px] text-solar-text-muted mt-1.5">
+            امتدادات مسموحة: PNG, JPG, SVG, WebP. يتم رفع الصورة وتخزينها سحابياً في Supabase وتعيين مسارها تلقائياً.
+          </p>
         </div>
 
         <div class="flex items-center gap-2 pt-1">
@@ -459,14 +546,26 @@ async function executeDelete() {
           />
         </div>
 
+        <!-- استبدال أو تحديث شعار المحفظة في Supabase -->
         <div>
-          <label class="block text-xs font-bold text-solar-text-body mb-1.5">مسار الشعار</label>
-          <input
-            v-model="editProvider.logo_path"
-            type="text"
-            dir="ltr"
-            class="solar-input h-11 text-xs w-full text-left"
-          />
+          <label class="block text-xs font-bold text-solar-text-body mb-1.5">شعار المحفظة الإلكترونية (Logo)</label>
+          <div class="flex items-center gap-3">
+            <div v-if="editProviderLogoPreview || editProvider.current_logo_url" class="size-12 shrink-0 rounded-xl border border-solar-border-card p-1.5 bg-white flex items-center justify-center shadow-2xs">
+              <img :src="editProviderLogoPreview || editProvider.current_logo_url!" alt="الشعار الحالي" class="max-h-full max-w-full object-contain" />
+            </div>
+            <div v-else class="size-12 shrink-0 rounded-xl border border-dashed border-solar-border-card bg-solar-bg-subtle flex items-center justify-center text-solar-text-muted text-[10px]">
+              بدون شعار
+            </div>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml,image/webp"
+              @change="handleEditLogoChange"
+              class="solar-input h-11 text-xs py-2 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-solar-navy file:text-white cursor-pointer w-full"
+            />
+          </div>
+          <p class="text-[11px] text-amber-800 bg-amber-50/80 p-2.5 rounded-lg border border-amber-200/60 mt-2 font-medium">
+            ملاحظة: عند اختيار صورة جديدة من جهازك، سيتم حذف الشعار القديم تلقائياً من سحابة Supabase واستبداله بالشعار الجديد للحفاظ على مساحة التخزين.
+          </p>
         </div>
 
         <div class="flex items-center gap-2 pt-1">
@@ -552,8 +651,11 @@ async function executeDelete() {
     >
       <div v-if="selectedProvider" class="flex flex-col gap-4">
         <div class="flex items-center gap-3 p-3.5 rounded-xl bg-solar-bg-subtle/80 border border-solar-border-card">
-          <div class="size-11 rounded-xl bg-solar-navy text-white flex items-center justify-center shrink-0">
-            <Wallet class="size-5" />
+          <div v-if="selectedProvider.logo_url" class="size-12 rounded-xl bg-white border border-solar-border-card p-1.5 flex items-center justify-center shrink-0 shadow-2xs">
+            <img :src="selectedProvider.logo_url" :alt="selectedProvider.name_ar" class="max-h-full max-w-full object-contain" />
+          </div>
+          <div v-else class="size-12 rounded-xl bg-solar-navy text-white flex items-center justify-center shrink-0 font-bold text-sm">
+            {{ selectedProvider.code.slice(0, 3) }}
           </div>
           <div>
             <h3 class="font-black text-sm text-solar-text-heading">{{ selectedProvider.name_ar }}</h3>
@@ -569,9 +671,9 @@ async function executeDelete() {
             </p>
           </div>
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-            <p class="text-[11px] text-solar-text-muted font-bold">الربط البرمجي بالـ API</p>
-            <p class="text-xs font-black text-emerald-600 mt-1">
-              متصل بقاعدة البيانات PostgreSQL
+            <p class="text-[11px] text-solar-text-muted font-bold">تخزين الشعار (Supabase)</p>
+            <p class="text-xs font-mono font-bold text-sky-700 truncate mt-1" :title="selectedProvider.logo_path || 'لا يوجد'">
+              {{ selectedProvider.logo_path || 'لا يوجد مسار' }}
             </p>
           </div>
         </div>
