@@ -72,7 +72,7 @@ async function handleSubmit() {
     } else if (result.user.role === 'supplier') {
       router.push('/customer/dashboard') // or supplier dashboard
     } else {
-      router.push('/customer/dashboard')
+      router.push('/admin/dashboard')
     }
   } else {
     if (result.status === 403 && (result.error?.includes('verify') || result.error?.includes('التحقق'))) {

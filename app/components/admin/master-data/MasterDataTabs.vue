@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Award, Boxes, Briefcase, MapPin, Users } from 'lucide-vue-next'
+import { Award, Boxes, Briefcase, MapPin, Users, Wallet } from 'lucide-vue-next'
 
 const route = useRoute()
 
@@ -9,6 +9,7 @@ const tabs = [
   { label: 'أنواع الخدمات', to: '/admin/master-data/service-types', icon: Briefcase },
   { label: 'التصنيفات', to: '/admin/master-data/categories', icon: Boxes },
   { label: 'العلامات التجارية', to: '/admin/master-data/brands', icon: Award },
+  { label: 'المحافظ الإلكترونية', to: '/admin/master-data/wallet-providers', icon: Wallet },
 ]
 
 function isActive(to: string) {

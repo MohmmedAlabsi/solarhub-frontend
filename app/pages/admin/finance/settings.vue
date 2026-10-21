@@ -5,8 +5,10 @@ import {
   Coins,
   DollarSign,
   Download,
+  Loader2,
   Lock,
   Percent,
+  RefreshCw,
   Save,
   ShieldAlert,
 } from 'lucide-vue-next'
@@ -15,35 +17,65 @@ import FinanceTabs from '../../../components/admin/finance/FinanceTabs.vue'
 definePageMeta({ layout: 'admin' })
 useSeoMeta({ title: 'الإدارة المالية — الإعدادات المالية | لوحة الإدارة العامة' })
 
-const form = ref({
-  currency: 'ريال سعودي (SAR)',
-  commissionRate: 2.5,
-  minimumPayout: 500,
-  payoutSchedule: 'weekly_thursday',
-  escrowDays: 7,
+const {
+  settings,
+  isLoading,
+  isActionLoading,
+  fetchSettings,
+  updateSettings,
+} = useAdminFinance()
+
+const { pending } = useLazyAsyncData('admin_finance_settings', () => fetchSettings(false), {
+  default: () => settings.value,
 })
 
-const isSaving = ref(false)
-const noticeMessage = ref('')
+const isRefreshing = ref(false)
 
-function saveSettings() {
-  isSaving.value = true
-  setTimeout(() => {
-    isSaving.value = false
-    noticeMessage.value = 'تم حفظ الإعدادات المالية ونسب العمولات بنجاح.'
-    setTimeout(() => {
-      noticeMessage.value = ''
-    }, 3000)
-  }, 600)
+const form = ref({
+  currency: 'YER - ريال يمني',
+  commissionRate: 5.0,
+  minimumPayout: 5000,
+  payoutSchedule: 'weekly_thursday',
+  escrowDays: 3,
+  platformName: 'سولار هاب - SolarHub',
+  supportPhone: '777000000',
+  supportEmail: 'support@solarhub.com',
+})
+
+// Sync form when settings are loaded from API
+watch(settings, (val) => {
+  if (val) {
+    form.value.currency = `${val.currency || 'YER'} - ريال يمني`
+    form.value.platformName = val.platform_name || form.value.platformName
+    form.value.supportPhone = val.support_phone || form.value.supportPhone
+    form.value.supportEmail = val.support_email || form.value.supportEmail
+  }
+}, { immediate: true })
+
+async function handleRefreshSettings() {
+  isRefreshing.value = true
+  try {
+    await fetchSettings(true)
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
+async function handleSaveSettings() {
+  await updateSettings({
+    currency: 'YER',
+    platform_name: form.value.platformName,
+    support_phone: form.value.supportPhone,
+    support_email: form.value.supportEmail,
+  })
 }
 
 function resetForm() {
-  form.value = {
-    currency: 'ريال سعودي (SAR)',
-    commissionRate: 2.5,
-    minimumPayout: 500,
-    payoutSchedule: 'weekly_thursday',
-    escrowDays: 7,
+  if (settings.value) {
+    form.value.currency = `${settings.value.currency || 'YER'} - ريال يمني`
+    form.value.platformName = settings.value.platform_name || 'سولار هاب - SolarHub'
+    form.value.supportPhone = settings.value.support_phone || '777000000'
+    form.value.supportEmail = settings.value.support_email || 'support@solarhub.com'
   }
 }
 </script>
@@ -60,13 +92,18 @@ function resetForm() {
           </p>
         </div>
 
-        <button
-          type="button"
-          class="btn-outline h-11 px-4 text-xs font-bold gap-2 self-start sm:self-auto"
-        >
-          <Download class="size-4" />
-          <span>تصدير كشف حساب</span>
-        </button>
+        <div class="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            @click="handleRefreshSettings"
+            :disabled="isRefreshing || pending || isLoading"
+            class="btn-outline h-10 px-4 text-xs font-bold gap-2 text-solar-text-body hover:bg-solar-bg-subtle"
+            title="تحديث البيانات من السيرفر"
+          >
+            <RefreshCw class="size-4" :class="{ 'animate-spin': isRefreshing || pending || isLoading }" />
+            <span>تحديث</span>
+          </button>
+        </div>
       </div>
 
       <!-- تبويبات الإدارة المالية -->
@@ -80,21 +117,21 @@ function resetForm() {
           <div>
             <h2 class="text-lg sm:text-xl font-black text-solar-text-heading">إعدادات المنظومة المالية والعمولات</h2>
             <p class="mt-1 text-xs sm:text-sm text-solar-text-muted">
-              تحديد العملة الافتراضية ونسب العمولة المقتطعة من مبيعات المتاجر والموردين.
+              تحديد العملة الافتراضية ونسب العمولة المقتطعة من مبيعات المتاجر والموردين المسجلة في الـ Database.
             </p>
           </div>
 
           <span class="inline-flex items-center gap-1.5 rounded-full border border-solar-navy/20 bg-solar-navy/5 px-3 py-1 text-xs font-bold text-solar-navy-dark shrink-0">
             <ShieldAlert class="size-3.5 text-solar-navy" />
-            صلاحية المشرف العام
+            صلاحية الإدارة المالية
           </span>
         </div>
 
-        <form @submit.prevent="saveSettings" class="mt-6 flex flex-col gap-6">
+        <form @submit.prevent="handleSaveSettings" class="mt-6 flex flex-col gap-6">
           <!-- العملة الافتراضية للمنصة -->
           <div>
             <label class="block text-xs font-bold text-solar-text-body mb-2">
-              العملة الافتراضية للمنصة
+              العملة الافتراضية المعتمدة للمنصة
             </label>
             <div class="relative flex items-center">
               <input
@@ -103,13 +140,13 @@ function resetForm() {
                 disabled
                 class="solar-input h-12 text-xs font-bold bg-solar-bg-subtle/80 cursor-not-allowed pl-32 text-right"
               />
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-lg bg-white border border-solar-border-card px-2.5 py-1 text-[11px] font-bold text-slate-500 shadow-2xs">
-                <Lock class="size-3 text-slate-400" />
-                غير قابل للتعديل
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-lg bg-white border border-solar-border-card px-2.5 py-1 text-[11px] font-bold text-emerald-700 shadow-2xs">
+                <Lock class="size-3 text-emerald-600" />
+                مطابق لقاعدة البيانات
               </span>
             </div>
             <p class="mt-1.5 text-[11px] text-solar-text-muted">
-              العملة الموحدة لجميع الفواتير والتحويلات داخل المملكة العربية السعودية.
+              العملة الموحدة لجميع الفواتير والمستحقات المعتمدة في جدول platform_settings.
             </p>
           </div>
 
@@ -117,7 +154,7 @@ function resetForm() {
             <!-- نسبة عمولة المنصة الثابتة -->
             <div>
               <label class="block text-xs font-bold text-solar-text-body mb-2">
-                نسبة عمولة المنصة الثابتة
+                نسبة عمولة المنصة من مبيعات المتاجر
               </label>
               <div class="relative">
                 <input
@@ -132,7 +169,7 @@ function resetForm() {
                 <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-solar-text-muted text-sm">%</span>
               </div>
               <p class="mt-1.5 text-[11px] text-solar-text-muted">
-                النسبة المستقطعة من إجمالي قيمة طلبات المنتجات المكتملة لصالح المنصة.
+                النسبة المعتمدة في جدول store_payouts (حالياً 5.00%).
               </p>
             </div>
 
@@ -145,66 +182,46 @@ function resetForm() {
                 <input
                   v-model.number="form.minimumPayout"
                   type="number"
-                  step="50"
-                  min="100"
+                  step="500"
+                  min="1000"
                   required
                   class="solar-input h-12 text-sm font-mono font-bold text-left pl-14"
                 />
-                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-solar-text-muted text-xs">ر.س</span>
+                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-solar-text-muted text-xs">ر.ي</span>
               </div>
               <p class="mt-1.5 text-[11px] text-solar-text-muted">
-                الحد الأدنى المتطلب في رصيد المورد لتفعيل عملية التحويل المالي.
+                الحد الأدنى المتطلب في رصيد المورد لتفعيل عملية التحويل المالي للمحفظة.
               </p>
             </div>
           </div>
 
           <div class="grid gap-6 sm:grid-cols-2">
-            <!-- دورة صرف المستحقات المجدولة -->
+            <!-- هاتف الدعم المالي -->
             <div>
               <label class="block text-xs font-bold text-solar-text-body mb-2">
-                دورة صرف المستحقات المجدولة
+                هاتف الدعم والاستفسارات المالية
               </label>
-              <div class="relative">
-                <select
-                  v-model="form.payoutSchedule"
-                  class="solar-input h-12 text-xs font-bold pl-10"
-                >
-                  <option value="weekly_thursday">أسبوعياً - كل يوم خميس</option>
-                  <option value="weekly_sunday">أسبوعياً - كل يوم أحد</option>
-                  <option value="monthly">شهرياً - نهاية كل شهر ميلادي</option>
-                </select>
-                <Calendar class="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-solar-text-muted" />
-              </div>
-              <p class="mt-1.5 text-[11px] text-solar-text-muted">
-                التوقيت الآلي لمعالجة التحويلات السريعة عبر شبكة المدفوعات السعودية (سريع).
-              </p>
+              <input
+                v-model="form.supportPhone"
+                type="text"
+                dir="ltr"
+                class="solar-input h-12 text-xs font-mono font-bold text-left"
+              />
             </div>
 
-            <!-- فترة تعليق المبالغ للضمان (Escrow) -->
+            <!-- البريد المالي -->
             <div>
               <label class="block text-xs font-bold text-solar-text-body mb-2">
-                فترة تعليق المبالغ للضمان (Escrow)
+                البريد الإلكتروني للعمليات المالية
               </label>
-              <div class="relative">
-                <input
-                  v-model.number="form.escrowDays"
-                  type="number"
-                  min="1"
-                  max="30"
-                  required
-                  class="solar-input h-12 text-sm font-mono font-bold text-left pl-14"
-                />
-                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-solar-text-muted text-xs">أيام</span>
-              </div>
-              <p class="mt-1.5 text-[11px] text-solar-text-muted">
-                فترة تعليق المستحقات بعد تأكيد استلام الشحنة لضمان حقوق العميل وفترة الإرجاع.
-              </p>
+              <input
+                v-model="form.supportEmail"
+                type="email"
+                dir="ltr"
+                class="solar-input h-12 text-xs font-mono font-bold text-left"
+              />
             </div>
           </div>
-
-          <p v-if="noticeMessage" class="rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
-            <Check class="size-4 text-emerald-600" /> {{ noticeMessage }}
-          </p>
 
           <!-- أزرار الإجراءات -->
           <div class="flex items-center justify-end gap-3 pt-4 border-t border-solar-border-card">
@@ -213,15 +230,16 @@ function resetForm() {
               @click="resetForm"
               class="btn-outline h-11 px-6 text-xs font-bold"
             >
-              إلغاء التغييرات
+              استعادة الافتراضي
             </button>
             <button
               type="submit"
-              :disabled="isSaving"
+              :disabled="isActionLoading"
               class="btn-primary h-11 px-8 text-xs font-bold bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md gap-2"
             >
-              <Save class="size-4" />
-              <span>{{ isSaving ? 'جارٍ الحفظ...' : 'حفظ الإعدادات المالية' }}</span>
+              <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+              <Save v-else class="size-4" />
+              <span>حفظ الإعدادات المالية</span>
             </button>
           </div>
         </form>

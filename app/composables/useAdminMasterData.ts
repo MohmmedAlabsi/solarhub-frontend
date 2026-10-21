@@ -1,4 +1,4 @@
-import type { Brand, Category, Governorate, ServiceType, Specialization } from '../../types/api'
+import type { Brand, Category, Governorate, ServiceType, Specialization, WalletProvider } from '../../types/api'
 
 export const useAdminMasterData = () => {
   const { $api } = useNuxtApp()
@@ -9,6 +9,7 @@ export const useAdminMasterData = () => {
   const cities = useState<Governorate[]>('admin_master_cities', () => [])
   const serviceTypes = useState<ServiceType[]>('admin_master_service_types', () => [])
   const specialties = useState<Specialization[]>('admin_master_specialties', () => [])
+  const walletProviders = useState<WalletProvider[]>('admin_master_wallet_providers', () => [])
 
   const isLoading = ref(false)
   const isActionLoading = ref(false)
@@ -537,6 +538,85 @@ export const useAdminMasterData = () => {
     }
   }
 
+
+  // ==========================================
+  // 6. المحافظ الإلكترونية (Wallet Providers)
+  // ==========================================
+  const fetchWalletProviders = async (force = false): Promise<WalletProvider[]> => {
+    if (!force && walletProviders.value.length > 0) return walletProviders.value
+    isLoading.value = true
+    try {
+      const res: any = await $fetch('/api/admin/wallet-providers')
+      const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+      walletProviders.value = data
+      return data
+    } catch (err: any) {
+      notify(err?.message || 'تعذر تحميل قائمة المحافظ الإلكترونية')
+      return []
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const createWalletProvider = async (data: { code: string; name_ar: string; name_en?: string | null; is_active?: boolean; logo_path?: string | null }): Promise<WalletProvider | null> => {
+    isActionLoading.value = true
+    try {
+      const res: any = await $fetch('/api/admin/wallet-providers', {
+        method: 'POST',
+        body: data,
+      })
+      const created = res?.data || res
+      walletProviders.value.unshift(created)
+      notify('تمت إضافة مزود المحفظة بنجاح')
+      return created
+    } catch (err: any) {
+      notify(err?.message || 'حدث خطأ أثناء إضافة المحفظة.')
+      throw err
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
+  const updateWalletProvider = async (id: number | string, data: { code?: string; name_ar?: string; name_en?: string | null; is_active?: boolean; logo_path?: string | null }): Promise<WalletProvider | null> => {
+    isActionLoading.value = true
+    try {
+      const res: any = await $fetch(`/api/admin/wallet-providers/${id}`, {
+        method: 'PUT',
+        body: data,
+      })
+      const updated = res?.data || res
+      const idx = walletProviders.value.findIndex(w => String(w.id) === String(id))
+      if (idx !== -1) {
+        walletProviders.value[idx] = { ...walletProviders.value[idx], ...updated }
+      }
+      notify('تم تحديث بيانات المحفظة بنجاح')
+      return updated
+    } catch (err: any) {
+      notify(err?.message || 'حدث خطأ أثناء تحديث المحفظة.')
+      throw err
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
+  const deleteWalletProvider = async (id: number | string): Promise<boolean> => {
+    isActionLoading.value = true
+    try {
+      const res: any = await $fetch(`/api/admin/wallet-providers/${id}`, {
+        method: 'DELETE',
+      })
+      const message = res?.message || 'تم حذف المحفظة بنجاح'
+      walletProviders.value = walletProviders.value.filter(w => String(w.id) !== String(id))
+      notify(message)
+      return true
+    } catch (err: any) {
+      notify(err?.message || 'تعذر حذف المحفظة.')
+      return false
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
   return {
     categories,
     brands,
@@ -565,5 +645,10 @@ export const useAdminMasterData = () => {
     createSpecialty,
     updateSpecialty,
     deleteSpecialty,
+    walletProviders,
+    fetchWalletProviders,
+    createWalletProvider,
+    updateWalletProvider,
+    deleteWalletProvider,
   }
 }

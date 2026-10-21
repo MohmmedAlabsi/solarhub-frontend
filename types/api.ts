@@ -176,32 +176,116 @@ export interface OrderStore {
   created_at: string;
 }
 
+export interface WalletProvider {
+  id: number;
+  code: string;
+  name_ar: string;
+  name_en?: string | null;
+  logo_url?: string | null;
+  logo_path?: string | null;
+  is_active: boolean;
+  user_wallets_count?: number;
+  order_payments_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UserWallet {
+  id: number;
+  user_id: number;
+  wallet_provider_id: number;
+  account_number: string;
+  account_name?: string | null;
+  is_default: boolean;
+  is_active: boolean;
+  created_at?: string;
+  user?: {
+    id: number;
+    name: string;
+    phone: string;
+    email: string;
+  };
+  wallet_provider?: WalletProvider;
+}
+
 export interface OrderPayment {
   id: number;
   order_id: number;
-  wallet_provider_id?: number;
+  wallet_provider_id?: number | null;
   wallet_provider_name?: string;
   amount: number;
-  transaction_reference?: string;
-  receipt_path?: string;
+  transaction_reference?: string | null;
+  receipt_image?: string | null;
+  receipt_path?: string | null;
   status: 'pending' | 'verified' | 'rejected';
   verified_by?: number | null;
+  paid_at?: string | null;
+  verified_at?: string | null;
   created_at: string;
+  updated_at?: string;
+  order?: {
+    id: number;
+    order_number: string;
+    total_amount: number | string;
+    status: string;
+    customer?: {
+      id: number;
+      name: string;
+      phone: string;
+      email: string;
+    };
+  };
+  wallet_provider?: WalletProvider;
 }
 
 export interface StorePayout {
   id: number;
-  store_id: number;
+  order_store_id: number;
+  user_wallet_id?: number | null;
+  store_id?: number;
   store_name?: string;
-  amount: number;
+  total_amount: number;
   commission_rate: number;
   commission_amount: number;
   net_amount: number;
   status: 'pending' | 'completed' | 'failed';
-  transfer_reference?: string;
+  transfer_reference?: string | null;
+  paid_at?: string | null;
+  created_at: string;
+  updated_at?: string;
   bank_account?: {
     bank_name: string;
     iban: string;
   };
-  created_at: string;
+  order_store?: {
+    id: number;
+    order_id: number;
+    store_id: number;
+    subtotal: number | string;
+    status: string;
+    store?: {
+      id: number;
+      company_name: string;
+      commercial_registry?: string;
+      whatsapp_number?: string;
+    };
+    order?: {
+      id: number;
+      order_number: string;
+    };
+  };
+  user_wallet?: UserWallet;
+}
+
+export interface PlatformSetting {
+  id: number;
+  platform_name: string;
+  support_phone: string;
+  support_email: string;
+  logo_url?: string;
+  favicon_url?: string;
+  currency: string;
+  is_maintenance_mode: boolean;
+  commission_rate?: number;
+  updated_at?: string;
 }

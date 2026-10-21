@@ -6,10 +6,10 @@ definePageMeta({ layout: 'admin' })
 useSeoMeta({ title: 'الإدارة المالية — الضرائب | لوحة الإدارة العامة' })
 
 const form = ref({
-  vatTin: '31024589200003',
+  vatTin: '1002458920',
   vatRate: '15',
   isInclusive: true,
-  taxEmail: 'finance-tax@solarhub.sa',
+  taxEmail: 'finance-tax@solarhub.ye',
 })
 
 const isSaving = ref(false)
@@ -28,10 +28,10 @@ function saveSettings() {
 
 function resetForm() {
   form.value = {
-    vatTin: '31024589200003',
+    vatTin: '1002458920',
     vatRate: '15',
     isInclusive: true,
-    taxEmail: 'finance-tax@solarhub.sa',
+    taxEmail: 'finance-tax@solarhub.ye',
   }
 }
 </script>
@@ -132,7 +132,7 @@ function resetForm() {
                 <div>
                   <span class="text-xs font-black text-solar-text-heading block">الأسعار شاملة الضريبة (VAT Inclusive)</span>
                   <span class="text-[11px] text-solar-text-muted mt-1 block">
-                    تظهر كافة أسعار الألواح والمحولات متضمنة نسبة الـ 15%.
+                    تظهر كافة أسعار الألواح والمحولات متضمنة نسبة الضريبة المحددة.
                   </span>
                 </div>
               </label>
