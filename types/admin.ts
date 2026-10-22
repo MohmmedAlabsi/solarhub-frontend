@@ -149,3 +149,50 @@ export interface AdminRoleUser {
   avatarText: string
   permissions: string[]
 }
+
+export type AdminApproval = 'approved' | 'pending' | 'rejected'
+export type AdminAudience = 'all' | 'customers' | 'suppliers' | 'engineers'
+export interface AdminUser {
+  id: string; name: string; email: string; phone: string; city: string
+  role: 'عميل سكني' | 'عميل تجاري' | 'مهندس طاقة شمسية' | 'مورد معتمد'
+  active: boolean; createdAt: string
+}
+export interface AdminDocument { id: string; name: string; size: string; url?: string }
+export interface AdminSupplier {
+  id: string; name: string; owner: string; email: string; phone: string
+  commercialNumber: string; taxNumber: string; city: string; address: string
+  storeType: 'وكيل معتمد' | 'متجر متخصص' | 'موزع رئيسي' | 'موزع معتمد'
+  approval: AdminApproval; description: string; rejectionReason: string; document?: AdminDocument
+}
+export interface AdminEngineer {
+  id: string; name: string; title: string; email: string; phone: string; city: string
+  license: string; licenseAuthority: string; experience: number; specialties: string[]
+  approval: AdminApproval; approvedAt?: string; bio: string; rejectionReason: string
+  documents: AdminDocument[]; image?: string
+}
+export type AdminServiceStatus = 'open' | 'awarded' | 'executing' | 'completed' | 'cancelled'
+export interface AdminServiceOffer {
+  id: string; engineerId: string; price: number; duration: number; proposal: string
+  status: 'قيد الانتظار' | 'مقبول' | 'مرفوض'; document?: AdminDocument
+}
+export interface AdminServiceRequest {
+  id: string; client: string; service: string; city: string; capacity: number
+  status: AdminServiceStatus; location: string; coordinates?: string; description: string
+  documents: AdminDocument[]; offers: AdminServiceOffer[]
+}
+export interface AdminReview {
+  id: string; orderId: string; client: string; targetId: string; score: number
+  comment: string; approved: boolean
+}
+export interface AdminBroadcast {
+  id: string; title: string; content: string; audience: AdminAudience
+  readPercentage: number | null; createdAt: string; simulated?: boolean
+}
+export interface AdminPlatformSettings {
+  nameAr: string; nameEn: string; email: string; phone: string; maintenance: boolean
+}
+export interface AdminDisplayPreferences { language: 'ar'; theme: 'light'; density: 'comfortable' | 'compact' }
+export interface AdminDirectoryDraft extends Pick<AdminUser, 'name' | 'email' | 'phone' | 'city' | 'role'>,
+  Pick<AdminSupplier, 'owner' | 'commercialNumber' | 'taxNumber' | 'address' | 'storeType'>,
+  Pick<AdminEngineer, 'title' | 'license' | 'experience'> { specialties: string }
+export type AdminDirectoryKind = 'user' | 'supplier' | 'engineer'

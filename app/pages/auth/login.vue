@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { User, Eye, EyeOff, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-vue-next'
-import { useAuthStore } from '~~/app/stores/auth.store'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({
   layout: 'auth',
@@ -13,9 +13,10 @@ useSeoMeta({
 
 const authStore = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const form = reactive({
-  login: '',
+  login: (route.query.email as string) || '',
   password: '',
   remember: false,
 })
@@ -23,6 +24,7 @@ const form = reactive({
 const showPassword = ref(false)
 const errorMessage = ref('')
 const isSuspendedPreview = ref(false)
+const isVerifiedSuccess = computed(() => route.query.verified === 'true')
 
 function togglePassword() {
   showPassword.value = !showPassword.value
@@ -65,11 +67,25 @@ async function handleSubmit() {
     // Redirect based on role
     if (result.user.role === 'customer') {
       router.push('/customer/dashboard')
+    } else if (result.user.role === 'engineer') {
+      router.push('/customer/dashboard') // or engineer dashboard
+    } else if (result.user.role === 'supplier') {
+      router.push('/customer/dashboard') // or supplier dashboard
     } else {
       router.push('/customer/dashboard')
     }
   } else {
-    errorMessage.value = result.error || 'تعذر تسجيل الدخول، يرجى التأكد من صحة البيانات'
+    if (result.status === 403 && (result.error?.includes('verify') || result.error?.includes('التحقق'))) {
+      errorMessage.value = 'يرجى التحقق من بريدك الإلكتروني أولاً. جاري توجيهك لصفحة التحقق...'
+      setTimeout(() => {
+        router.push({
+          path: '/auth/verify-email',
+          query: { email: form.login },
+        })
+      }, 1200)
+    } else {
+      errorMessage.value = result.error || 'تعذر تسجيل الدخول، يرجى التأكد من صحة البيانات'
+    }
   }
 }
 </script>
@@ -93,6 +109,15 @@ async function handleSubmit() {
         >
           [{{ isSuspendedPreview ? 'إلغاء معاينة الحساب المعلق' : 'معاينة تنبيه الحساب المعلق' }}]
         </button>
+      </div>
+
+      <!-- تنبيه نجاح التحقق من البريد -->
+      <div
+        v-if="isVerifiedSuccess"
+        class="mb-6 flex items-start gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3.5 text-xs font-semibold text-emerald-800 leading-relaxed animate-in fade-in duration-200"
+      >
+        <CheckCircle2 class="size-4.5 shrink-0 text-emerald-600 mt-0.5" />
+        <span class="flex-1">تم تفعيل بريدك الإلكتروني بنجاح! يمكنك الآن تسجيل الدخول إلى حسابك.</span>
       </div>
 
       <!-- تنبيه الخطأ أو التعليق -->

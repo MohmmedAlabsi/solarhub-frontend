@@ -50,6 +50,7 @@ export default defineNuxtConfig({
 
   // ربط ملفات التنسيقات العامة ومتغيرات الهوية
   css: [
+    'leaflet/dist/leaflet.css',
     '~/assets/design-tokens.css',
     '~/assets/main.css',
   ],
@@ -57,13 +58,21 @@ export default defineNuxtConfig({
   // Laravel API المتغيرات البيئية ورابط
   runtimeConfig: {
     public: {
-      apiBase: 'http://localhost:8000/api',
+      apiBase: 'http://127.0.0.1:8000/api',
+      apiBaseUrl: 'http://127.0.0.1:8000/api',
+      appName: 'SolarHub',
     }
   },
 
   // سياسة الرندرة الهجينة (Hybrid Rendering Policy) حسب معايير سولار هب
   routeRules: {
     '/products/**': { swr: 3600 },
+    '/admin/products': { ssr: true },
+    '/admin/products/**': { ssr: true },
+    '/admin/master-data': { ssr: true },
+    '/admin/master-data/**': { ssr: true },
+    '/admin/orders': { ssr: true },
+    '/admin/orders/**': { ssr: true },
     '/customer/**': { ssr: false },
     '/engineer/**': { ssr: false },
     '/auth/**': { ssr: false },

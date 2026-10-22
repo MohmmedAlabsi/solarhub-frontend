@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download, Eye, Search } from 'lucide-vue-next'
+import { Download, Eye, Loader2, RefreshCw, Search, ShoppingBag } from 'lucide-vue-next'
 import AdminBadge from '../../../components/admin/common/AdminBadge.vue'
 import AdminPagination from '../../../components/admin/common/AdminPagination.vue'
 import OrderDetailsModal from '../../../components/admin/orders/OrderDetailsModal.vue'
@@ -8,240 +8,53 @@ import type { AdminOrder } from '../../../../types/admin'
 definePageMeta({ layout: 'admin' })
 useSeoMeta({ title: 'إدارة طلبات الشراء | لوحة الإدارة العامة' })
 
-const searchQuery = ref('')
-const selectedStatus = ref('all')
-const currentPage = ref(1)
+const route = useRoute()
+const router = useRouter()
+
+const {
+  orders,
+  isLoading,
+  fetchOrders,
+  updateOrderStatus,
+  exportOrdersCsv,
+} = useAdminOrderManagement()
+
+// Non-blocking lazy SSR Data Fetching for instant navigation
+const { pending } = useLazyAsyncData('admin_management_orders', () => fetchOrders(false), {
+  default: () => orders.value,
+})
+
+const isRefreshing = ref(false)
+
+async function handleRefreshOrders() {
+  isRefreshing.value = true
+  try {
+    await fetchOrders(true)
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
+const searchQuery = ref((route.query.search as string) || '')
+const selectedStatus = ref(String(route.query.status ?? 'all'))
+const currentPage = ref(Number(route.query.page) || 1)
+
+watch(() => route.query.status, value => {
+  selectedStatus.value = String(value ?? 'all')
+})
 
 const selectedOrder = ref<AdminOrder | null>(null)
 const isDetailsModalOpen = ref(false)
 
-const orders = ref<AdminOrder[]>([
-  {
-    id: '1',
-    orderNumber: 'ORD-2025-401',
-    customerName: 'فيصل العتيبي',
-    customerAvatarText: 'ف ع',
-    city: 'الرياض',
-    address: 'الرياض - حي النرجس، شارع أنس بن مالك',
-    totalAmount: 18450,
-    status: 'قيد المعالجة',
-    createdAt: '2025-05-14',
-    groups: [
-      {
-        supplierId: 'sup-1',
-        supplierName: 'شركة شمس الرياض للمهمات الكهروضوئية',
-        subtotal: 11650,
-        status: 'تم الشحن',
-        deliveryDate: '24 فبراير 2025',
-        customerConfirmation: 'قيد الانتظار',
-        notes: 'تم فحص الشحنة وتغليف الألواح على منصات خشبية مؤمنة',
-        products: [
-          { name: 'لوح شمسي مونوكريستالين Jinko Tiger Pro 585W', quantity: '20 لوح', unitPrice: 485, total: 9700 },
-          { name: 'هياكل تثبيت وقواعد ألومنيوم سداسية', quantity: '1 طقم (20 لوح)', unitPrice: 1950, total: 1950 },
-        ],
-      },
-      {
-        supplierId: 'sup-2',
-        supplierName: 'مؤسسة طاقة المستقبل للبطاريات',
-        subtotal: 6800,
-        status: 'قيد التجهيز',
-        deliveryDate: '26 فبراير 2025',
-        customerConfirmation: 'قيد الانتظار',
-        notes: 'بانتظار وصول بوليصة الشحن من شركة النقل المعتمدة',
-        products: [
-          { name: 'كابلات تيار مستمر 6 ملم نحاس معزول', quantity: '100 متر', unitPrice: 18, total: 1800 },
-          { name: 'قواطع تيار DC ولوحة حماية متكاملة', quantity: '2 طقم', unitPrice: 2500, total: 5000 },
-        ],
-      },
-    ],
-  },
-  {
-    id: '2',
-    orderNumber: 'ORD-2025-398',
-    customerName: 'نورة السبيعي',
-    customerAvatarText: 'ن س',
-    city: 'المنطقة الشرقية',
-    address: 'الخبر - حي الشاطئ، طريق الأمير فيصل',
-    totalAmount: 42800,
-    status: 'قيد التجهيز والشحن',
-    createdAt: '2025-05-14',
-    groups: [
-      {
-        supplierId: 'sup-3',
-        supplierName: 'طاقة الصحراء المتقدمة',
-        subtotal: 42800,
-        status: 'قيد التجهيز',
-        deliveryDate: '28 فبراير 2025',
-        customerConfirmation: 'قيد الانتظار',
-        notes: 'يتم تجهيز المنظومة المتكاملة مع الفحص المخبري للبطاريات',
-        products: [
-          { name: 'إنفرتر شمسي هجين Deye Hybrid 8kW ثلاثي الأوجه', quantity: '1 جهاز', unitPrice: 14200, total: 14200 },
-          { name: 'بطارية ليثيوم Pylontech US5000 4.8kWh', quantity: '2 بطارية', unitPrice: 14300, total: 28600 },
-        ],
-      },
-    ],
-  },
-  {
-    id: '3',
-    orderNumber: 'ORD-2025-395',
-    customerName: 'عبدالله الدوسري',
-    customerAvatarText: 'ع د',
-    city: 'مكة المكرمة',
-    address: 'جدة - حي الروضة، شارع الأمير سلطان',
-    totalAmount: 9650,
-    status: 'تم التسليم',
-    createdAt: '2025-05-13',
-    groups: [
-      {
-        supplierId: 'sup-4',
-        supplierName: 'نيرات الحلول للطاقة',
-        subtotal: 9650,
-        status: 'تم التسليم',
-        deliveryDate: '20 فبراير 2025',
-        customerConfirmation: 'تم الاستلام',
-        notes: 'تم التوصيل والتوقيع على إشعار الاستلام من العميل',
-        products: [
-          { name: 'منظم شحن شمسي Victron SmartSolar MPPT 150/70', quantity: '1 جهاز', unitPrice: 3250, total: 3250 },
-          { name: 'ألواح شمسية LONGI Hi-MO 6 Explorer 575W', quantity: '10 ألواح', unitPrice: 640, total: 6400 },
-        ],
-      },
-    ],
-  },
-  {
-    id: '4',
-    orderNumber: 'ORD-2025-391',
-    customerName: 'سارة القحطاني',
-    customerAvatarText: 'س ق',
-    city: 'القصيم',
-    address: 'بريدة - طريق الملك فهد',
-    totalAmount: 31200,
-    status: 'مكتمل',
-    createdAt: '2025-05-13',
-    groups: [
-      {
-        supplierId: 'sup-5',
-        supplierName: 'مجموعة الأمانة الكهروضوئية',
-        subtotal: 31200,
-        status: 'تم التسليم',
-        deliveryDate: '18 فبراير 2025',
-        customerConfirmation: 'تم الاستلام',
-        notes: 'طلب مكتمل وتم تحويل مستحقات المورد',
-        products: [
-          { name: 'مضخة مياه شمسية غاطسة Grundfos SQFlex', quantity: '1 منظومة', unitPrice: 31200, total: 31200 },
-        ],
-      },
-    ],
-  },
-  {
-    id: '5',
-    orderNumber: 'ORD-2025-388',
-    customerName: 'ماجد الغامدي',
-    customerAvatarText: 'م غ',
-    city: 'الرياض',
-    address: 'الرياض - حي الياسمين',
-    totalAmount: 15300,
-    status: 'قيد المعالجة',
-    createdAt: '2025-05-12',
-    groups: [
-      {
-        supplierId: 'sup-1',
-        supplierName: 'شركة شمس الرياض للمهمات الكهروضوئية',
-        subtotal: 15300,
-        status: 'قيد التجهيز',
-        deliveryDate: '01 مارس 2025',
-        customerConfirmation: 'قيد الانتظار',
-        notes: 'قيد مراجعة وتجهيز الفاتورة الضريبية',
-        products: [
-          { name: 'إنفرتر مستقل Growatt SPF 5000 ES', quantity: '2 جهاز', unitPrice: 7650, total: 15300 },
-        ],
-      },
-    ],
-  },
-  {
-    id: '6',
-    orderNumber: 'ORD-2025-384',
-    customerName: 'ريم الحربي',
-    customerAvatarText: 'ر ح',
-    city: 'عسير',
-    address: 'أبها - حي الخالدية',
-    totalAmount: 64500,
-    status: 'ملغي',
-    createdAt: '2025-05-11',
-    groups: [
-      {
-        supplierId: 'sup-2',
-        supplierName: 'المتجر السعودي للبطاريات',
-        subtotal: 64500,
-        status: 'ملغي',
-        deliveryDate: 'غير محدد',
-        customerConfirmation: 'مرفوض',
-        notes: 'تم إلغاء الطلب بناءً على رغبة العميل وإعادة المبلغ للمحفظة',
-        products: [
-          { name: 'بنك بطاريات ليثيوم صناعية 15kWh', quantity: '1 بنك', unitPrice: 64500, total: 64500 },
-        ],
-      },
-    ],
-  },
-  {
-    id: '7',
-    orderNumber: 'ORD-2025-380',
-    customerName: 'خالد الشمري',
-    customerAvatarText: 'خ ش',
-    city: 'القصيم',
-    address: 'عنيزة - حي الفاخرية',
-    totalAmount: 8900,
-    status: 'قيد التجهيز والشحن',
-    createdAt: '2025-05-10',
-    groups: [
-      {
-        supplierId: 'sup-3',
-        supplierName: 'طاقة الصحراء المتقدمة',
-        subtotal: 8900,
-        status: 'قيد التجهيز',
-        deliveryDate: '02 مارس 2025',
-        customerConfirmation: 'قيد الانتظار',
-        notes: 'تم تأكيد التجهيز وجارٍ تسليم الشحنة لمندوب التوصيل',
-        products: [
-          { name: 'هياكل تثبيت أسطح قرميد متطورة', quantity: '4 أطقم', unitPrice: 2225, total: 8900 },
-        ],
-      },
-    ],
-  },
-  {
-    id: '8',
-    orderNumber: 'ORD-2025-376',
-    customerName: 'محمد الشهري',
-    customerAvatarText: 'م ش',
-    city: 'المدينة المنورة',
-    address: 'المدينة المنورة - حي سلطانة',
-    totalAmount: 23750,
-    status: 'تم التسليم',
-    createdAt: '2025-05-09',
-    groups: [
-      {
-        supplierId: 'sup-4',
-        supplierName: 'تقنيات الهجين للتوليد',
-        subtotal: 23750,
-        status: 'تم التسليم',
-        deliveryDate: '15 فبراير 2025',
-        customerConfirmation: 'تم الاستلام',
-        notes: 'استلم العميل كامل المنظومة مع الضمان المعتمد',
-        products: [
-          { name: 'إنفرتر ذكي Huawei SUN2000-10KTL-M1', quantity: '1 جهاز', unitPrice: 16500, total: 16500 },
-          { name: 'قواطع دي سي وحماية صواعق', quantity: '1 طقم', unitPrice: 7250, total: 7250 },
-        ],
-      },
-    ],
-  },
-])
-
 const filteredOrders = computed(() => {
   return orders.value.filter((item) => {
+    const q = searchQuery.value.trim().toLowerCase()
     const matchesSearch =
-      !searchQuery.value ||
-      item.orderNumber.includes(searchQuery.value) ||
-      item.customerName.includes(searchQuery.value) ||
-      item.city.includes(searchQuery.value)
+      !q ||
+      item.orderNumber.toLowerCase().includes(q) ||
+      item.customerName.toLowerCase().includes(q) ||
+      item.city.toLowerCase().includes(q) ||
+      item.address.toLowerCase().includes(q)
 
     const matchesStatus =
       selectedStatus.value === 'all' || item.status === selectedStatus.value
@@ -250,9 +63,31 @@ const filteredOrders = computed(() => {
   })
 })
 
+const pageSize = 8
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredOrders.value.length / pageSize)))
+const visibleOrders = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredOrders.value.slice(start, start + pageSize)
+})
+
+watch([searchQuery, selectedStatus], () => {
+  currentPage.value = 1
+})
+
+watch(totalPages, total => {
+  currentPage.value = Math.min(currentPage.value, total)
+})
+
 function openOrderDetails(order: AdminOrder) {
   selectedOrder.value = order
   isDetailsModalOpen.value = true
+}
+
+async function handleStatusUpdate(orderId: string, newStatus: AdminOrder['status']) {
+  await updateOrderStatus(orderId, newStatus)
+  if (selectedOrder.value && selectedOrder.value.id === orderId) {
+    selectedOrder.value.status = newStatus
+  }
 }
 </script>
 
@@ -262,20 +97,40 @@ function openOrderDetails(order: AdminOrder) {
     <div class="solar-card p-5 sm:p-7">
       <!-- رأس الصفحة -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-solar-border-card/60 pb-6">
-        <div>
-          <h1 class="text-xl sm:text-2xl font-black text-solar-text-heading">إدارة طلبات الشراء</h1>
-          <p class="mt-1 text-xs sm:text-sm text-solar-text-muted">
-            عرض ومتابعة طلبات الشراء متعددة المتاجر، وتفاصيل التوريد والتسليم.
-          </p>
+        <div class="flex items-center gap-3">
+          <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-solar-navy text-white shadow-md">
+            <ShoppingBag class="size-5" />
+          </div>
+          <div>
+            <h1 class="text-xl sm:text-2xl font-black text-solar-text-heading">إدارة طلبات الشراء</h1>
+            <p class="mt-1 text-xs sm:text-sm text-solar-text-muted">
+              عرض ومتابعة طلبات شراء المنتجات متعددة المتاجر، وتفاصيل التوريد والتسليم (إجمالي الطلبات: {{ orders.length }} طلب).
+            </p>
+          </div>
         </div>
 
-        <button
-          type="button"
-          class="btn-outline h-11 px-4 text-xs font-bold gap-2 self-start sm:self-auto"
-        >
-          <Download class="size-4" />
-          <span>تصدير القائمة</span>
-        </button>
+        <div class="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            @click="handleRefreshOrders"
+            :disabled="isRefreshing || pending || isLoading"
+            class="btn-outline h-10 px-4 text-xs font-bold gap-2 text-solar-text-body hover:bg-solar-bg-subtle"
+            title="تحديث قائمة الطلبات من السيرفر"
+          >
+            <RefreshCw class="size-4" :class="{ 'animate-spin': isRefreshing || pending || isLoading }" />
+            <span>تحديث</span>
+          </button>
+
+          <button
+            type="button"
+            @click="exportOrdersCsv"
+            :disabled="!orders.length"
+            class="btn-outline h-10 px-4 text-xs font-bold gap-2 text-solar-navy border-solar-navy/30 hover:bg-sky-50"
+          >
+            <Download class="size-4" />
+            <span>تصدير القائمة (CSV)</span>
+          </button>
+        </div>
       </div>
 
       <!-- الفلاتر والبحث -->
@@ -284,14 +139,14 @@ function openOrderDetails(order: AdminOrder) {
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="ابحث برقم الطلب، اسم العميل، أو المحافظة..."
-            class="solar-input h-11 pr-10 text-xs"
+            placeholder="ابحث برقم الطلب، اسم العميل، المحافظة، أو العنوان..."
+            class="solar-input h-11 pr-10 text-xs w-full"
           />
           <Search class="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-solar-text-muted" />
         </div>
 
         <div class="sm:col-span-4">
-          <select v-model="selectedStatus" class="solar-input h-11 text-xs">
+          <select v-model="selectedStatus" class="solar-input h-11 text-xs w-full font-bold">
             <option value="all">كافة الحالات</option>
             <option value="قيد المعالجة">قيد المعالجة</option>
             <option value="قيد التجهيز والشحن">قيد التجهيز والشحن</option>
@@ -302,8 +157,14 @@ function openOrderDetails(order: AdminOrder) {
         </div>
       </div>
 
+      <!-- حالة التحميل الأولي فقط -->
+      <div v-if="pending && orders.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
+        <Loader2 class="size-8 text-solar-navy animate-spin mb-3" />
+        <p class="text-xs font-bold text-solar-text-muted">جاري تحميل طلبات الشراء من السيرفر...</p>
+      </div>
+
       <!-- جدول الطلبات -->
-      <div class="mt-6 overflow-x-auto rounded-xl border border-solar-border-card/80">
+      <div v-else class="mt-6 overflow-x-auto rounded-xl border border-solar-border-card/80">
         <table class="w-full text-right text-xs">
           <thead class="bg-solar-bg-subtle/70 text-solar-text-muted font-bold border-b border-solar-border-card">
             <tr>
@@ -318,12 +179,12 @@ function openOrderDetails(order: AdminOrder) {
           </thead>
           <tbody class="divide-y divide-solar-border-card/60">
             <tr
-              v-for="item in filteredOrders"
+              v-for="item in visibleOrders"
               :key="item.id"
               class="transition-colors hover:bg-solar-bg-subtle/30"
             >
               <!-- رقم الطلب -->
-              <td class="py-3.5 px-4 font-bold font-mono text-solar-navy-dark">
+              <td class="py-3.5 px-4 font-bold font-mono text-solar-navy-dark text-xs">
                 #{{ item.orderNumber }}
               </td>
 
@@ -333,22 +194,25 @@ function openOrderDetails(order: AdminOrder) {
                   <div class="flex size-7 shrink-0 items-center justify-center rounded-full bg-solar-yellow/30 text-solar-navy-dark font-black text-[10px]">
                     {{ item.customerAvatarText }}
                   </div>
-                  <span class="font-extrabold text-solar-text-heading">{{ item.customerName }}</span>
+                  <div>
+                    <span class="font-extrabold text-solar-text-heading block">{{ item.customerName }}</span>
+                    <span class="text-[10px] text-solar-text-muted font-mono" dir="ltr">{{ item.createdAt.slice(0, 10) }}</span>
+                  </div>
                 </div>
               </td>
 
               <!-- محافظة التسليم -->
-              <td class="py-3.5 px-4 font-medium text-solar-text-body">
+              <td class="py-3.5 px-4 font-bold text-solar-text-heading">
                 {{ item.city }}
               </td>
 
               <!-- إجمالي الطلب -->
-              <td class="py-3.5 px-4 font-black font-mono text-solar-text-heading">
+              <td class="py-3.5 px-4 font-black font-mono text-solar-text-heading text-sm">
                 {{ item.totalAmount.toLocaleString() }} ر.س
               </td>
 
               <!-- عنوان التسليم -->
-              <td class="py-3.5 px-4 text-solar-text-muted max-w-xs truncate">
+              <td class="py-3.5 px-4 text-solar-text-body max-w-xs truncate" :title="item.address">
                 {{ item.address }}
               </td>
 
@@ -362,9 +226,9 @@ function openOrderDetails(order: AdminOrder) {
                 <button
                   type="button"
                   @click="openOrderDetails(item)"
-                  class="inline-flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-bold text-solar-text-heading hover:bg-solar-bg-subtle hover:border-solar-yellow transition-all shadow-2xs"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-bold text-solar-text-heading hover:bg-solar-bg-subtle hover:border-solar-navy transition-all shadow-2xs"
                 >
-                  <Eye class="size-3.5" />
+                  <Eye class="size-3.5 text-solar-navy" />
                   <span>عرض التفاصيل</span>
                 </button>
               </td>
@@ -372,7 +236,7 @@ function openOrderDetails(order: AdminOrder) {
 
             <tr v-if="!filteredOrders.length">
               <td colspan="7" class="py-12 text-center text-solar-text-muted">
-                لا توجد طلبات شراء مطابقة للبحث.
+                لا توجد طلبات شراء مطابقة لمعايير البحث الحالية.
               </td>
             </tr>
           </tbody>
@@ -382,9 +246,9 @@ function openOrderDetails(order: AdminOrder) {
       <!-- الترقيم والتقدم أسفل الجدول -->
       <AdminPagination
         v-model:current-page="currentPage"
-        :total-pages="4"
-        :total-count="48"
-        :page-size="8"
+        :total-pages="totalPages"
+        :total-count="filteredOrders.length"
+        :page-size="pageSize"
         item-name="طلب شراء"
       />
     </div>
@@ -393,6 +257,7 @@ function openOrderDetails(order: AdminOrder) {
     <OrderDetailsModal
       v-model="isDetailsModalOpen"
       :order="selectedOrder"
+      @update-status="handleStatusUpdate"
     />
   </div>
 </template>

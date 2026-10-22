@@ -3,7 +3,7 @@
  * Strict types matching Laravel 11 Auth & User Resources
  */
 
-export type UserRole = 'customer' | 'supplier' | 'engineer'
+export type UserRole = 'customer' | 'supplier' | 'engineer' | 'admin'
 
 export interface User {
   id: string | number
@@ -11,7 +11,8 @@ export interface User {
   email: string
   phone: string
   role: UserRole
-  governorate?: string
+  status?: string
+  governorate?: string | { id: number; name_ar: string } | null
   location?: {
     lat: number
     lng: number
@@ -23,6 +24,8 @@ export interface User {
   avatar?: string
   isVerified: boolean
   isSuspended?: boolean
+  has_store?: boolean
+  has_engineer_profile?: boolean
   createdAt: string
 }
 
@@ -33,13 +36,13 @@ export interface LoginPayload {
 }
 
 export interface RegisterBasePayload {
-  role: UserRole
+  role: 'customer' | 'supplier' | 'engineer'
   name: string
   email: string
   phone: string
   password: string
   password_confirmation: string
-  governorate: string
+  governorate?: string
   location?: {
     lat: number
     lng: number
@@ -53,6 +56,8 @@ export interface RegisterCustomerPayload extends RegisterBasePayload {
 
 export interface RegisterEngineerPayload extends RegisterBasePayload {
   role: 'engineer'
+  licenseNumber?: string
+  license_number?: string
   cvFile?: File | null
   cvFileName?: string
 }
@@ -60,8 +65,14 @@ export interface RegisterEngineerPayload extends RegisterBasePayload {
 export interface RegisterSupplierPayload extends RegisterBasePayload {
   role: 'supplier'
   companyName: string
+  commercialRegistry?: string
+  commercial_registry?: string
+  storeType?: 'wholesaler' | 'retailer' | 'authorized_agent'
+  store_type?: 'wholesaler' | 'retailer' | 'authorized_agent'
   commercialRegisterFile?: File | null
   commercialRegisterFileName?: string
+  addressDetails?: string
+  address_details?: string
 }
 
 export type RegisterPayload = RegisterCustomerPayload | RegisterEngineerPayload | RegisterSupplierPayload

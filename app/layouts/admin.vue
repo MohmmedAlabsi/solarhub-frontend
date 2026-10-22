@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import '../assets/admin-workspace.css'
 import AppToast from '../components/common/AppToast.vue'
 import AdminFooter from '../components/admin/AdminFooter.vue'
 import AdminHeader from '../components/admin/AdminHeader.vue'
 import AdminSidebar from '../components/admin/AdminSidebar.vue'
 
 const route = useRoute()
+const workspace = useAdminWorkspace()
+const { notice } = useAdminNotice()
 useHead({
   htmlAttrs: { class: 'admin-portal', lang: 'ar', dir: 'rtl' },
   bodyAttrs: { class: 'admin-portal bg-solar-bg-page' },
@@ -21,6 +24,12 @@ let noticeTimeout: ReturnType<typeof setTimeout> | undefined
 
 const handleKeydown = (event: KeyboardEvent) => {
   if (isMobileOpen.value) {
+    if (event.key === 'Tab') {
+      const nodes = Array.from(drawerPanel.value?.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),[tabindex="0"]') ?? [])
+      const first = nodes[0], last = nodes[nodes.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+    }
     if (event.key === 'Escape') {
       event.preventDefault()
       isMobileOpen.value = false
@@ -62,6 +71,18 @@ watch(() => route.fullPath, async () => {
   contentScroll.value?.scrollTo({ top: 0, behavior: 'auto' })
 })
 
+watch(isMobileOpen, async open => {
+  if (open) {
+    returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    await nextTick()
+    drawerPanel.value?.querySelector<HTMLElement>('[data-drawer-close]')?.focus({ preventScroll: true })
+  } else {
+    await nextTick()
+    returnFocus?.focus({ preventScroll: true })
+    returnFocus = null
+  }
+})
+
 const toggleSidebar = () => {
   isCollapsed.value = !isCollapsed.value
   try {
@@ -83,7 +104,7 @@ const showUnavailable = (label: string) => {
 </script>
 
 <template>
-  <div dir="rtl" class="flex h-dvh w-full max-w-full overflow-hidden bg-solar-bg-page text-solar-text-heading antialiased selection:bg-solar-yellow selection:text-solar-navy-dark">
+  <div dir="rtl" :data-density="workspace.preferences.density" class="admin-workspace flex h-dvh w-full max-w-full overflow-hidden bg-solar-bg-page text-solar-text-heading antialiased selection:bg-solar-yellow selection:text-solar-navy-dark">
     <a href="#admin-main" class="sr-only z-[100] rounded-lg bg-solar-navy-dark px-4 py-3 text-white focus:not-sr-only focus:fixed focus:right-4 focus:top-4">تخطي إلى المحتوى الإداري</a>
 
     <!-- سايدبار سطح المكتب العائم -->
@@ -119,6 +140,10 @@ const showUnavailable = (label: string) => {
       <AdminFooter class="mt-auto w-full shrink-0" @unavailable="showUnavailable" />
     </div>
 
-    <AppToast :message="noticeMessage" />
+    <AppToast :message="noticeMessage || notice.message" class="!z-[100]" />
   </div>
 </template>
+
+<style scoped>
+.admin-workspace { position: fixed; inset: 0; overflow: clip; }
+</style>

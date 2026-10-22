@@ -4,6 +4,8 @@ import {
   Check,
   FileCheck,
   FileText,
+  Loader2,
+  Pencil,
   Plus,
   Sliders,
   Star,
@@ -12,81 +14,410 @@ import {
   X,
 } from 'lucide-vue-next'
 import AdminModal from '../common/AdminModal.vue'
-import type { AdminProduct } from '../../../../types/admin'
+import type { Brand, Category, MasterProduct, ProductSpecification } from '../../../../types/api'
 
 const props = defineProps<{
   modelValue: boolean
+  editProduct?: MasterProduct | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'created', product: AdminProduct): void
+  (e: 'created', product: MasterProduct): void
+  (e: 'updated', product: MasterProduct): void
 }>()
 
-const form = ref({
-  name: '',
-  category: 'الألواح الكهروضوئية (Solar PV Panels)',
-  categoryType: 'panel' as const,
-  brand: 'Jinko Solar',
-  modelNumber: '',
-  status: 'active' as 'active' | 'inactive',
-  description: '',
-  datasheetName: 'Jinko_Tiger_Pro_585W_Datasheet_Rev2.pdf',
-  datasheetSize: '1.8 ميغابايت • تم التحقق الفني',
-  featuredImageIndex: 0,
-})
+const {
+  fetchCategories,
+  fetchBrands,
+  fetchMasterProduct,
+  createMasterProduct,
+  updateMasterProduct,
+  addSpecification,
+  deleteSpecification,
+  uploadProductImage,
+  deleteProductImage,
+  markImageFeatured,
+} = useAdminCatalog()
 
-const dynamicSpecs = ref<Array<{ key: string; value: string; unit: string }>>([
-  { key: 'القدرة القصوى (Pmax)', value: '585', unit: 'واط (W)' },
-  { key: 'كفاءة اللوح (Module Efficiency)', value: '21.4', unit: '%' },
-  { key: 'جهد الدائرة المفتوحة (Voc)', value: '50.15', unit: 'فولت (V)' },
-  { key: 'تيار القصر (Isc)', value: '14.28', unit: 'أمبير (A)' },
-])
+const isEditMode = computed(() => Boolean(props.editProduct && props.editProduct.id))
 
+const categories = ref<Category[]>([])
+const brands = ref<Brand[]>([])
+const isLoadingMeta = ref(false)
 const isSubmitting = ref(false)
+const errorMessage = ref('')
 const successMsg = ref('')
 
+// Form state
+const form = ref({
+  title: '',
+  category_id: '' as string | number,
+  brand_id: '' as string | number,
+  model_number: '',
+  is_active: true,
+  description: '',
+})
+
+// Datasheet file
+const datasheetFile = ref<File | null>(null)
+const datasheetInfo = ref<{ name: string; size: string; url?: string } | null>(null)
+const datasheetInputRef = ref<HTMLInputElement | null>(null)
+
+// Existing images from server
+const existingImages = ref<Array<{ id: number; image_url: string; is_featured: boolean }>>([])
+
+// Newly selected local images
+interface LocalImageItem {
+  id: string
+  file: File
+  previewUrl: string
+  isFeatured: boolean
+}
+const localImages = ref<LocalImageItem[]>([])
+const imageInputRef = ref<HTMLInputElement | null>(null)
+
+// Dynamic specifications
+interface SpecItem {
+  id?: number
+  name: string
+  value: string
+  unit: string
+}
+const dynamicSpecs = ref<SpecItem[]>([])
+
+const defaultSpecs: SpecItem[] = [
+  { name: 'القدرة القصوى (Pmax)', value: '585', unit: 'W' },
+  { name: 'كفاءة اللوح (Module Efficiency)', value: '21.4', unit: '%' },
+  { name: 'جهد الدائرة المفتوحة (Voc)', value: '50.15', unit: 'V' },
+  { name: 'تيار القصر (Isc)', value: '14.28', unit: 'A' },
+]
+
+onMounted(async () => {
+  isLoadingMeta.value = true
+  try {
+    const [catList, brandList] = await Promise.all([
+      fetchCategories(),
+      fetchBrands(),
+    ])
+    categories.value = catList
+    brands.value = brandList
+  } finally {
+    isLoadingMeta.value = false
+  }
+})
+
+// Populate form when editProduct changes or modal opens
+watch(
+  () => [props.modelValue, props.editProduct],
+  async ([isOpen, product]) => {
+    if (!isOpen) return
+
+    errorMessage.value = ''
+    successMsg.value = ''
+    datasheetFile.value = null
+
+    if (product && typeof product === 'object' && 'id' in product) {
+      // Edit mode: fetch full details to ensure specifications and images are complete
+      form.value = {
+        title: product.title || '',
+        category_id: product.category?.id || product.category_id || '',
+        brand_id: product.brand?.id || product.brand_id || '',
+        model_number: product.model_number || '',
+        is_active: !!product.is_active,
+        description: product.description || '',
+      }
+
+      if (product.datasheet_url) {
+        datasheetInfo.value = {
+          name: `${product.model_number || 'product'}_Datasheet.pdf`,
+          size: 'ملف المواصفات الفنية المعتمد (PDF)',
+          url: product.datasheet_url,
+        }
+      } else {
+        datasheetInfo.value = null
+      }
+
+      // Specifications
+      if (product.specifications && product.specifications.length > 0) {
+        dynamicSpecs.value = product.specifications.map(s => ({
+          id: s.id,
+          name: s.name,
+          value: s.value,
+          unit: s.unit || '',
+        }))
+      } else {
+        dynamicSpecs.value = [...defaultSpecs]
+      }
+
+      // Existing images
+      existingImages.value = product.images ? [...product.images] : []
+      localImages.value = []
+
+      // If specifications or images are not loaded in the listing row, fetch full single product
+      if (!product.specifications || !product.images) {
+        const full = await fetchMasterProduct(product.id)
+        if (full) {
+          if (full.specifications && full.specifications.length > 0) {
+            dynamicSpecs.value = full.specifications.map(s => ({
+              id: s.id,
+              name: s.name,
+              value: s.value,
+              unit: s.unit || '',
+            }))
+          }
+          if (full.images && full.images.length > 0) {
+            existingImages.value = [...full.images]
+          }
+          if (full.datasheet_url && !datasheetInfo.value) {
+            datasheetInfo.value = {
+              name: `${full.model_number || 'product'}_Datasheet.pdf`,
+              size: 'ملف المواصفات الفنية المعتمد (PDF)',
+              url: full.datasheet_url,
+            }
+          }
+        }
+      }
+    } else {
+      // Create mode
+      resetForm()
+    }
+  },
+  { immediate: true }
+)
+
 function addSpec() {
-  dynamicSpecs.value.push({ key: '', value: '', unit: '' })
+  dynamicSpecs.value.push({ name: '', value: '', unit: '' })
 }
 
-function removeSpec(index: number) {
+async function removeSpec(index: number) {
+  const spec = dynamicSpecs.value[index]
+  if (spec.id && isEditMode.value) {
+    try {
+      await deleteSpecification(spec.id)
+    } catch {
+      // ignore
+    }
+  }
   dynamicSpecs.value.splice(index, 1)
 }
 
-function handleSubmit() {
-  if (!form.value.name || !form.value.modelNumber) return
-  isSubmitting.value = true
-  setTimeout(() => {
-    isSubmitting.value = false
-    successMsg.value = 'تمت إضافة المنتج بنجاح إلى الكتالوج المرجعي!'
-    emit('created', {
-      id: String(Date.now()),
-      name: form.value.name,
-      subtitle: form.value.description || 'منتج معتمد مطابق للمواصفات',
-      category: form.value.category.split(' ')[0],
-      categoryType: form.value.categoryType,
-      brand: form.value.brand,
-      modelNumber: form.value.modelNumber,
-      status: form.value.status,
-      datasheet: form.value.datasheetName,
-      images: ['/images/product-panel.png'],
-      featuredImageIndex: 0,
+function triggerDatasheetPicker() {
+  datasheetInputRef.value?.click()
+}
+
+function onDatasheetChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  if (target.files && target.files[0]) {
+    const file = target.files[0]
+    datasheetFile.value = file
+    const sizeInMb = (file.size / (1024 * 1024)).toFixed(2)
+    datasheetInfo.value = {
+      name: file.name,
+      size: `${sizeInMb} ميغابايت • ملف جديد جاهز للرفع`,
+    }
+  }
+}
+
+function triggerImagePicker() {
+  imageInputRef.value?.click()
+}
+
+function onImagesChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  if (target.files) {
+    const files = Array.from(target.files)
+    for (const file of files) {
+      const isFirst = localImages.value.length === 0 && existingImages.value.length === 0
+      localImages.value.push({
+        id: Math.random().toString(36).substring(7),
+        file,
+        previewUrl: URL.createObjectURL(file),
+        isFeatured: isFirst,
+      })
+    }
+  }
+}
+
+async function setFeaturedExistingImage(imgId: number) {
+  try {
+    await markImageFeatured(imgId)
+    existingImages.value.forEach(img => {
+      img.is_featured = img.id === imgId
     })
-    setTimeout(() => {
-      successMsg.value = ''
-      emit('update:modelValue', false)
-    }, 1200)
-  }, 700)
+    localImages.value.forEach(img => {
+      img.isFeatured = false
+    })
+  } catch {
+    // handled in composable
+  }
+}
+
+function setFeaturedLocalImage(index: number) {
+  existingImages.value.forEach(img => {
+    img.is_featured = false
+  })
+  localImages.value.forEach((img, i) => {
+    img.isFeatured = i === index
+  })
+}
+
+async function removeExistingImage(index: number) {
+  const img = existingImages.value[index]
+  if (img?.id) {
+    try {
+      await deleteProductImage(img.id)
+      existingImages.value.splice(index, 1)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function removeLocalImage(index: number) {
+  const [removed] = localImages.value.splice(index, 1)
+  if (removed?.previewUrl) {
+    URL.revokeObjectURL(removed.previewUrl)
+  }
+}
+
+async function handleSubmit() {
+  if (!form.value.title || !form.value.category_id || !form.value.brand_id) {
+    errorMessage.value = 'يرجى إدخال اسم المنتج واختيار التصنيف والعلامة التجارية.'
+    return
+  }
+
+  isSubmitting.value = true
+  errorMessage.value = ''
+  successMsg.value = ''
+
+  try {
+    const payload = new FormData()
+    payload.append('title', form.value.title)
+    payload.append('category_id', String(form.value.category_id))
+    payload.append('brand_id', String(form.value.brand_id))
+    if (form.value.model_number) {
+      payload.append('model_number', form.value.model_number)
+    }
+    if (form.value.description) {
+      payload.append('description', form.value.description)
+    }
+    payload.append('is_active', form.value.is_active ? '1' : '0')
+
+    if (datasheetFile.value) {
+      payload.append('datasheet', datasheetFile.value)
+    }
+
+    if (isEditMode.value && props.editProduct) {
+      // EDIT MODE
+      payload.append('_method', 'PUT')
+      const updated = await updateMasterProduct(props.editProduct.id, payload)
+
+      // Add newly added specifications
+      const newSpecs = dynamicSpecs.value.filter(s => !s.id && s.name.trim() && s.value.trim())
+      for (const spec of newSpecs) {
+        try {
+          await addSpecification({
+            product_id: props.editProduct.id,
+            name: spec.name.trim(),
+            value: spec.value.trim(),
+            unit: spec.unit?.trim() || null,
+          })
+        } catch (err) {
+          console.warn('Failed to add spec:', spec.name, err)
+        }
+      }
+
+      // Upload new images
+      for (const img of localImages.value) {
+        try {
+          await uploadProductImage(props.editProduct.id, img.file, img.isFeatured)
+        } catch (err) {
+          console.warn('Failed to upload image:', img.file.name, err)
+        }
+      }
+
+      successMsg.value = 'تم تحديث بيانات المنتج بنجاح!'
+      const fallbackProduct: MasterProduct = {
+        ...props.editProduct,
+        ...form.value,
+        category_id: Number(form.value.category_id),
+        brand_id: Number(form.value.brand_id),
+      }
+      emit('updated', updated || fallbackProduct)
+
+      setTimeout(() => {
+        emit('update:modelValue', false)
+      }, 1000)
+    } else {
+      // CREATE MODE
+      const created = await createMasterProduct(payload)
+
+      // Add specifications
+      const validSpecs = dynamicSpecs.value.filter(s => s.name.trim() && s.value.trim())
+      for (const spec of validSpecs) {
+        try {
+          await addSpecification({
+            product_id: created.id,
+            name: spec.name.trim(),
+            value: spec.value.trim(),
+            unit: spec.unit?.trim() || null,
+          })
+        } catch (err) {
+          console.warn('Failed to upload spec:', spec.name, err)
+        }
+      }
+
+      // Upload images
+      for (const img of localImages.value) {
+        try {
+          await uploadProductImage(created.id, img.file, img.isFeatured)
+        } catch (err) {
+          console.warn('Failed to upload image:', img.file.name, err)
+        }
+      }
+
+      successMsg.value = 'تمت إضافة المنتج بنجاح إلى الكتالوج المرجعي!'
+      emit('created', created)
+
+      setTimeout(() => {
+        emit('update:modelValue', false)
+        resetForm()
+      }, 1000)
+    }
+  } catch (err: any) {
+    errorMessage.value = err?.data?.userMessage || 'حدث خطأ أثناء حفظ المنتج، يرجى مراجعة المدخلات.'
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+function resetForm() {
+  form.value = {
+    title: '',
+    category_id: categories.value[0]?.id || '',
+    brand_id: brands.value[0]?.id || '',
+    model_number: '',
+    is_active: true,
+    description: '',
+  }
+  datasheetFile.value = null
+  datasheetInfo.value = null
+  localImages.value.forEach(img => URL.revokeObjectURL(img.previewUrl))
+  localImages.value = []
+  existingImages.value = []
+  dynamicSpecs.value = [...defaultSpecs]
+  errorMessage.value = ''
+  successMsg.value = ''
 }
 </script>
 
 <template>
   <AdminModal
     :model-value="modelValue"
-    title="إضافة منتج جديد للكتالوج المرجعي"
-    subtitle="تعريف المواصفات القياسية للمنتج المرجعي لإتاحته للموردين في المنصة"
-    :icon="Boxes"
+    :title="isEditMode ? `تعديل المنتج: ${form.title || 'بيانات الكتالوج'}` : 'إضافة منتج جديد للكتالوج المرجعي'"
+    :subtitle="isEditMode ? 'تحديث وتعديل المواصفات الفنية والمرفقات للمنتج المعتمد' : 'تعريف المواصفات القياسية للمنتج المرجعي لإتاحته للموردين في المنصة'"
+    :icon="isEditMode ? Pencil : Boxes"
     max-width="3xl"
     @update:model-value="emit('update:modelValue', $event)"
   >
@@ -103,7 +434,7 @@ function handleSubmit() {
             اسم المنتج المرجعي <span class="text-rose-500">*</span>
           </label>
           <input
-            v-model="form.name"
+            v-model="form.title"
             type="text"
             required
             placeholder="مثال: لوح شمسي مونوكريستالين Jinko Tiger Pro 585W ثنائي الوجه"
@@ -116,12 +447,11 @@ function handleSubmit() {
             <label class="block text-xs font-bold text-solar-text-body mb-1.5">
               التصنيف <span class="text-rose-500">*</span>
             </label>
-            <select v-model="form.category" class="solar-input h-11 text-xs">
-              <option value="الألواح الكهروضوئية (Solar PV Panels)">الألواح الكهروضوئية (Solar PV Panels)</option>
-              <option value="الإنفرترات والمحولات (Inverters)">الإنفرترات والمحولات (Inverters)</option>
-              <option value="بطاريات التخزين (Solar Batteries)">بطاريات التخزين (Solar Batteries)</option>
-              <option value="مضخات المياه الشمسية (Solar Pumps)">مضخات المياه الشمسية (Solar Pumps)</option>
-              <option value="منظمات الشحن (Charge Controllers)">منظمات الشحن (Charge Controllers)</option>
+            <select v-model="form.category_id" required class="solar-input h-11 text-xs">
+              <option disabled value="">اختر التصنيف</option>
+              <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                {{ cat.name_ar }} {{ cat.name_en ? `(${cat.name_en})` : '' }}
+              </option>
             </select>
           </div>
 
@@ -129,15 +459,11 @@ function handleSubmit() {
             <label class="block text-xs font-bold text-solar-text-body mb-1.5">
               العلامة التجارية (Brand) <span class="text-rose-500">*</span>
             </label>
-            <select v-model="form.brand" class="solar-input h-11 text-xs">
-              <option value="Jinko Solar">Jinko Solar</option>
-              <option value="LONGI Solar">LONGI Solar</option>
-              <option value="Deye">Deye</option>
-              <option value="Huawei">Huawei</option>
-              <option value="Victron Energy">Victron Energy</option>
-              <option value="Growatt">Growatt</option>
-              <option value="Pylontech">Pylontech</option>
-              <option value="Grundfos">Grundfos</option>
+            <select v-model="form.brand_id" required class="solar-input h-11 text-xs">
+              <option disabled value="">اختر العلامة التجارية</option>
+              <option v-for="b in brands" :key="b.id" :value="b.id">
+                {{ b.name }}
+              </option>
             </select>
           </div>
         </div>
@@ -148,7 +474,7 @@ function handleSubmit() {
               رقم الموديل (Model Number) <span class="text-rose-500">*</span>
             </label>
             <input
-              v-model="form.modelNumber"
+              v-model="form.model_number"
               type="text"
               required
               placeholder="مثال: JKM585M-7RL3-TV"
@@ -163,18 +489,18 @@ function handleSubmit() {
             <div class="flex items-center gap-4 h-11 rounded-xl border border-solar-border-card px-4 bg-solar-bg-subtle/50 text-xs font-bold">
               <label class="flex items-center gap-2 cursor-pointer text-emerald-800">
                 <input
-                  v-model="form.status"
+                  v-model="form.is_active"
                   type="radio"
-                  value="active"
+                  :value="true"
                   class="accent-emerald-600 size-4"
                 />
                 <span>مفعل (نشط بالكتالوج)</span>
               </label>
               <label class="flex items-center gap-2 cursor-pointer text-slate-600">
                 <input
-                  v-model="form.status"
+                  v-model="form.is_active"
                   type="radio"
-                  value="inactive"
+                  :value="false"
                   class="accent-slate-500 size-4"
                 />
                 <span>معطل (مسودة)</span>
@@ -203,25 +529,65 @@ function handleSubmit() {
             <span class="flex size-6 items-center justify-center rounded-md bg-solar-yellow/20 text-solar-navy-dark text-xs font-black">2</span>
             <h4>ملف المواصفات الفنية المعتمد (Technical Datasheet)</h4>
           </div>
-          <span class="text-[11px] text-solar-text-muted">PDF بحد أقصى 15MB</span>
+          <span class="text-[11px] text-solar-text-muted">PDF بحد أقصى 10MB</span>
         </div>
 
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border-2 border-dashed border-amber-200 bg-amber-50/40 p-4">
+        <input
+          ref="datasheetInputRef"
+          type="file"
+          accept=".pdf"
+          class="hidden"
+          @change="onDatasheetChange"
+        />
+
+        <div
+          v-if="datasheetInfo"
+          class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/50 p-4"
+        >
           <div class="flex items-center gap-3">
             <div class="flex size-11 items-center justify-center rounded-xl bg-rose-100 text-rose-600 font-black text-xs">
               PDF
             </div>
             <div>
-              <p class="text-xs font-bold text-solar-text-heading font-mono">{{ form.datasheetName }}</p>
-              <p class="text-[11px] text-solar-text-muted mt-0.5">{{ form.datasheetSize }}</p>
+              <p class="text-xs font-bold text-solar-text-heading font-mono">{{ datasheetInfo.name }}</p>
+              <p class="text-[11px] text-solar-text-muted mt-0.5">{{ datasheetInfo.size }}</p>
             </div>
           </div>
-          <button
-            type="button"
-            class="rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-bold text-solar-text-body hover:bg-solar-bg-subtle transition-colors shadow-2xs"
-          >
-            تغيير الملف
-          </button>
+          <div class="flex items-center gap-2">
+            <a
+              v-if="datasheetInfo.url"
+              :href="datasheetInfo.url"
+              target="_blank"
+              class="rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-bold text-solar-navy hover:bg-solar-bg-subtle transition-colors shadow-2xs"
+            >
+              عرض الملف الحالي
+            </a>
+            <button
+              type="button"
+              @click="triggerDatasheetPicker"
+              class="rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-bold text-solar-text-body hover:bg-solar-bg-subtle transition-colors shadow-2xs"
+            >
+              تغيير الملف
+            </button>
+            <button
+              type="button"
+              @click="datasheetFile = null; datasheetInfo = null"
+              class="rounded-lg text-rose-500 hover:bg-rose-50 p-1.5 transition-colors"
+              title="إزالة الملف"
+            >
+              <Trash2 class="size-4" />
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-else
+          @click="triggerDatasheetPicker"
+          class="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-solar-border-card bg-solar-bg-subtle/40 p-5 text-center cursor-pointer hover:border-amber-400 hover:bg-amber-50/20 transition-all"
+        >
+          <FileText class="size-7 text-amber-500" />
+          <span class="text-xs font-bold text-solar-text-heading">انقر هنا لرفع ملف المواصفات الفنية المعتمد (PDF)</span>
+          <span class="text-[10px] text-solar-text-muted">أقصى حجم 10 ميغابايت بصيغة PDF الرسمية للمنتج</span>
         </div>
       </section>
 
@@ -235,37 +601,99 @@ function handleSubmit() {
           <span class="text-[11px] text-solar-text-muted">انقر على النجمة لاختيار الصورة الرئيسية</span>
         </div>
 
+        <input
+          ref="imageInputRef"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          multiple
+          class="hidden"
+          @change="onImagesChange"
+        />
+
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <!-- الكارد 1: الصورة المميزة -->
-          <div class="relative flex flex-col items-center justify-center rounded-xl border-2 border-solar-navy bg-white p-3 aspect-square shadow-sm">
-            <span class="absolute top-2 right-2 rounded-md bg-solar-navy px-1.5 py-0.5 text-[9px] font-black text-white flex items-center gap-1">
+          <!-- الصور الموجودة مسبقاً في السيرفر (في حالة التعديل) -->
+          <div
+            v-for="(img, idx) in existingImages"
+            :key="'existing-' + img.id"
+            class="relative flex flex-col items-center justify-center rounded-xl p-2 aspect-square group transition-all"
+            :class="[
+              img.is_featured
+                ? 'border-2 border-solar-navy bg-white shadow-sm ring-2 ring-amber-400/40'
+                : 'border border-solar-border-card bg-solar-bg-subtle'
+            ]"
+          >
+            <span
+              v-if="img.is_featured"
+              class="absolute top-2 right-2 rounded-md bg-solar-navy px-1.5 py-0.5 text-[9px] font-black text-white flex items-center gap-1 shadow-xs"
+            >
               <Star class="size-2.5 fill-solar-yellow text-solar-yellow" /> المميزة
             </span>
-            <img src="/images/product-panel.png" alt="لوح شمسي" class="h-20 object-contain" />
-          </div>
-
-          <!-- الكارد 2 -->
-          <div class="relative flex flex-col items-center justify-center rounded-xl border border-solar-border-card bg-solar-bg-subtle p-3 aspect-square">
-            <button type="button" class="absolute top-2 right-2 text-slate-400 hover:text-solar-yellow">
+            <button
+              v-else
+              type="button"
+              @click="setFeaturedExistingImage(img.id)"
+              class="absolute top-2 right-2 text-slate-400 hover:text-amber-500 transition-colors p-1"
+              title="تعيين كصورة مميزة"
+            >
               <Star class="size-4" />
             </button>
-            <div class="size-10 rounded-lg bg-white flex items-center justify-center text-slate-400">
-              <Sliders class="size-5" />
-            </div>
+
+            <button
+              type="button"
+              @click="removeExistingImage(idx)"
+              class="absolute top-2 left-2 text-rose-500 hover:bg-rose-100/80 rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="حذف الصورة"
+            >
+              <Trash2 class="size-3.5" />
+            </button>
+
+            <img :src="img.image_url" alt="صورة المنتج" class="h-20 w-20 object-contain" />
           </div>
 
-          <!-- الكارد 3 -->
-          <div class="relative flex flex-col items-center justify-center rounded-xl border border-solar-border-card bg-solar-bg-subtle p-3 aspect-square">
-            <button type="button" class="absolute top-2 right-2 text-slate-400 hover:text-solar-yellow">
+          <!-- الصور المختارة محلياً -->
+          <div
+            v-for="(img, idx) in localImages"
+            :key="'local-' + img.id"
+            class="relative flex flex-col items-center justify-center rounded-xl p-2 aspect-square group transition-all"
+            :class="[
+              img.isFeatured
+                ? 'border-2 border-solar-navy bg-white shadow-sm ring-2 ring-amber-400/40'
+                : 'border border-solar-border-card bg-solar-bg-subtle'
+            ]"
+          >
+            <span
+              v-if="img.isFeatured"
+              class="absolute top-2 right-2 rounded-md bg-solar-navy px-1.5 py-0.5 text-[9px] font-black text-white flex items-center gap-1 shadow-xs"
+            >
+              <Star class="size-2.5 fill-solar-yellow text-solar-yellow" /> المميزة
+            </span>
+            <button
+              v-else
+              type="button"
+              @click="setFeaturedLocalImage(idx)"
+              class="absolute top-2 right-2 text-slate-400 hover:text-amber-500 transition-colors p-1"
+              title="تعيين كصورة مميزة"
+            >
               <Star class="size-4" />
             </button>
-            <div class="size-10 rounded-lg bg-white flex items-center justify-center text-slate-400">
-              <FileCheck class="size-5" />
-            </div>
+
+            <button
+              type="button"
+              @click="removeLocalImage(idx)"
+              class="absolute top-2 left-2 text-rose-500 hover:bg-rose-100/80 rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="حذف الصورة"
+            >
+              <Trash2 class="size-3.5" />
+            </button>
+
+            <img :src="img.previewUrl" alt="صورة المنتج" class="h-20 w-20 object-contain" />
           </div>
 
-          <!-- الكارد 4: رفع صورة -->
-          <div class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-solar-border-card bg-solar-bg-page p-3 aspect-square text-center cursor-pointer hover:border-solar-yellow hover:bg-amber-50/20 transition-all">
+          <!-- بطاقة رفع صورة جديدة -->
+          <div
+            @click="triggerImagePicker"
+            class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-solar-border-card bg-solar-bg-page p-3 aspect-square text-center cursor-pointer hover:border-amber-500 hover:bg-amber-50/20 transition-all"
+          >
             <UploadCloud class="size-6 text-solar-text-muted mb-1" />
             <span class="text-xs font-bold text-solar-text-heading">رفع صورة</span>
             <span class="text-[10px] text-solar-text-muted">PNG, JPG</span>
@@ -289,6 +717,10 @@ function handleSubmit() {
           </button>
         </div>
 
+        <p class="text-[11px] text-solar-text-muted -mt-1">
+          مواصفات قياسية مرنة بحسب نوع المنتج دون حقول صلبة مسبقة (اسم المواصفة، القيمة، الوحدة)
+        </p>
+
         <div class="flex flex-col gap-2">
           <div
             v-for="(spec, idx) in dynamicSpecs"
@@ -296,7 +728,7 @@ function handleSubmit() {
             class="flex items-center gap-2 bg-solar-bg-subtle/50 p-2 rounded-xl border border-solar-border-card/60"
           >
             <input
-              v-model="spec.key"
+              v-model="spec.name"
               type="text"
               placeholder="اسم المواصفة (مثال: أقصى تيار)"
               class="solar-input h-9 text-xs flex-2 bg-white"
@@ -325,7 +757,12 @@ function handleSubmit() {
         </div>
       </section>
 
-      <p v-if="successMsg" class="rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
+      <!-- رسائل التنبيه والخطأ والنجاح -->
+      <p v-if="errorMessage" class="rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700 flex items-center gap-2 border border-rose-200">
+        <X class="size-4 text-rose-600" /> {{ errorMessage }}
+      </p>
+
+      <p v-if="successMsg" class="rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2 border border-emerald-200">
         <Check class="size-4 text-emerald-600" /> {{ successMsg }}
       </p>
 
@@ -341,9 +778,10 @@ function handleSubmit() {
         <button
           type="submit"
           :disabled="isSubmitting"
-          class="btn-primary h-11 px-8 text-xs font-bold bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md"
+          class="btn-primary h-11 px-8 text-xs font-bold bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md flex items-center gap-2"
         >
-          {{ isSubmitting ? 'جارٍ الحفظ...' : 'حفظ ونشر في الكتالوج' }}
+          <Loader2 v-if="isSubmitting" class="size-4 animate-spin" />
+          <span>{{ isSubmitting ? 'جارٍ الحفظ...' : (isEditMode ? 'حفظ التعديلات' : 'حفظ ونشر في الكتالوج') }}</span>
         </button>
       </div>
     </form>
