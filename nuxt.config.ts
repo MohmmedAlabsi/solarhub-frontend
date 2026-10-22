@@ -74,6 +74,7 @@ export default defineNuxtConfig({
     '/admin/orders': { ssr: true },
     '/admin/orders/**': { ssr: true },
     '/customer/**': { ssr: false },
+    '/engineer/**': { ssr: false },
     '/auth/**': { ssr: false },
     '/admin/**': { ssr: false },
     '/profile/**': { ssr: false },
