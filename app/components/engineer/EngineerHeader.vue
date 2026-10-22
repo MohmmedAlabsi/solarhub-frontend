@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Bell, ChevronDown, Menu, User } from 'lucide-vue-next'
-import { useAuthStore } from '~~/app/stores/auth.store'
+import { useAuthStore } from '~~/app/stores/auth'
 
 withDefaults(defineProps<{ isMobileOpen?: boolean }>(), { isMobileOpen: false })
 const emit = defineEmits<{

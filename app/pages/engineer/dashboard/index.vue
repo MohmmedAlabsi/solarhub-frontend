@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import EngineerStatCard from '../../../components/engineer/dashboard/EngineerStatCard.vue'
 import EngineerWorkItem from '../../../components/engineer/dashboard/EngineerWorkItem.vue'
-import { useAuthStore } from '~~/app/stores/auth.store'
+import { useAuthStore } from '~~/app/stores/auth'
 
 definePageMeta({ layout: 'engineer' })
 useSeoMeta({
