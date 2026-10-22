@@ -14,9 +14,13 @@ const accountMenu = ref<HTMLElement>()
 const accountButton = ref<HTMLButtonElement>()
 const route = useRoute()
 
-// اسم المهندس من الـ store أو بيانات تجريبية
-// TODO: استبدل بـ useFetch('/api/engineer/me') عند ربط الـ API
-const engineerName = computed(() => authStore.user?.name ?? 'م. أحمد الشمري')
+// اسم المهندس من الـ store الرسمي
+const engineerName = computed(() => authStore.user?.name || 'م. أحمد الشمري')
+
+async function handleLogout() {
+  isUserMenuOpen.value = false
+  await authStore.logout()
+}
 
 function closeAccountMenu(event: PointerEvent) {
   if (event.target instanceof Node && !accountMenu.value?.contains(event.target)) isUserMenuOpen.value = false
@@ -109,7 +113,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
           <button
             type="button"
             class="block w-full rounded-lg px-3 py-2 text-right text-xs font-semibold text-red-600 hover:bg-red-50"
-            @click="isUserMenuOpen = false; emit('unavailable', 'تسجيل الخروج')"
+            @click="handleLogout"
           >
             تسجيل الخروج
           </button>

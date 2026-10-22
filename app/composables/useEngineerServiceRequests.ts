@@ -1,5 +1,4 @@
-// بيانات تجريبية لطلبات الخدمات المتاحة للمهندس
-// TODO: استبدل بـ useFetch('/api/engineer/service-requests?status=available')
+import { useAuthStore } from '~~/app/stores/auth'
 
 export type ServiceRequestStatus =
   | 'awaiting_offers'   // بانتظار العروض
@@ -8,7 +7,8 @@ export type ServiceRequestStatus =
 
 export interface EngineerServiceRequest {
   id: string                   // SR-2025-1042
-  serviceType: string          // نوع الخدمة (نص عرض)
+  rawId: number                // 1042 (المعرف الرقمي في الـ Backend)
+  serviceType: string          // نوع الخدمة
   serviceIcon: 'grid' | 'inspect' | 'droplet' | 'compliance' | 'bess' | 'monitor'
   governorate: string          // المحافظة
   location: string             // تفاصيل الموقع
@@ -16,7 +16,6 @@ export interface EngineerServiceRequest {
   createdAt: string            // تاريخ الإنشاء
   status: ServiceRequestStatus
   offersCount?: number         // عدد العروض المقدمة حتى الآن
-  // تفاصيل الطلب (تُعرض في المودال)
   scopeDescription: string     // نطاق العمل ومواصفات الطلب
   additionalLocation: string   // تفاصيل الموقع الإضافية
   locationTag?: string         // وسم الموقع
@@ -31,101 +30,6 @@ export interface SubmitOfferForm {
   attachmentFile: File | null
 }
 
-// --- بيانات تجريبية ---
-const mockRequests: EngineerServiceRequest[] = [
-  {
-    id: 'SR-2025-1042',
-    serviceType: 'دراسة جدوى وتصميم محطة On-Grid',
-    serviceIcon: 'grid',
-    governorate: 'الرياض',
-    location: 'الرياض - حي الملقا (مبنى تجاري مستوى)',
-    capacityLabel: '25 kWp',
-    createdAt: '25 أكتوبر 2025',
-    status: 'awaiting_offers',
-    offersCount: 3,
-    scopeDescription: 'مطلوب إعداد دراسة الجدوى الهندسية الكهروضوئية الكاملة للمحطة، واحتساب سعة المدولات والتأكد من مطابقة قواعد البناء السعودي SBC ومتطلبات شركة الكهرباء',
-    additionalLocation: 'الرياض - حي الملقا (مبنى تجاري معرّض وجاهز للتركيب)',
-    locationTag: 'سطح تجاري مستوٍ',
-    attachmentName: 'Building_Electrical_Load.pdf',
-    attachmentSize: '4.8 ميجابايت',
-  },
-  {
-    id: 'SR-2025-1038',
-    serviceType: 'إشراف وفحص هندسي ميداني',
-    serviceIcon: 'inspect',
-    governorate: 'القصيم (بريدة)',
-    location: 'بريدة - الموقع الصناعي الشمالية',
-    capacityLabel: '150 kWp',
-    createdAt: '24 أكتوبر 2025',
-    status: 'available',
-    offersCount: 0,
-    scopeDescription: 'إشراف ميداني على تركيب وتوصيل المحطة الكهروضوئية والتأكد من سلامة التوصيلات الكهربائية والإنشائية',
-    additionalLocation: 'القصيم - بريدة - الموقع الصناعي الشمالية',
-    attachmentName: undefined,
-    attachmentSize: undefined,
-  },
-  {
-    id: 'SR-2025-1035',
-    serviceType: 'تصميم منظومة ضخ مياه زراعية Off-Grid',
-    serviceIcon: 'droplet',
-    governorate: 'المنطقة الشرقية (الإحساء)',
-    location: 'الإحساء - مزرعة هجولة - تار إيزاوي',
-    capacityLabel: '50 مضخة HP',
-    createdAt: '22 أكتوبر 2025',
-    status: 'awaiting_offers',
-    offersCount: 1,
-    scopeDescription: 'تصميم منظومة طاقة شمسية Off-Grid لتشغيل مضخة مياه بقدرة 50 HP مع احتساب بطاريات التخزين وضمان الاستمرارية',
-    additionalLocation: 'الإحساء - مزرعة هجولة - طريق إيزاوي',
-    attachmentName: 'Farm_Location_Map.pdf',
-    attachmentSize: '2.1 ميجابايت',
-  },
-  {
-    id: 'SR-2025-1029',
-    serviceType: 'فحص واختيار توافق مع كود البناء SBC',
-    serviceIcon: 'compliance',
-    governorate: 'مكة المكرمة (جدة)',
-    location: 'جدة - مجمع مشروعات تجارية',
-    capacityLabel: '500 kWp',
-    createdAt: '20 أكتوبر 2025',
-    status: 'urgent',
-    offersCount: 0,
-    scopeDescription: 'مراجعة المخططات الكهربائية وضمان توافقها مع اشتراطات الكود السعودي للبناء (SBC) ومتطلبات شركة الكهرباء',
-    additionalLocation: 'جدة - مجمع مشروعات تجارية - حي النزهة',
-    attachmentName: 'SBC_Review_Request.pdf',
-    attachmentSize: '1.5 ميجابايت',
-  },
-  {
-    id: 'SR-2025-1024',
-    serviceType: 'استشارة هندسية لنظام تخزين هجين BESS',
-    serviceIcon: 'bess',
-    governorate: 'المدينة المنورة (ينبع)',
-    location: 'ينبع - مجمع صناعي',
-    capacityLabel: '15 MWh',
-    createdAt: '18 أكتوبر 2025',
-    status: 'available',
-    offersCount: 0,
-    scopeDescription: 'استشارة هندسية متخصصة في تصميم وتكامل أنظمة تخزين الطاقة الهجينة (BESS) لمجمع صناعي بتقنية بطاريات ليثيوم',
-    additionalLocation: 'ينبع - المجمع الصناعي - قسيمة D-14',
-    attachmentName: 'BESS_Technical_Brief.pdf',
-    attachmentSize: '3.2 ميجابايت',
-  },
-  {
-    id: 'SR-2025-1018',
-    serviceType: 'إشراف وتدقيق أداء محطة قائمة',
-    serviceIcon: 'monitor',
-    governorate: 'عسير (أبها)',
-    location: 'أبها - محطة سولاري لايف',
-    capacityLabel: '80 kWp',
-    createdAt: '15 أكتوبر 2025',
-    status: 'awaiting_offers',
-    offersCount: 4,
-    scopeDescription: 'تدقيق شامل لأداء محطة كهروضوئية قائمة بسعة 80 kWp وتحليل مؤشرات الأداء وإصدار تقرير مفصّل مع التوصيات',
-    additionalLocation: 'أبها - محطة سولاري لايف - طريق الملك فهد',
-    attachmentName: 'Plant_Performance_Data.xlsx',
-    attachmentSize: '980 كيلوبايت',
-  },
-]
-
 const statusLabels: Record<ServiceRequestStatus, string> = {
   awaiting_offers: 'بانتظار العروض',
   available:       'متاح للتقديم',
@@ -138,12 +42,89 @@ const statusClasses: Record<ServiceRequestStatus, string> = {
   urgent:          'bg-red-100 text-red-700 border-red-200',
 }
 
+function mapServiceIcon(typeName: string): EngineerServiceRequest['serviceIcon'] {
+  if (typeName.includes('ضخ') || typeName.includes('مياه')) return 'droplet'
+  if (typeName.includes('فحص') || typeName.includes('كود') || typeName.includes('SBC')) return 'compliance'
+  if (typeName.includes('تخزين') || typeName.includes('بطاريات') || typeName.includes('BESS')) return 'bess'
+  if (typeName.includes('إشراف') || typeName.includes('ميداني')) return 'inspect'
+  if (typeName.includes('تدقيق') || typeName.includes('أداء')) return 'monitor'
+  return 'grid'
+}
+
+function formatDate(dateString: string): string {
+  try {
+    const d = new Date(dateString)
+    return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })
+  } catch {
+    return dateString || 'مؤخراً'
+  }
+}
+
 export function useEngineerServiceRequests() {
+  const { $api } = useNuxtApp()
+  const authStore = useAuthStore()
+
+  const requests = ref<EngineerServiceRequest[]>([])
+  const isLoading = ref(false)
+  const error = ref<string | null>(null)
   const search = ref('')
   const statusFilter = ref<ServiceRequestStatus | 'all'>('all')
 
+  async function fetchRequests() {
+    if (!authStore.token) return
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const res = await $api<{ status: string; data: any[] }>('/service-requests/open')
+      const items = Array.isArray(res?.data) ? res.data : []
+
+      requests.value = items.map((item: any) => {
+        const typeName = item.service_type?.name || 'دراسة وتصميم محطة شمسية'
+        const rawId = Number(item.id)
+        return {
+          id: `SR-2025-${rawId}`,
+          rawId,
+          serviceType: typeName,
+          serviceIcon: mapServiceIcon(typeName),
+          governorate: item.governorate?.name || 'المملكة',
+          location: item.location_details || item.governorate?.name || 'الموقع محدد في الطلب',
+          capacityLabel: item.system_capacity_estimate ? `${item.system_capacity_estimate} kWp` : 'تقديرية',
+          createdAt: formatDate(item.created_at),
+          status: item.status === 'open_for_bids' ? 'available' : 'awaiting_offers',
+          offersCount: item.offers_count || 0,
+          scopeDescription: item.description || 'تفاصيل نطاق العمل موضحة ومرفقة مع طلب الخدمة.',
+          additionalLocation: item.location_details || item.governorate?.name || 'الموقع محدد',
+          locationTag: item.location_coordinates ? 'إحداثيات محددة' : undefined,
+          attachmentName: item.attachment_file ? item.attachment_file.split('/').pop() : undefined,
+          attachmentSize: item.attachment_file ? 'مستند فني معتمد' : undefined,
+        }
+      })
+    } catch (err: any) {
+      error.value = err?.data?.message || 'تعذر تحميل طلبات الخدمات المفتوحة'
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function submitOffer(rawRequestId: number, form: SubmitOfferForm) {
+    const formData = new FormData()
+    formData.append('proposed_cost', form.totalCost.trim())
+    formData.append('execution_time_days', form.durationDays.trim())
+    formData.append('technical_proposal', form.methodology.trim())
+
+    if (form.attachmentFile) {
+      formData.append('proposal', form.attachmentFile)
+    }
+
+    return await $api<{ status: string; message?: string; data: any }>(`/service-requests/${rawRequestId}/offers`, {
+      method: 'POST',
+      body: formData,
+    })
+  }
+
   const filtered = computed(() => {
-    let list = mockRequests
+    let list = requests.value
     if (statusFilter.value !== 'all') {
       list = list.filter(r => r.status === statusFilter.value)
     }
@@ -151,7 +132,8 @@ export function useEngineerServiceRequests() {
       const q = search.value.toLowerCase()
       list = list.filter(r =>
         r.id.toLowerCase().includes(q) ||
-        r.serviceType.toLowerCase().includes(q)
+        r.serviceType.toLowerCase().includes(q) ||
+        r.governorate.toLowerCase().includes(q)
       )
     }
     return list
@@ -160,14 +142,19 @@ export function useEngineerServiceRequests() {
   // --- Pagination ---
   const pageSize = 6
   const currentPage = ref(1)
-  const totalPages = computed(() => Math.ceil(filtered.value.length / pageSize))
+  const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
   const paginated = computed(() =>
     filtered.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
   )
   function setPage(p: number) { currentPage.value = p }
   watch([search, statusFilter], () => { currentPage.value = 1 })
 
+  onMounted(() => {
+    fetchRequests()
+  })
+
   return {
+    requests,
     search,
     statusFilter,
     filtered,
@@ -179,5 +166,9 @@ export function useEngineerServiceRequests() {
     statusLabels,
     statusClasses,
     total: computed(() => filtered.value.length),
+    isLoading,
+    error,
+    fetchRequests,
+    submitOffer,
   }
 }

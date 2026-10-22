@@ -22,6 +22,8 @@ const {
   setPage,
   statusLabels,
   statusClasses,
+  fetchRequests,
+  isLoading,
 } = useEngineerServiceRequests()
 
 // حالة المودال
@@ -40,8 +42,9 @@ function openOffer(req: EngineerServiceRequest) {
 function onDetailGoToSubmit(req: EngineerServiceRequest) {
   openOffer(req)
 }
-function onOfferSubmitted() {
+async function onOfferSubmitted() {
   selectedRequest.value = null
+  await fetchRequests()
 }
 
 // حساب مؤشرات عرض الصفحة

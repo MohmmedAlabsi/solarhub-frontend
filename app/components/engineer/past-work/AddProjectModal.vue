@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { CheckCircle2, FileUp, ImagePlus, PlusCircle, X } from 'lucide-vue-next'
-import {
-  governoratesList,
-  serviceTypesList,
-  type NewProjectPayload,
+import type {
+  GovernorateOption,
+  NewProjectPayload,
+  SelectOption,
 } from '~~/app/composables/useEngineerProjects'
 
-const props = defineProps<{
-  modelValue: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean
+    serviceTypesList?: SelectOption[]
+    governoratesList?: GovernorateOption[]
+  }>(),
+  {
+    serviceTypesList: () => [],
+    governoratesList: () => [],
+  }
+)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', val: boolean): void

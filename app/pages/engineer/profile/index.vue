@@ -10,11 +10,14 @@ import {
   Eye,
   FileCheck,
   FileText,
+  Loader2,
   Plus,
   ShieldCheck,
+  Trash2,
   Zap,
 } from 'lucide-vue-next'
 import AppToast from '~/components/common/AppToast.vue'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'engineer' })
 useSeoMeta({
@@ -22,17 +25,43 @@ useSeoMeta({
   description: 'إدارة بيانات الاعتماد المهني، التخصصات الهندسية، والشهادات المعتمدة للمهندس.',
 })
 
-// الحالة التفاعلية للملف المهني
+const { $api } = useNuxtApp()
+const config = useRuntimeConfig()
+const authStore = useAuthStore()
+
+function resolveUrl(path: string | null | undefined): string {
+  if (!path) return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
+  if (path.startsWith('http')) return path
+  const base = config.public.apiBase ? config.public.apiBase.replace(/\/api$/, '') : 'http://127.0.0.1:8000'
+  return `${base}/storage/${path.replace(/^\//, '')}`
+}
+
 const toastMessage = ref('')
+const isLoading = ref(false)
+const isSaving = ref(false)
+const isUploadingCert = ref(false)
+
+const profileFileInput = ref<HTMLInputElement | null>(null)
+const certFileInput = ref<HTMLInputElement | null>(null)
+
+interface CertDisplay {
+  id: number
+  title: string
+  meta: string
+  type: string
+  url: string
+}
 
 const profileData = reactive({
-  name: 'م. أحمد الشمري',
+  name: authStore.user?.name || 'م. أحمد الشمري',
   title: 'مهندس استشاري طاقة كهروضوئية',
   licenseNumber: 'SCE-748921',
-  experienceYears: '8 سنوات في الطاقة الكهروضوئية',
-  bio: 'مهندس استشاري معتمد لدى الهيئة السعودية للمهندسين متخصص في تصميم وتدقيق محطات الطاقة الشمسية الكهروضوئية (PV) للقطاعات السكنية والتجارية والصناعية. خبرة في إعداد دراسات الجدوى الفنية باستخدام PVsyst و HelioScope ومطابقة التصاميم مع كود البناء السعودي (SBC) ومتطلبات هيئة تنظيم المياه والكهرباء.',
+  experienceYears: '8',
+  bio: 'مهندس استشاري معتمد لدى الهيئة السعودية للمهندسين متخصص في تصميم وتدقيق محطات الطاقة الشمسية الكهروضوئية (PV) للقطاعات السكنية والتجارية والصناعية.',
   image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
 })
+
+const initialProfile = ref<Record<string, any>>({})
 
 const specialties = ref([
   {
@@ -65,24 +94,20 @@ const specialties = ref([
   },
 ])
 
-const certificates = ref([
+const certificates = ref<CertDisplay[]>([
   {
     id: 1,
     title: 'رخصة مهنية معتمدة - الهيئة السعودية للمهندسين (SCE)',
     meta: 'ملف PDF · تاريخ التوثيق: 15 يناير 2024 - صالحة حتى 2026',
     type: 'pdf',
+    url: '#',
   },
   {
     id: 2,
     title: 'شهادة مهندس معتمد في تصميم محطات الطاقة الشمسية الكهروضوئية (PVsyst Professional Certified)',
     meta: 'ملف PDF · تاريخ الاعتماد: 08 مارس 2023 - اعتماد دولي',
     type: 'pdf',
-  },
-  {
-    id: 3,
-    title: 'شهادة مطابقة كود البناء السعودي (401 SBC - الأنظمة الكهروضوئية)',
-    meta: 'صورة PNG عالية الدقة · اعتماد وطني مطابق للاشتراطات الفنية',
-    type: 'image',
+    url: '#',
   },
 ])
 
@@ -98,13 +123,184 @@ function showToast(msg: string) {
   }, 3500)
 }
 
-function handleSave() {
-  showToast('تم حفظ تعديلات الملف المهني بنجاح!')
+async function loadProfile() {
+  try {
+    isLoading.value = true
+    const res = await $api<any>('/engineer/profile')
+    const data = res?.data || res
+    if (data) {
+      if (data.user?.name) profileData.name = data.user.name
+      if (data.license_number) profileData.licenseNumber = data.license_number
+      if (data.years_of_experience !== undefined && data.years_of_experience !== null) {
+        profileData.experienceYears = String(data.years_of_experience)
+      }
+      if (data.bio) profileData.bio = data.bio
+      if (data.profile_photo_path) profileData.image = resolveUrl(data.profile_photo_path)
+
+      initialProfile.value = { ...profileData }
+    }
+  } catch (err: any) {
+    // Keep fallback defaults if not loaded
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function loadCertificates() {
+  try {
+    const res = await $api<any>('/engineer/certificates')
+    const items = res?.data || res
+    if (Array.isArray(items) && items.length > 0) {
+      certificates.value = items.map((c: any, index: number) => {
+        const path = c.file_path || ''
+        const fileName = path.split('/').pop() || `شهادة اعتماد مهني ${index + 1}`
+        const isPdf = path.toLowerCase().endsWith('.pdf')
+        const createdDate = c.created_at ? new Date(c.created_at).toLocaleDateString('ar-SA') : 'معتمدة'
+        return {
+          id: c.id,
+          title: fileName,
+          meta: `${isPdf ? 'ملف PDF' : 'صورة'} · تاريخ الرفع: ${createdDate}`,
+          type: isPdf ? 'pdf' : 'image',
+          url: resolveUrl(c.file_path),
+        }
+      })
+    }
+  } catch (err: any) {
+    // Keep initial certificates on error
+  }
+}
+
+function triggerPhotoSelect() {
+  profileFileInput.value?.click()
+}
+
+async function onPhotoSelected(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('حجم الصورة يجب ألا يتجاوز 5 ميجابايت')
+    return
+  }
+
+  try {
+    const formData = new FormData()
+    formData.append('_method', 'PUT')
+    formData.append('profile_photo', file)
+    
+    const res = await $api<any>('/engineer/profile', {
+      method: 'POST',
+      body: formData,
+    })
+    const data = res?.data || res
+    if (data?.profile_photo_path) {
+      profileData.image = resolveUrl(data.profile_photo_path)
+    }
+    showToast('تم تحديث الصورة المهنية بنجاح!')
+  } catch (err: any) {
+    showToast(err?.data?.message || 'تعذر تحديث الصورة المهنية')
+  }
+}
+
+function triggerCertUpload() {
+  certFileInput.value?.click()
+}
+
+async function onCertSelected(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('حجم الشهادة يجب ألا يتجاوز 5 ميجابايت')
+    return
+  }
+
+  try {
+    isUploadingCert.value = true
+    const formData = new FormData()
+    formData.append('certificate', file)
+
+    await $api<any>('/engineer/certificates', {
+      method: 'POST',
+      body: formData,
+    })
+
+    showToast('تم رفع الشهادة بنجاح!')
+    await loadCertificates()
+  } catch (err: any) {
+    showToast(err?.data?.message || 'تعذر رفع الشهادة')
+  } finally {
+    isUploadingCert.value = false
+    if (target) target.value = ''
+  }
+}
+
+async function deleteCertificate(id: number) {
+  if (!confirm('هل أنت متأكد من حذف هذه الشهادة؟')) return
+
+  try {
+    await $api(`/engineer/certificates/${id}`, {
+      method: 'DELETE',
+    })
+    certificates.value = certificates.value.filter(c => c.id !== id)
+    showToast('تم حذف الشهادة بنجاح')
+  } catch (err: any) {
+    showToast(err?.data?.message || 'تعذر حذف الشهادة')
+  }
+}
+
+function viewCertificate(url: string) {
+  if (url && url !== '#') {
+    window.open(url, '_blank')
+  } else {
+    showToast('معاينة الشهادة')
+  }
+}
+
+async function handleSave() {
+  try {
+    isSaving.value = true
+    const expNum = parseInt(profileData.experienceYears, 10)
+    const payload: Record<string, any> = {
+      license_number: profileData.licenseNumber || null,
+      years_of_experience: isNaN(expNum) ? null : expNum,
+      bio: profileData.bio || null,
+    }
+
+    const res = await $api<any>('/engineer/profile', {
+      method: 'PUT',
+      body: payload,
+    })
+
+    const data = res?.data || res
+    if (data) {
+      if (data.license_number) profileData.licenseNumber = data.license_number
+      if (data.years_of_experience !== undefined) profileData.experienceYears = String(data.years_of_experience)
+      if (data.bio) profileData.bio = data.bio
+    }
+
+    showToast('تم حفظ تعديلات الملف المهني بنجاح!')
+  } catch (err: any) {
+    const msg = err?.data?.message || 'تعذر حفظ تعديلات الملف المهني'
+    showToast(msg)
+  } finally {
+    isSaving.value = false
+  }
 }
 
 function handleCancel() {
-  showToast('تم إلغاء التعديلات')
+  if (Object.keys(initialProfile.value).length > 0) {
+    Object.assign(profileData, initialProfile.value)
+  }
+  showToast('تم إلغاء التعديلات واسترجاع البيانات السابقة')
 }
+
+onMounted(() => {
+  loadProfile()
+  loadCertificates()
+})
 </script>
 
 <template>
@@ -144,10 +340,17 @@ function handleCancel() {
               {{ profileData.title }}
             </p>
 
+            <input
+              ref="profileFileInput"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              class="hidden"
+              @change="onPhotoSelected"
+            />
             <button
               type="button"
               class="mt-4 flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3.5 py-1.5 text-xs font-bold text-solar-text-heading shadow-xs hover:border-solar-yellow transition-all"
-              @click="showToast('تحديث الصورة المهنية غير متاح حالياً')"
+              @click="triggerPhotoSelect"
             >
               <Camera class="size-3.5" />
               <span>تحديث الصورة المهنية</span>
@@ -254,13 +457,22 @@ function handleCancel() {
           <ShieldCheck class="size-4 text-solar-navy-dark" />
           <h2>الشهادات والاعتمادات</h2>
         </div>
+        <input
+          ref="certFileInput"
+          type="file"
+          accept=".pdf,image/png,image/jpeg"
+          class="hidden"
+          @change="onCertSelected"
+        />
         <button
           type="button"
-          class="flex items-center gap-1.5 text-xs font-bold text-solar-navy hover:text-solar-yellow-active transition-colors"
-          @click="showToast('إضافة شهادة جديدة غير متاحة حالياً')"
+          :disabled="isUploadingCert"
+          class="flex items-center gap-1.5 text-xs font-bold text-solar-navy hover:text-solar-yellow-active transition-colors disabled:opacity-50"
+          @click="triggerCertUpload"
         >
-          <Plus class="size-3.5" />
-          <span>إضافة شهادة جديدة</span>
+          <Loader2 v-if="isUploadingCert" class="size-3.5 animate-spin" />
+          <Plus v-else class="size-3.5" />
+          <span>{{ isUploadingCert ? 'جاري الرفع...' : 'إضافة شهادة جديدة' }}</span>
         </button>
       </div>
 
@@ -288,18 +500,27 @@ function handleCancel() {
             <button
               type="button"
               class="flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-semibold text-solar-text-body hover:border-solar-navy transition-colors"
-              @click="showToast('معاينة الشهادة')"
+              @click="viewCertificate(cert.url)"
             >
               <Eye class="size-3.5" />
               <span>معاينة</span>
             </button>
-            <button
-              type="button"
+            <a
+              :href="cert.url"
+              target="_blank"
+              download
               class="flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-semibold text-solar-text-body hover:border-solar-navy transition-colors"
-              @click="showToast('تحميل الشهادة')"
             >
               <Download class="size-3.5" />
               <span>تحميل</span>
+            </a>
+            <button
+              type="button"
+              class="flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+              title="حذف الشهادة"
+              @click="deleteCertificate(cert.id)"
+            >
+              <Trash2 class="size-3.5" />
             </button>
           </div>
         </div>
@@ -310,10 +531,12 @@ function handleCancel() {
     <div class="flex items-center justify-start gap-3 pt-4 border-t border-solar-border-card">
       <button
         type="button"
-        class="btn-primary px-8 text-xs sm:text-sm font-bold"
+        :disabled="isSaving"
+        class="btn-primary px-8 text-xs sm:text-sm font-bold flex items-center gap-2"
         @click="handleSave"
       >
-        حفظ التعديلات
+        <Loader2 v-if="isSaving" class="size-4 animate-spin" />
+        <span>{{ isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات' }}</span>
       </button>
       <button
         type="button"

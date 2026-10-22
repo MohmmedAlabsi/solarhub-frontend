@@ -1,114 +1,23 @@
-// بيانات تجريبية لعروض المهندس المقدمة
-// TODO: استبدل بـ useFetch('/api/engineer/offers')
+import { useAuthStore } from '~~/app/stores/auth'
 
 export type OfferStatus = 'pending_review' | 'approved' | 'rejected'
 
 export interface EngineerOffer {
   id: string               // OF-2025-089
+  rawId: number            // 89 (المعرف الرقمي في Backend)
   requestId: string        // SR-2025-1042
+  rawRequestId: number     // 1042
   requestTitle: string     // دراسة جدوى وتصميم محطة On-Grid
   totalCost: number        // 4500
   durationDays: number     // 7
   submittedAt: string      // تاريخ تقديم العرض
   status: OfferStatus
-  // تفاصيل العرض (تُعرض في المودال)
   methodology: string      // العرض الفني ومنهجية العمل
   methodologyPoints?: string[] // قائمة النقاط
   attachmentName?: string
   attachmentSize?: string
+  attachmentUrl?: string
 }
-
-const mockOffers: EngineerOffer[] = [
-  {
-    id: 'OF-2025-089',
-    requestId: 'SR-2025-1042',
-    requestTitle: 'دراسة جدوى وتصميم محطة On-Grid\nSR-2025-1042',
-    totalCost: 4500,
-    durationDays: 7,
-    submittedAt: '25 أكتوبر 2025',
-    status: 'pending_review',
-    methodology: 'يتضمن العرض الفني منهجية متكاملة تشتمل على الخطوات التالية:',
-    methodologyPoints: [
-      'مراجعة دقيقة للأحمال الكهربائية للأجمال وبيانات الاستهلاك وتحديد السعة التوليدية المثلى (KWp 25)',
-      'تحليل طبوغرافي ومحاكاة شمسية ثلاثية الأبعاد باستخدام برنامج PVsyst لاحتساب معدلات الظلال ونوع الإيرادية الاقتصادية بدقة',
-      'إعداد المخططات الكهربائية الأحادية التوضيحية (Single Line Diagram - SLD) ومخططات توزيع الكيلوات والحماية',
-      'إصدار تقرير هندسي نهائي معتمد ومطابق لاشتراطات الشركة السعودية للكهرباء (SEC) وكود البناء السعودي (SBC).',
-    ],
-    attachmentName: 'Technical_Offer_PV_OnGrid_2025.pdf',
-    attachmentSize: '3.4 ميجابايت · وثيقة هندسية موثقة ومعتمدة',
-  },
-  {
-    id: 'OF-2025-084',
-    requestId: 'SR-2025-1038',
-    requestTitle: 'إشراف وفحص هندسي ميداني\nSR-2025-1038',
-    totalCost: 12000,
-    durationDays: 14,
-    submittedAt: '22 أكتوبر 2025',
-    status: 'approved',
-    methodology: 'إشراف ميداني شامل على مراحل التركيب والتوصيل والاختبار والتشغيل بموجب تقارير يومية.',
-    methodologyPoints: [
-      'زيارات ميدانية دورية للموقع طوال مرحلة التنفيذ',
-      'مراجعة وتوثيق التوصيلات الكهربائية والإنشائية',
-      'اختبارات الجودة والأداء عند الاستلام الابتدائي والنهائي',
-      'إعداد تقرير الاستلام الهندسي الشامل',
-    ],
-    attachmentName: 'Supervision_Plan_SR1038.pdf',
-    attachmentSize: '1.8 ميجابايت',
-  },
-  {
-    id: 'OF-2025-078',
-    requestId: 'SR-2025-1035',
-    requestTitle: 'تصميم منظومة ضخ مياه زراعية\nSR-2025-1035',
-    totalCost: 3200,
-    durationDays: 5,
-    submittedAt: '18 أكتوبر 2025',
-    status: 'pending_review',
-    methodology: 'تصميم منظومة Off-Grid متكاملة لضخ المياه الزراعية مع احتساب بطاريات التخزين.',
-    methodologyPoints: [
-      'تحليل احتياجات المضخة والأحمال المصاحبة',
-      'احتساب طاقة الألواح وسعة بطاريات التخزين اللازمة',
-      'تصميم لوحة التحكم وأنظمة الحماية',
-    ],
-    attachmentName: 'Farm_PV_Pump_Design.pdf',
-    attachmentSize: '2.2 ميجابايت',
-  },
-  {
-    id: 'OF-2025-065',
-    requestId: 'SR-2025-1029',
-    requestTitle: 'فحص واختيار توافق مع كود البناء SBC\nSR-2025-1029',
-    totalCost: 8500,
-    durationDays: 10,
-    submittedAt: '14 أكتوبر 2025',
-    status: 'approved',
-    methodology: 'مراجعة شاملة للمخططات وإصدار تقرير التوافق مع كود البناء السعودي.',
-    attachmentName: 'SBC_Compliance_Report.pdf',
-    attachmentSize: '4.1 ميجابايت',
-  },
-  {
-    id: 'OF-2025-052',
-    requestId: 'SR-2025-1024',
-    requestTitle: 'استشارة هندسية لنظام تخزين هجين BESS\nSR-2025-1024',
-    totalCost: 2800,
-    durationDays: 4,
-    submittedAt: '09 أكتوبر 2025',
-    status: 'rejected',
-    methodology: 'استشارة متخصصة في تصميم وتكامل أنظمة BESS للمجمعات الصناعية.',
-    attachmentName: undefined,
-    attachmentSize: undefined,
-  },
-  {
-    id: 'OF-2025-041',
-    requestId: 'SR-2025-1018',
-    requestTitle: 'إشراف وتدقيق أداء محطة قائمة\nSR-2025-1018',
-    totalCost: 5000,
-    durationDays: 6,
-    submittedAt: '03 أكتوبر 2025',
-    status: 'approved',
-    methodology: 'تدقيق شامل للأداء وإصدار تقرير تشخيصي مع التوصيات.',
-    attachmentName: 'Performance_Audit_SR1018.pdf',
-    attachmentSize: '2.9 ميجابايت',
-  },
-]
 
 const statusLabels: Record<OfferStatus, string> = {
   pending_review: 'قيد المراجعة',
@@ -122,12 +31,77 @@ const statusClasses: Record<OfferStatus, string> = {
   rejected:       'bg-red-100 text-red-700 border-red-200',
 }
 
+function mapStatus(status: string): OfferStatus {
+  if (status === 'accepted') return 'approved'
+  if (status === 'rejected') return 'rejected'
+  return 'pending_review'
+}
+
+function formatDate(dateString: string): string {
+  try {
+    const d = new Date(dateString)
+    return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })
+  } catch {
+    return dateString || 'مؤخراً'
+  }
+}
+
 export function useEngineerOffers() {
+  const { $api } = useNuxtApp()
+  const authStore = useAuthStore()
+
+  const offers = ref<EngineerOffer[]>([])
+  const isLoading = ref(false)
+  const error = ref<string | null>(null)
   const search = ref('')
   const statusFilter = ref<OfferStatus | 'all'>('all')
 
+  async function fetchOffers() {
+    if (!authStore.token) return
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const res = await $api<{ status: string; data: any[] }>('/my/offers')
+      const items = Array.isArray(res?.data) ? res.data : []
+
+      offers.value = items.map((item: any) => {
+        const rawId = Number(item.id)
+        const rawReqId = Number(item.service_request_id || 0)
+        const proposal = item.technical_proposal || ''
+        const lines = proposal.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+
+        return {
+          id: `OF-2025-${rawId}`,
+          rawId,
+          requestId: `SR-2025-${rawReqId}`,
+          rawRequestId: rawReqId,
+          requestTitle: `طلب خدمة #${rawReqId}\nSR-2025-${rawReqId}`,
+          totalCost: Number(item.proposed_cost || 0),
+          durationDays: Number(item.execution_time_days || 1),
+          submittedAt: formatDate(item.created_at),
+          status: mapStatus(item.status),
+          methodology: lines[0] || proposal,
+          methodologyPoints: lines.length > 1 ? lines.slice(1) : undefined,
+          attachmentName: item.proposal_file ? item.proposal_file.split('/').pop() : undefined,
+          attachmentSize: item.proposal_file ? 'وثيقة هندسية معتمدة' : undefined,
+          attachmentUrl: item.proposal_file || undefined,
+        }
+      })
+    } catch (err: any) {
+      error.value = err?.data?.message || 'تعذر تحميل العروض الهندسية'
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function withdrawOffer(offerId: number) {
+    await $api(`/offers/${offerId}`, { method: 'DELETE' })
+    offers.value = offers.value.filter(o => o.rawId !== offerId)
+  }
+
   const filtered = computed(() => {
-    let list = mockOffers
+    let list = offers.value
     if (statusFilter.value !== 'all') {
       list = list.filter(o => o.status === statusFilter.value)
     }
@@ -151,7 +125,12 @@ export function useEngineerOffers() {
   function setPage(p: number) { currentPage.value = p }
   watch([search, statusFilter], () => { currentPage.value = 1 })
 
+  onMounted(() => {
+    fetchOffers()
+  })
+
   return {
+    offers,
     search,
     statusFilter,
     filtered,
@@ -163,5 +142,9 @@ export function useEngineerOffers() {
     statusLabels,
     statusClasses,
     total: computed(() => filtered.value.length),
+    isLoading,
+    error,
+    fetchOffers,
+    withdrawOffer,
   }
 }

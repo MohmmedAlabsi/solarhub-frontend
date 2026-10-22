@@ -1,5 +1,16 @@
-// بيانات تجريبية لتقييمات المهندس وآراء العملاء
-// TODO: استبدل بـ useFetch('/api/engineer/reviews')
+/**
+ * Engineer Reviews Composable
+ *
+ * BACKEND BLOCKER / NOTE:
+ * The Laravel API (`solarhub-api`) currently has `EngineerRatingController` and `engineer_ratings` table,
+ * but:
+ * 1. The controller is NOT registered in `routes/api/*.php`.
+ * 2. The controller does not have an `index` or `myRatings` action to list reviews for an engineer.
+ * 
+ * When the backend team exposes `GET /api/engineer/reviews` or `GET /api/engineers/{id}/ratings`,
+ * this composable can directly plug into that endpoint.
+ * In the meantime, safe fallback data is provided to preserve the UI without crashing.
+ */
 
 export interface ReviewItem {
   id: number

@@ -1,6 +1,4 @@
-// بيانات تجريبية لمشاريع المهندس السابقة
-// الحقول مطابقة لـ Laravel API backend الموضحة في التصميم
-// TODO: استبدل بـ useFetch('/api/engineer/projects')
+import { useAuthStore } from '~~/app/stores/auth'
 
 export interface EngineerProjectItem {
   id: number
@@ -28,85 +26,156 @@ export interface NewProjectPayload {
   file_attachment: File | null
 }
 
-const mockProjects: EngineerProjectItem[] = [
-  {
-    id: 1,
-    project_title: 'محطة كهروضوئية لسطح مصنع الشرق للأغذية',
-    service_type_id: '1',
-    service_type_label: 'تصميم محطات كهروضوئية',
-    system_capacity: '250 kWp',
-    governorate_id: 'riyadh',
-    governorate_name: 'الرياض',
-    address_text: 'الرياض - المدينة الصناعية الثانية - طريق الخرج، مجمع المصانع',
-    description: 'إعداد الدراسات الفنية وتصاميم ومخططات PVsyst التنفيذية المعتمدة لربط محطة كهروضوئية سطحية بقدرة 250 kWp بشبكة التوزيع وفق اشتراطات كود البناء السعودي 401 SBC والتنسيق مع شركة الكهرباء.',
-    image_path: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?auto=format&fit=crop&w=800&q=80',
-    file_path: 'مخطط_المشروع_التنفيذي_EastFactory.pdf',
-    file_size_pages: '2 MB · 14 صفحة PDF معتمدة',
-  },
-  {
-    id: 2,
-    project_title: 'منظومة ضخ مياه زراعية بمزرعة الواحة',
-    service_type_id: '2',
-    service_type_label: 'دراسات جدوى واستشارات',
-    system_capacity: '80 kWp',
-    governorate_id: 'qassim',
-    governorate_name: 'القصيم',
-    address_text: 'القصيم - مزرعة الواحة - القصيم',
-    description: 'دراسة وتصميم شبكة ضخ غاطسة بقدرة 40 حصان لتأمين ري محاصيل النخيل باستخدام منظومة طاقة شمسية كهروضوئية منعزلة عن الشبكة مع أنظمة حماية وتحكم ذكية.',
-    image_path: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32b?auto=format&fit=crop&w=800&q=80',
-    file_path: 'تقرير_الجدوى_والضخ.pdf',
-    file_size_pages: '3.1 MB · 8 صفحات PDF',
-  },
-  {
-    id: 3,
-    project_title: 'اعتماد مطابقة مركز الأعمال اللوجستي',
-    service_type_id: '3',
-    service_type_label: 'فحص واعتماد كود البناء السعودي',
-    system_capacity: '150 kWp',
-    governorate_id: 'makkah',
-    governorate_name: 'مكة المكرمة',
-    address_text: 'مكة المكرمة - حي الرصيفة - مكة المكرمة',
-    description: 'فحص ميكانيكي وكهربائي متكامل واعتماد التصاميم لمنظومة التوليد المتصلة مع اختبارات الأداء الميداني ومنحنيات I-V والفحص الحراري بالأشعة تحت الحمراء.',
-    image_path: 'https://images.unsplash.com/photo-1497440001374-f26997328c1b?auto=format&fit=crop&w=800&q=80',
-    file_path: 'شهادة_فحص_الاعتماد_SBC.pdf',
-    file_size_pages: '1.5 MB · وثيقة رسمية معتمدة',
-  },
-  {
-    id: 4,
-    project_title: 'نظام هجين وبطاريات تخزين لمجمع سكني خاص',
-    service_type_id: '4',
-    service_type_label: 'أنظمة هجينة وبطاريات',
-    system_capacity: '45 kWp',
-    governorate_id: 'eastern',
-    governorate_name: 'المنطقة الشرقية',
-    address_text: 'المنطقة الشرقية - حي الشاطئ - الدمام',
-    description: 'تنفيذ نظام طوارئ هجين وتخزين ليثيوم بسعة 120 kWh لتشغيل الأحمال الحيوية وضمان استمرارية التغذية في حال انقطاع الشبكة العمومية مع تكامل العواكس الهجينة.',
-    image_path: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80',
-    file_path: 'مخطط_توصيل_البطاريات.pdf',
-    file_size_pages: '2.4 MB · 6 صفحات PDF',
-  },
-]
+export interface SelectOption {
+  id: string
+  label: string
+}
 
-export const serviceTypesList = [
-  { id: '1', label: 'تصميم محطات كهروضوئية' },
-  { id: '2', label: 'دراسات جدوى واستشارات' },
-  { id: '3', label: 'فحص واعتماد كود البناء السعودي' },
-  { id: '4', label: 'أنظمة هجينة وبطاريات' },
-]
-
-export const governoratesList = [
-  { id: 'riyadh', name: 'الرياض (منطقة الرياض)' },
-  { id: 'makkah', name: 'مكة المكرمة (جدة / مكة)' },
-  { id: 'eastern', name: 'المنطقة الشرقية (الدمام / الخبر / الأحساء)' },
-  { id: 'qassim', name: 'القصيم (بريدة / عنيزة)' },
-  { id: 'asir', name: 'عسير (أبها / خميس مشيط)' },
-  { id: 'madinah', name: 'المدينة المنورة (ينبع / المدينة)' },
-]
+export interface GovernorateOption {
+  id: string
+  name: string
+}
 
 export function useEngineerProjects() {
-  const projects = ref<EngineerProjectItem[]>([...mockProjects])
+  const { $api } = useNuxtApp()
+  const authStore = useAuthStore()
+
+  const projects = ref<EngineerProjectItem[]>([])
+  const serviceTypesList = ref<SelectOption[]>([
+    { id: '1', label: 'تصميم محطات كهروضوئية' },
+    { id: '2', label: 'دراسات جدوى واستشارات' },
+    { id: '3', label: 'فحص واعتماد كود البناء السعودي' },
+    { id: '4', label: 'أنظمة هجينة وبطاريات' },
+  ])
+  const governoratesList = ref<GovernorateOption[]>([
+    { id: '1', name: 'الرياض (منطقة الرياض)' },
+    { id: '2', name: 'مكة المكرمة (جدة / مكة)' },
+    { id: '3', name: 'المنطقة الشرقية (الدمام / الخبر)' },
+    { id: '4', name: 'القصيم (بريدة / عنيزة)' },
+    { id: '5', name: 'عسير (أبها / خميس مشيط)' },
+    { id: '6', name: 'المدينة المنورة (ينبع / المدينة)' },
+  ])
+
   const search = ref('')
   const serviceTypeFilter = ref('all')
+  const isLoading = ref(false)
+  const error = ref<string | null>(null)
+
+  async function fetchMasterData() {
+    try {
+      const [typesRes, govsRes] = await Promise.allSettled([
+        $api<{ status: string; data: any[] }>('/service-types'),
+        $api<{ status: string; data: any[] }>('/governorates'),
+      ])
+
+      if (typesRes.status === 'fulfilled' && typesRes.value?.data) {
+        const items = Array.isArray(typesRes.value.data) ? typesRes.value.data : []
+        if (items.length > 0) {
+          serviceTypesList.value = items.map((t: any) => ({
+            id: String(t.id),
+            label: t.name || t.name_ar || t.label,
+          }))
+        }
+      }
+
+      if (govsRes.status === 'fulfilled' && govsRes.value?.data) {
+        const govs = Array.isArray(govsRes.value.data) ? govsRes.value.data : []
+        if (govs.length > 0) {
+          governoratesList.value = govs.map((g: any) => ({
+            id: String(g.id),
+            name: g.name_ar || g.name || g.label,
+          }))
+        }
+      }
+    } catch {
+      // Keep sensible default lists
+    }
+  }
+
+  async function fetchProjects() {
+    if (!authStore.token) return
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const res = await $api<{ status: string; data: any[] }>('/engineer/portfolio-items')
+      const items = Array.isArray(res?.data) ? res.data : []
+
+      projects.value = items.map((item: any) => {
+        const servName = item.service_type?.name || 'تصميم محطات كهروضوئية'
+        const govName = item.governorate?.name || item.governorate?.name_ar || 'المملكة'
+        const capacityNum = item.system_capacity ? `${item.system_capacity} kWp` : 'غير محددة'
+
+        return {
+          id: Number(item.id),
+          project_title: item.project_title || 'مشروع هندسي معتمد',
+          service_type_id: String(item.service_type?.id || '1'),
+          service_type_label: servName,
+          system_capacity: capacityNum,
+          governorate_id: String(item.governorate?.id || '1'),
+          governorate_name: govName,
+          address_text: item.address_text || govName,
+          description: item.description || 'إعداد المخططات الهندسية المعتمدة للمنظومة الكهروضوئية.',
+          image_path: item.image_path || 'https://images.unsplash.com/photo-1509391365360-2e959784a276?auto=format&fit=crop&w=800&q=80',
+          file_path: item.file_path ? item.file_path.split('/').pop() : 'مخطط_تنفيذي_معتمد.pdf',
+          file_size_pages: 'وثيقة ومخطط معتمد',
+        }
+      })
+    } catch (err: any) {
+      error.value = err?.data?.message || 'تعذر تحميل نماذج الأعمال السابقة'
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function addProject(payload: NewProjectPayload) {
+    const formData = new FormData()
+    formData.append('project_title', payload.project_title.trim())
+    formData.append('service_type_id', payload.service_type_id)
+
+    if (payload.governorate_id) {
+      formData.append('governorate_id', payload.governorate_id)
+    }
+
+    if (payload.system_capacity) {
+      // Remove any non-numeric characters for backend numeric validation
+      const numericCapacity = payload.system_capacity.replace(/[^\d.]/g, '')
+      if (numericCapacity) {
+        formData.append('system_capacity', numericCapacity)
+      }
+    }
+
+    if (payload.description) {
+      formData.append('description', payload.description.trim())
+    }
+
+    if (payload.address_text) {
+      formData.append('address_text', payload.address_text.trim())
+    }
+
+    if (payload.image_file) {
+      formData.append('image', payload.image_file)
+    }
+
+    if (payload.file_attachment) {
+      formData.append('file', payload.file_attachment)
+    }
+
+    const res = await $api<{ status: string; data: any }>('/engineer/portfolio-items', {
+      method: 'POST',
+      body: formData,
+    })
+
+    await fetchProjects()
+    return res
+  }
+
+  async function deleteProject(id: number) {
+    await $api(`/engineer/portfolio-items/${id}`, {
+      method: 'DELETE',
+    })
+    projects.value = projects.value.filter(p => p.id !== id)
+  }
 
   const filteredProjects = computed(() => {
     return projects.value.filter(project => {
@@ -122,30 +191,10 @@ export function useEngineerProjects() {
     })
   })
 
-  function addProject(payload: NewProjectPayload) {
-    const serviceTypeObj = serviceTypesList.find(s => s.id === payload.service_type_id)
-    const governorateObj = governoratesList.find(g => g.id === payload.governorate_id)
-
-    const newProject: EngineerProjectItem = {
-      id: Date.now(),
-      project_title: payload.project_title,
-      service_type_id: payload.service_type_id,
-      service_type_label: serviceTypeObj?.label || 'خدمة هندسية',
-      system_capacity: payload.system_capacity,
-      governorate_id: payload.governorate_id,
-      governorate_name: governorateObj?.name.split(' ')[0] || 'المملكة',
-      address_text: payload.address_text,
-      description: payload.description,
-      image_path: payload.image_file ? URL.createObjectURL(payload.image_file) : 'https://images.unsplash.com/photo-1509391365360-2e959784a276?auto=format&fit=crop&w=800&q=80',
-      file_path: payload.file_attachment ? payload.file_attachment.name : 'مخطط_تنفيذي.pdf',
-      file_size_pages: 'ملف معتمد مرفق',
-    }
-    projects.value.unshift(newProject)
-  }
-
-  function deleteProject(id: number) {
-    projects.value = projects.value.filter(p => p.id !== id)
-  }
+  onMounted(() => {
+    fetchMasterData()
+    fetchProjects()
+  })
 
   return {
     projects,
@@ -154,6 +203,9 @@ export function useEngineerProjects() {
     serviceTypeFilter,
     serviceTypesList,
     governoratesList,
+    isLoading,
+    error,
+    fetchProjects,
     addProject,
     deleteProject,
   }

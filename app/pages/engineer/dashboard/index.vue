@@ -9,10 +9,9 @@ useSeoMeta({
   description: 'متابعة طلبات الخدمات الهندسية المتاحة وحالة عروضك الفنية والمالية المقدمة.',
 })
 
-const { stats, workItems } = useEngineerDashboard()
+const { stats, workItems, isLoading } = useEngineerDashboard()
 const authStore = useAuthStore()
-// TODO: استبدل بـ useFetch('/api/engineer/me') عند ربط الـ API
-const engineerName = computed(() => authStore.user?.name ?? 'م. أحمد الشمري')
+const engineerName = computed(() => authStore.user?.name || 'م. أحمد الشمري')
 </script>
 
 <template>

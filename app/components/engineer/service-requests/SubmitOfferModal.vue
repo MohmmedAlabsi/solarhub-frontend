@@ -55,12 +55,26 @@ function validate() {
   return Object.keys(errors).length === 0
 }
 
+const { $api } = useNuxtApp()
+
 async function submit() {
-  if (submitting.value || !validate()) return
+  if (submitting.value || !validate() || !props.request) return
   submitting.value = true
   try {
-    // TODO: استبدل بـ useFetch('/api/engineer/offers', { method: 'POST', body: formData })
-    await new Promise<void>(resolve => setTimeout(resolve, 700))
+    const rawId = props.request.rawId || Number(props.request.id.replace(/\D/g, ''))
+    const formData = new FormData()
+    formData.append('proposed_cost', form.totalCost.trim())
+    formData.append('execution_time_days', form.durationDays.trim())
+    formData.append('technical_proposal', form.methodology.trim())
+    if (form.attachmentFile) {
+      formData.append('proposal', form.attachmentFile)
+    }
+
+    await $api(`/service-requests/${rawId}/offers`, {
+      method: 'POST',
+      body: formData,
+    })
+
     submitSuccess.value = true
     setTimeout(() => {
       close()
@@ -68,8 +82,14 @@ async function submit() {
       Object.assign(form, { totalCost: '', durationDays: '', methodology: '', attachmentFile: null })
       emit('submitted')
     }, 1200)
-  } catch {
-    errors.totalCost = 'حدث خطأ أثناء إرسال العرض. حاول مرة أخرى.'
+  } catch (err: any) {
+    const backendMsg = err?.data?.message || err?.data?.userMessage || 'حدث خطأ أثناء إرسال العرض. حاول مرة أخرى.'
+    const backendErrors = err?.data?.errors
+    if (backendErrors?.proposed_cost) errors.totalCost = backendErrors.proposed_cost[0]
+    if (backendErrors?.execution_time_days) errors.durationDays = backendErrors.execution_time_days[0]
+    if (backendErrors?.technical_proposal) errors.methodology = backendErrors.technical_proposal[0]
+    if (backendErrors?.proposal) errors.attachmentFile = backendErrors.proposal[0]
+    if (!Object.keys(errors).length) errors.totalCost = backendMsg
   } finally {
     submitting.value = false
   }

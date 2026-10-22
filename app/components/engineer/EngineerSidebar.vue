@@ -13,6 +13,13 @@ import {
   X,
 } from 'lucide-vue-next'
 import EngineerSidebarLink from './EngineerSidebarLink.vue'
+import { useAuthStore } from '~~/app/stores/auth'
+
+const authStore = useAuthStore()
+
+async function handleLogout() {
+  await authStore.logout()
+}
 
 const props = withDefaults(
   defineProps<{
@@ -125,7 +132,7 @@ function handleLinkClick() {
     <div class="shrink-0 p-3 border-t border-solar-navy-light/40">
       <button
         type="button"
-        @click="emit('unavailable', 'تسجيل الخروج')"
+        @click="handleLogout"
         aria-label="تسجيل الخروج"
         class="group relative flex items-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow text-red-200 hover:bg-red-500/20 hover:text-red-100"
         :class="[isCollapsed && !isMobile ? 'justify-center p-3 rounded-xl' : 'gap-3.5 px-3.5 py-2.5 rounded-lg text-sm font-medium']"

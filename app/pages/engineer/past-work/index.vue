@@ -22,6 +22,7 @@ const {
   search,
   serviceTypeFilter,
   serviceTypesList,
+  governoratesList,
   addProject,
   deleteProject,
 } = useEngineerProjects()
@@ -46,16 +47,24 @@ function handleEditProject(project: EngineerProjectItem) {
   showToast(`تعديل مشروع: ${project.project_title}`)
 }
 
-function handleDeleteProject(id: number) {
+async function handleDeleteProject(id: number) {
   if (confirm('هل أنت متأكد من حذف هذا المشروع من أعمالك السابقة؟')) {
-    deleteProject(id)
-    showToast('تم حذف المشروع بنجاح')
+    try {
+      await deleteProject(id)
+      showToast('تم حذف المشروع بنجاح')
+    } catch (err: any) {
+      showToast(err?.data?.message || 'تعذر حذف المشروع')
+    }
   }
 }
 
-function handleProjectCreated(payload: NewProjectPayload) {
-  addProject(payload)
-  showToast('تمت إضافة المشروع الجديد بنجاح!')
+async function handleProjectCreated(payload: NewProjectPayload) {
+  try {
+    await addProject(payload)
+    showToast('تمت إضافة المشروع الجديد بنجاح!')
+  } catch (err: any) {
+    showToast(err?.data?.message || 'تعذر إضافة المشروع، يرجى التحقق من البيانات')
+  }
 }
 
 function showToast(msg: string) {
@@ -160,6 +169,8 @@ function showToast(msg: string) {
     <!-- نافذة إضافة مشروع جديد (Modal) -->
     <AddProjectModal
       v-model="isAddModalOpen"
+      :service-types-list="serviceTypesList"
+      :governorates-list="governoratesList"
       @submit="handleProjectCreated"
     />
 

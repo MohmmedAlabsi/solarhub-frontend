@@ -36,15 +36,17 @@ export interface EngineerNotification {
   iconColor: string
 }
 
+const { $api } = useNuxtApp()
 const filterTab = ref<'all' | 'unread'>('all')
 const toastMessage = ref('')
+const isLoading = ref(false)
 
-const notifications = ref<EngineerNotification[]>([
+const fallbackNotifications: EngineerNotification[] = [
   {
     id: 1,
     title: 'قبول العرض الهندسي للطلب #SR-2025-1042',
     category: 'عروض مقبولة',
-    message: 'وافق العميل طارق منصور العمري على عرضك الهندسي لدراسة جدوى وتصميم محطة On-Grid بقدرة 25 kWp. يمكنك الآن بدء إعداد المخططات التنفيذية.',
+    message: 'وافق العميل طارق منصور العمري على عرضك الهندسي لدراسة جدوى وتصميم محطة On-Grid بقدرة 25 kWp.',
     time: 'اليوم، 11:30 ص',
     read: false,
     actionLabel: 'عرض تفاصيل المشروع والعرض',
@@ -70,7 +72,7 @@ const notifications = ref<EngineerNotification[]>([
     id: 3,
     title: 'تم التحقق ومزامنة الترخيص المهني بنجاح',
     category: 'الاعتماد والتراخيص',
-    message: 'تم تحديث ومزامنة بيانات الاعتماد المهني الصادر من الهيئة السعودية للمهندسين (SCE-748921) ومطابقتها.',
+    message: 'تم تحديث ومزامنة بيانات الاعتماد المهني الصادر من الهيئة السعودية للمهندسين ومطابقتها.',
     time: 'أمس، 04:20 م',
     read: true,
     actionLabel: 'معاينة الملف المهني',
@@ -79,37 +81,49 @@ const notifications = ref<EngineerNotification[]>([
     iconBg: 'bg-blue-50',
     iconColor: 'text-blue-600',
   },
-  {
-    id: 4,
-    title: 'تقييم جديد من العميل لمشروع مكتمل',
-    category: 'التقييمات',
-    message: '«أضاف العميل فهد الدوسري تعليقاً: مهندس متميز ودقيق جداً في إعداد دراسة الجدوى ومخططات PVsyst.»',
-    time: '22 مايو 2024',
-    read: true,
-    rating: 5,
-    actionLabel: 'عرض التقييم في ملفك المهني',
-    actionLink: '/engineer/reviews',
-    icon: Star,
-    iconBg: 'bg-purple-50',
-    iconColor: 'text-purple-600',
-  },
-  {
-    id: 5,
-    title: 'استفسار جديد بخصوص العرض المقدم #OF-2025-084',
-    category: 'عروضي',
-    message: 'أرسل العميل استفساراً تقنياً حول الجدول الزمني لفحص واختبار التوافق مع كود البناء السعودي SBC.',
-    time: '18 مايو 2024',
-    read: true,
-    actionLabel: 'عرض تفاصيل العرض والرد',
-    actionLink: '/engineer/offers',
-    icon: MessageSquare,
-    iconBg: 'bg-gray-100',
-    iconColor: 'text-gray-700',
-  },
-])
+]
+
+const notifications = ref<EngineerNotification[]>([...fallbackNotifications])
+
+function formatRelativeTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'الآن'
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('ar-SA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return dateStr
+  }
+}
+
+async function loadNotifications() {
+  try {
+    isLoading.value = true
+    const res = await $api<any>('/my/notifications')
+    const items = res?.data || res
+    if (Array.isArray(items) && items.length > 0) {
+      notifications.value = items.map((n: any) => ({
+        id: n.id,
+        title: n.title || 'إشعار من المنصة',
+        category: n.title?.includes('عرض') ? 'العروض' : n.title?.includes('طلب') ? 'طلبات جديدة' : 'تنبيه',
+        message: n.body || '',
+        time: formatRelativeTime(n.created_at),
+        read: !!n.is_read,
+        actionLabel: 'عرض التفاصيل',
+        actionLink: n.action_url || '/engineer/dashboard',
+        icon: n.title?.includes('عرض') ? CheckCircle2 : n.title?.includes('طلب') ? Zap : Bell,
+        iconBg: n.is_read ? 'bg-gray-100' : 'bg-amber-100',
+        iconColor: n.is_read ? 'text-gray-700' : 'text-amber-700',
+      }))
+    }
+  } catch (err: any) {
+    // Keep fallback list on network or unauthenticated error
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
-const totalCount = ref(6)
+const totalCount = computed(() => notifications.value.length)
 
 const filteredNotifications = computed(() => {
   if (filterTab.value === 'unread') {
@@ -118,9 +132,25 @@ const filteredNotifications = computed(() => {
   return notifications.value
 })
 
-function markAllAsRead() {
-  notifications.value.forEach(n => { n.read = true })
-  showToast('تم تحديد جميع الإشعارات كمقروءة')
+async function markAllAsRead() {
+  try {
+    await $api('/my/notifications/read-all', { method: 'PATCH' })
+    notifications.value.forEach(n => { n.read = true })
+    showToast('تم تحديد جميع الإشعارات كمقروءة')
+  } catch (err: any) {
+    notifications.value.forEach(n => { n.read = true })
+    showToast('تم تحديد جميع الإشعارات كمقروءة')
+  }
+}
+
+async function markSingleAsRead(item: EngineerNotification) {
+  if (item.read) return
+  item.read = true
+  try {
+    await $api(`/my/notifications/${item.id}/read`, { method: 'PATCH' })
+  } catch {
+    // Handled locally
+  }
 }
 
 function showToast(msg: string) {
@@ -129,6 +159,10 @@ function showToast(msg: string) {
     toastMessage.value = ''
   }, 3500)
 }
+
+onMounted(() => {
+  loadNotifications()
+})
 </script>
 
 <template>
@@ -231,6 +265,7 @@ function showToast(msg: string) {
               <NuxtLink
                 :to="item.actionLink"
                 class="inline-flex items-center gap-1.5 text-xs font-bold text-solar-navy hover:text-solar-yellow-active transition-colors mt-3"
+                @click="markSingleAsRead(item)"
               >
                 <span>{{ item.actionLabel }}</span>
                 <ArrowLeft class="size-3" />

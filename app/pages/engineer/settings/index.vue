@@ -8,13 +8,14 @@ import {
   EyeOff,
   FileText,
   Info,
+  Loader2,
   Lock,
   Phone,
   Shield,
   User,
 } from 'lucide-vue-next'
 import AppToast from '~/components/common/AppToast.vue'
-import { governoratesList } from '~~/app/composables/useEngineerProjects'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'engineer' })
 useSeoMeta({
@@ -22,17 +23,32 @@ useSeoMeta({
   description: 'إدارة بيانات الحساب الشخصية وإعدادات الأمان الخاصة بالمهندس المعتمد.',
 })
 
+const { $api } = useNuxtApp()
+const authStore = useAuthStore()
+
 const toastMessage = ref('')
+const isSaving = ref(false)
+
+const governoratesList = ref<{ id: number; name: string }[]>([
+  { id: 1, name: 'الرياض' },
+  { id: 2, name: 'مكة المكرمة' },
+  { id: 3, name: 'المدينة المنورة' },
+  { id: 4, name: 'الشرقية' },
+  { id: 5, name: 'عسير' },
+  { id: 6, name: 'القصيم' },
+])
 
 const form = reactive({
-  fullName: 'أحمد بن عبد الله الشمري',
-  phone: '+966 54 892 1045',
-  email: 'ahmed.shammari@solarhub.sa',
-  governorate: 'riyadh',
+  fullName: authStore.user?.name || 'أحمد بن عبد الله الشمري',
+  phone: authStore.user?.phone || '+966 54 892 1045',
+  email: authStore.user?.email || 'ahmed.shammari@solarhub.sa',
+  governorate: (authStore.user as any)?.governorate_id || 1,
   currentPassword: '',
   newPassword: '',
   confirmPassword: '',
 })
+
+const initialForm = ref({ ...form })
 
 const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
@@ -45,11 +61,101 @@ function showToast(msg: string) {
   }, 3500)
 }
 
-function handleSave() {
-  showToast('تم حفظ التعديلات بنجاح!')
+function syncUser() {
+  if (authStore.user) {
+    if (authStore.user.name) form.fullName = authStore.user.name
+    if (authStore.user.phone) form.phone = authStore.user.phone
+    if (authStore.user.email) form.email = authStore.user.email
+    if ((authStore.user as any).governorate_id) form.governorate = (authStore.user as any).governorate_id
+    initialForm.value = { ...form }
+  }
+}
+
+watch(() => authStore.user, () => syncUser(), { immediate: true })
+
+async function loadGovernorates() {
+  try {
+    const res = await $api<any>('/governorates')
+    const items = res?.data || res
+    if (Array.isArray(items) && items.length > 0) {
+      governoratesList.value = items.map((g: any) => ({
+        id: g.id,
+        name: g.name_ar || g.name,
+      }))
+    }
+  } catch {
+    // Keep fallback list
+  }
+}
+
+onMounted(async () => {
+  loadGovernorates()
+  if (!authStore.user) {
+    await authStore.fetchCurrentUser()
+  }
+  syncUser()
+})
+
+async function handleSave() {
+  if (!form.fullName.trim()) {
+    showToast('يرجى إدخال الاسم الكامل')
+    return
+  }
+
+  if (form.newPassword) {
+    if (form.newPassword.length < 8) {
+      showToast('يجب ألا تقل كلمة المرور الجديدة عن 8 أحرف')
+      return
+    }
+    if (form.newPassword !== form.confirmPassword) {
+      showToast('كلمة المرور الجديدة وتأكيدها غير متطابقين')
+      return
+    }
+    if (!form.currentPassword) {
+      showToast('يرجى إدخال كلمة المرور الحالية لتأكيد التغيير')
+      return
+    }
+  }
+
+  try {
+    isSaving.value = true
+    const payload: Record<string, any> = {
+      name: form.fullName,
+      phone: form.phone,
+      governorate_id: Number(form.governorate) || null,
+    }
+
+    if (form.newPassword) {
+      payload.current_password = form.currentPassword
+      payload.password = form.newPassword
+      payload.password_confirmation = form.confirmPassword
+    }
+
+    await $api('/my/profile', {
+      method: 'PUT',
+      body: payload,
+    })
+
+    form.currentPassword = ''
+    form.newPassword = ''
+    form.confirmPassword = ''
+
+    await authStore.fetchCurrentUser()
+    syncUser()
+    showToast('تم حفظ التعديلات بنجاح!')
+  } catch (err: any) {
+    const errorMsg = err?.data?.message || err?.message || 'حدث خطأ أثناء حفظ التعديلات'
+    showToast(errorMsg)
+  } finally {
+    isSaving.value = false
+  }
 }
 
 function handleCancel() {
+  Object.assign(form, initialForm.value)
+  form.currentPassword = ''
+  form.newPassword = ''
+  form.confirmPassword = ''
   showToast('تم إلغاء التعديلات')
 }
 </script>
@@ -314,10 +420,12 @@ function handleCancel() {
     <div class="flex items-center justify-start gap-3 pt-2">
       <button
         type="button"
-        class="btn-primary px-8 text-xs sm:text-sm font-bold"
+        :disabled="isSaving"
+        class="btn-primary px-8 text-xs sm:text-sm font-bold flex items-center gap-2"
         @click="handleSave"
       >
-        حفظ التعديلات
+        <Loader2 v-if="isSaving" class="size-4 animate-spin" />
+        <span>{{ isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات' }}</span>
       </button>
       <button
         type="button"
