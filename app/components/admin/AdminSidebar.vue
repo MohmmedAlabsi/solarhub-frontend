@@ -41,25 +41,25 @@ const { hasPermission } = useAdminPermissions()
 
 const navItems = [
   { label: 'الرئيسية', to: '/admin', icon: Home, matchPrefixes: ['/admin/dashboard'] },
-  { label: 'إدارة المستخدمين', to: '/admin/users', icon: Users, matchPrefixes: ['/admin/users'], permission: 'users.manage' },
-  { label: 'إدارة الموردين', to: '/admin/stores', icon: Store, matchPrefixes: ['/admin/stores'], permission: 'stores.view-pending' },
-  { label: 'إدارة المهندسين', to: '/admin/engineers', icon: UserCheck, matchPrefixes: ['/admin/engineers'], permission: 'engineers.view-pending' },
-  { label: 'إدارة المنتجات والكتالوج', to: '/admin/products', icon: Package, matchPrefixes: ['/admin/products'], permission: 'catalog.manage' },
-  { label: 'إدارة البيانات الأساسية', to: '/admin/master-data/categories', icon: Database, matchPrefixes: ['/admin/master-data'], permission: 'catalog.manage' },
-  { label: 'إدارة طلبات الخدمات', to: '/admin/services', icon: FileText, matchPrefixes: ['/admin/services'], permission: 'service-requests.view-open' },
-  { label: 'إدارة طلبات الشراء', to: '/admin/orders', icon: ShoppingBag, matchPrefixes: ['/admin/orders'], permission: 'orders.view' },
-  { label: 'الإدارة المالية', to: '/admin/finance/payments', icon: CreditCard, matchPrefixes: ['/admin/finance'], permission: 'order-payments.verify' },
-  { label: 'إدارة الصلاحيات', to: '/admin/roles', icon: ShieldCheck, matchPrefixes: ['/admin/roles', '/admin/permissions'], permission: 'users.manage' },
-  { label: 'إدارة التقييمات', to: '/admin/reviews', icon: Star, matchPrefixes: ['/admin/reviews'], permission: 'store-ratings.update' },
-  { label: 'الإشعارات', to: '/admin/notifications', icon: Bell, matchPrefixes: ['/admin/notifications'], permission: 'notification-templates.manage' },
-  { label: 'إعدادات النظام', to: '/admin/settings', icon: Settings, matchPrefixes: ['/admin/settings'], permission: 'settings.manage' },
+  { label: 'إدارة المستخدمين', to: '/admin/users', icon: Users, matchPrefixes: ['/admin/users'], permissions: ['users.manage'] },
+  { label: 'إدارة الموردين', to: '/admin/stores', icon: Store, matchPrefixes: ['/admin/stores'], permissions: ['stores.view-pending', 'stores.approve', 'stores.reject', 'stores.create', 'stores.update', 'stores.delete'] },
+  { label: 'إدارة المهندسين', to: '/admin/engineers', icon: UserCheck, matchPrefixes: ['/admin/engineers'], permissions: ['engineers.view-pending', 'engineers.approve', 'engineers.reject', 'engineer-profiles.approve', 'engineer-profiles.update', 'engineer-certificates.create', 'engineer-certificates.delete', 'portfolio-items.create', 'portfolio-items.update', 'portfolio-items.delete'] },
+  { label: 'إدارة المنتجات والكتالوج', to: '/admin/products', icon: Package, matchPrefixes: ['/admin/products'], permissions: ['catalog.manage', 'store-products.create', 'store-products.update', 'store-products.delete'] },
+  { label: 'إدارة البيانات الأساسية', to: '/admin/master-data/categories', icon: Database, matchPrefixes: ['/admin/master-data'], permissions: ['catalog.manage'] },
+  { label: 'إدارة طلبات الخدمات', to: '/admin/services', icon: FileText, matchPrefixes: ['/admin/services'], permissions: ['service-requests.view-open', 'service-requests.create', 'service-requests.update', 'service-requests.cancel', 'quote-requests.create', 'quote-requests.respond', 'quote-requests.accept', 'quote-requests.reject', 'offers.create', 'offers.update', 'offers.accept'] },
+  { label: 'إدارة طلبات الشراء', to: '/admin/orders', icon: ShoppingBag, matchPrefixes: ['/admin/orders'], permissions: ['orders.view', 'orders.manage-status', 'orders.cancel', 'orders.create'] },
+  { label: 'الإدارة المالية', to: '/admin/finance/payments', icon: CreditCard, matchPrefixes: ['/admin/finance'], permissions: ['order-payments.verify', 'store-payouts.manage', 'wallet-providers.manage'] },
+  { label: 'إدارة الصلاحيات', to: '/admin/roles', icon: ShieldCheck, matchPrefixes: ['/admin/roles', '/admin/permissions'], permissions: ['users.manage'] },
+  { label: 'إدارة التقييمات', to: '/admin/reviews', icon: Star, matchPrefixes: ['/admin/reviews'], permissions: ['store-ratings.create', 'store-ratings.update', 'store-ratings.delete', 'engineer-ratings.create', 'engineer-ratings.update', 'engineer-ratings.delete'] },
+  { label: 'الإشعارات', to: '/admin/notifications', icon: Bell, matchPrefixes: ['/admin/notifications'], permissions: ['notification-templates.manage'] },
+  { label: 'إعدادات النظام', to: '/admin/settings', icon: Settings, matchPrefixes: ['/admin/settings'], permissions: ['settings.manage'] },
 ]
 
-// تطبيق وتصفية الروابط الجانبية ديناميكياً وفق الصلاحيات الحية للأدمن
+// تطبيق وتصفية الروابط الجانبية ديناميكياً وفق الصلاحيات الحية للأدمن المسجل دخوله
 const filteredNavItems = computed(() => {
   return navItems.filter((item) => {
-    if (!item.permission) return true
-    return hasPermission(item.permission)
+    if (!item.permissions || item.permissions.length === 0) return true
+    return hasPermission(item.permissions)
   })
 })
 

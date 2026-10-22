@@ -65,6 +65,9 @@ export const useAuth = () => {
 
       if (response?.data?.token && response?.data?.user) {
         authStore.setAuth(response.data.user, response.data.token)
+        if (response.data.user.id) {
+          await authStore.fetchUserPermissions(response.data.user.id)
+        }
       }
 
       return {
@@ -254,6 +257,9 @@ export const useAuth = () => {
 
       if (response?.data) {
         authStore.setUser(response.data)
+        if (response.data.id) {
+          await authStore.fetchUserPermissions(response.data.id)
+        }
         return response.data
       }
       return null

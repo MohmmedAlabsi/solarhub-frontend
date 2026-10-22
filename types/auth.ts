@@ -27,6 +27,7 @@ export interface User {
   has_store?: boolean
   has_engineer_profile?: boolean
   createdAt: string
+  permissions?: string[]
 }
 
 export interface LoginPayload {

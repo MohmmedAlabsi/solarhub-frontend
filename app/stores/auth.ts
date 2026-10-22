@@ -20,6 +20,7 @@ export interface UserProfile {
   created_at?: string
   createdAt?: string
   isVerified?: boolean
+  permissions?: string[]
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -27,6 +28,12 @@ export const useAuthStore = defineStore('auth', () => {
     maxAge: 60 * 60 * 24 * 7, // 7 days
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
+  })
+
+  const authPermissionsCookie = useCookie<string[]>('auth_permissions', {
+    maxAge: 60 * 60 * 24 * 7,
+    sameSite: 'lax',
+    default: () => [],
   })
 
   const user = ref<User | null>(null)
@@ -51,6 +58,7 @@ export const useAuthStore = defineStore('auth', () => {
   function setUser(newUser: any | null) {
     if (!newUser) {
       user.value = null
+      authPermissionsCookie.value = []
     } else {
       user.value = {
         id: newUser.id,
@@ -64,6 +72,7 @@ export const useAuthStore = defineStore('auth', () => {
         has_store: newUser.has_store,
         has_engineer_profile: newUser.has_engineer_profile,
         createdAt: newUser.created_at || newUser.createdAt || new Date().toISOString(),
+        permissions: Array.isArray(newUser.permissions) ? newUser.permissions : (authPermissionsCookie.value || []),
       }
     }
     isInitialized.value = true
@@ -76,6 +85,7 @@ export const useAuthStore = defineStore('auth', () => {
   function clearAuth() {
     user.value = null
     token.value = null
+    authPermissionsCookie.value = []
     isInitialized.value = true
     clearErrors()
   }
@@ -147,6 +157,29 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Fetch live permissions for a given user from database/API
+   */
+  async function fetchUserPermissions(userId?: string | number): Promise<string[]> {
+    const targetId = userId || user.value?.id
+    if (!targetId) return []
+
+    try {
+      const res = await $fetch<{ status: string; data?: { all_permissions?: string[] } }>(`/api/admin/permissions/users/${targetId}`)
+      if (res?.status === 'success' && res.data?.all_permissions) {
+        const perms = res.data.all_permissions
+        if (user.value && String(user.value.id) === String(targetId)) {
+          user.value.permissions = perms
+          authPermissionsCookie.value = perms
+        }
+        return perms
+      }
+    } catch {
+      // Fallback silently to existing cookie
+    }
+    return authPermissionsCookie.value || []
+  }
+
+  /**
    * Restore authenticated user session from backend
    */
   async function initAuth() {
@@ -160,6 +193,9 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await apiRequest<any>('/auth/me')
       if (res.success && res.data) {
         setUser(res.data)
+        if (res.data.id) {
+          await fetchUserPermissions(res.data.id)
+        }
         return user.value
       } else {
         clearAuth()
@@ -190,6 +226,9 @@ export const useAuthStore = defineStore('auth', () => {
       if (res.success && res.data) {
         token.value = res.data.token
         setUser(res.data.user)
+        if (res.data.user?.id) {
+          await fetchUserPermissions(res.data.user.id)
+        }
         return { success: true, user: user.value }
       }
 
@@ -434,6 +473,7 @@ export const useAuthStore = defineStore('auth', () => {
     clearAuth,
     initAuth,
     fetchCurrentUser: initAuth,
+    fetchUserPermissions,
     login,
     register,
     verifyOtp,

@@ -1,7 +1,8 @@
 import type { AdminPermissionGroup, AdminRoleUser } from '../../types/admin'
+import { useAuthStore } from '../stores/auth'
 
 /**
- * قاموس تعريب وتوصيف الصلاحيات المسجلة في قاعدة البيانات
+ * قاموس تعريب وتوصيف الصلاحيات الـ 48 المسجلة في قاعدة البيانات
  */
 export const PERMISSION_METADATA: Record<string, { label: string; description: string; group: string }> = {
   // 1. المستخدمين والأدوار
@@ -264,17 +265,16 @@ export const PERMISSION_METADATA: Record<string, { label: string; description: s
 export const useAdminPermissions = () => {
   const { notify } = useAdminNotice()
 
-  // الحالة التفاعلية
+  // حالة إدارة الصلاحيات للأدمن المختار في صفحة إدارة الصلاحيات (/admin/roles)
   const permissions = useState<{ id: number; name: string }[]>('admin_all_permissions', () => [])
   const adminUsers = useState<AdminRoleUser[]>('admin_role_users', () => [])
   const selectedUserId = useState<number | string>('admin_selected_user_id', () => 1)
-  const currentPermissions = useState<string[]>('admin_current_user_permissions', () => [])
-  const activeDashboardPermissions = useState<string[]>('admin_active_dashboard_permissions', () => [])
+  const currentPermissions = useState<string[]>('admin_selected_user_permissions', () => [])
 
   const isLoading = ref(false)
   const isSaving = ref(false)
 
-  // تعريف المجموعات الست الرئيسية
+  // تعريف المجموعات الرئيسية الثمان
   const baseGroups = [
     { id: 'users_roles', title: 'إدارة المستخدمين والأدوار الإدارية', icon: 'users', expanded: true },
     { id: 'catalog_products', title: 'إدارة الكتالوج الشمسي والمنتجات', icon: 'package', expanded: true },
@@ -287,7 +287,7 @@ export const useAdminPermissions = () => {
   ]
 
   /**
-   * جلب كافة الصلاحيات من قاعدة البيانات والـ API
+   * جلب كافة الصلاحيات المسجلة من قاعدة البيانات
    */
   const fetchPermissions = async (force = false): Promise<{ id: number; name: string }[]> => {
     if (!force && permissions.value.length > 0) return permissions.value
@@ -316,16 +316,11 @@ export const useAdminPermissions = () => {
       const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
       adminUsers.value = data
 
-      // ضبط الصلاحيات الافتراضية لأول مستخدم إذا لم يتم التحديد
+      // ضبط الصلاحيات الافتراضية للمستخدم المختار في واجهة إدارة الصلاحيات
       if (data.length > 0) {
         const found = data.find((u: any) => String(u.id) === String(selectedUserId.value)) || data[0]
         selectedUserId.value = found.id
         currentPermissions.value = [...(found.all_permissions || found.direct_permissions || [])]
-
-        // إذا كان المستخدم هو مدير النظام، نعين الصلاحيات للداشبورد فورياً
-        if (found.role === 'admin' || String(found.id) === '1') {
-          activeDashboardPermissions.value = [...currentPermissions.value]
-        }
       }
 
       return data
@@ -338,13 +333,12 @@ export const useAdminPermissions = () => {
   }
 
   /**
-   * اختيار مشرف وعرض صلاحياته الحالية
+   * اختيار مشرف من القائمة في واجهة إدارة الصلاحيات وعرض صلاحياته الحالية
    */
   const selectUser = (userId: number | string) => {
     selectedUserId.value = userId
     const target = adminUsers.value.find(u => String(u.id) === String(userId))
     if (target) {
-      // ندمج الصلاحيات الموروثة والمباشرة
       const perms = target.all_permissions && target.all_permissions.length > 0
         ? target.all_permissions
         : (target.direct_permissions || [])
@@ -353,7 +347,7 @@ export const useAdminPermissions = () => {
   }
 
   /**
-   * تبديل صلاحية معينة (مباشرة في الواجهة)
+   * تبديل صلاحية معينة للمشرف المختار في الواجهة
    */
   const togglePermission = (permissionName: string, checked: boolean) => {
     if (checked) {
@@ -366,7 +360,8 @@ export const useAdminPermissions = () => {
   }
 
   /**
-   * حفظ ومزامنة الصلاحيات للمشرف المحدد
+   * حفظ ومزامنة الصلاحيات للمشرف المختار في قاعدة البيانات
+   * يتم تطبيقها على المشرف المختار في قاعدة البيانات دون التأثير على جلسة الأدمن الحالي
    */
   const saveUserPermissions = async (userId: number | string, permsToSave: string[]): Promise<boolean> => {
     isSaving.value = true
@@ -376,16 +371,19 @@ export const useAdminPermissions = () => {
         body: { permissions: permsToSave },
       })
 
-      // تحديث الحالة محلياً
+      // تحديث الحالة محلياً للمشرف في القائمة
       const target = adminUsers.value.find(u => String(u.id) === String(userId))
       if (target) {
         target.direct_permissions = [...permsToSave]
         target.all_permissions = [...permsToSave]
       }
 
-      // إذا كان هذا المستخدم هو المستخدم النشط للداشبورد، نطبق التعديلات فوراً
-      if (String(userId) === String(selectedUserId.value) || String(userId) === '1') {
-        activeDashboardPermissions.value = [...permsToSave]
+      // إذا كان المشرف المختار هو نفسه المستخدم المسجل دخوله حالياً في الجلسة، نحدث جلسته
+      const authStore = useAuthStore()
+      if (authStore.user && String(userId) === String(authStore.user.id)) {
+        authStore.user.permissions = [...permsToSave]
+        const authPermissionsCookie = useCookie<string[]>('auth_permissions')
+        authPermissionsCookie.value = [...permsToSave]
       }
 
       notify(res?.message || 'تم حفظ وتطبيق الصلاحيات بنجاح.')
@@ -399,7 +397,7 @@ export const useAdminPermissions = () => {
   }
 
   /**
-   * تعيين دور إداري للمستخدم
+   * تعيين دور إداري للمستخدم المحدد
    */
   const assignRole = async (userId: number | string, role: string): Promise<boolean> => {
     isSaving.value = true
@@ -416,7 +414,16 @@ export const useAdminPermissions = () => {
         if (res?.data?.all_permissions) {
           target.all_permissions = res.data.all_permissions
           currentPermissions.value = [...res.data.all_permissions]
-          activeDashboardPermissions.value = [...res.data.all_permissions]
+        }
+      }
+
+      const authStore = useAuthStore()
+      if (authStore.user && String(userId) === String(authStore.user.id)) {
+        authStore.user.role = role as any
+        if (res?.data?.all_permissions) {
+          authStore.user.permissions = [...res.data.all_permissions]
+          const authPermissionsCookie = useCookie<string[]>('auth_permissions')
+          authPermissionsCookie.value = [...res.data.all_permissions]
         }
       }
 
@@ -431,31 +438,52 @@ export const useAdminPermissions = () => {
   }
 
   /**
-   * فحص ما إذا كان الأدمن يمتلك صلاحية معينة لتطبيقها في الداشبورد
+   * فحص ما إذا كان الأدمن المسجّل دخوله حالياً (Logged-in User) يمتلك صلاحية معينة
+   * لعكسها حصراً على السايدبار والداشبورد الخاصة به
    */
-  const hasPermission = (permission: string): boolean => {
-    // مدير النظام يملك كافة الصلاحيات افتراضياً
-    const currentUser = adminUsers.value.find(u => String(u.id) === String(selectedUserId.value))
-    if (currentUser?.role === 'admin' && (!currentUser.direct_permissions || currentUser.direct_permissions.length === 0)) {
+  const hasPermission = (permission: string | string[]): boolean => {
+    const authStore = useAuthStore()
+    const currentUser = authStore.user
+    const authCookiePerms = useCookie<string[]>('auth_permissions').value || []
+
+    // إذا لم يكن هناك مستخدم مسجل دخوله في الجلسة
+    if (!currentUser) {
+      return false
+    }
+
+    // مدير النظام الرئيسي (Super Admin - User ID: 1) يمتلك كافة الصلاحيات بدون استثناء
+    if (String(currentUser.id) === '1') {
       return true
     }
 
-    if (activeDashboardPermissions.value.length > 0) {
-      return activeDashboardPermissions.value.includes(permission)
+    // جلب قائمة الصلاحيات الخاصة بالمستخدم المسجل دخوله
+    const userPerms = (currentUser.permissions && currentUser.permissions.length > 0)
+      ? currentUser.permissions
+      : authCookiePerms
+
+    if (userPerms && userPerms.length > 0) {
+      if (Array.isArray(permission)) {
+        return permission.some(p => userPerms.includes(p))
+      }
+      return userPerms.includes(permission)
     }
 
-    return currentPermissions.value.includes(permission)
+    // إذا كان الحساب يحمل دور 'admin' ولم يتم تقييد صلاحياته بعد، يمنح الوصول الكامل
+    if (currentUser.role === 'admin') {
+      return true
+    }
+
+    return false
   }
 
   /**
-   * توليد المجموعات الكاملة مع فحص الصلاحيات المحددة
+   * توليد المجموعات الكاملة مع فحص الصلاحيات المحددة للمشرف المختار
    */
   const permissionGroups = computed<AdminPermissionGroup[]>(() => {
     const rawList = permissions.value
     const activeSet = new Set(currentPermissions.value)
 
     return baseGroups.map((group) => {
-      // تجميع الصلاحيات التابعة للمجموعة
       const items = rawList
         .filter((p) => {
           const meta = PERMISSION_METADATA[p.name]
@@ -486,7 +514,6 @@ export const useAdminPermissions = () => {
     adminUsers,
     selectedUserId,
     currentPermissions,
-    activeDashboardPermissions,
     permissionGroups,
     isLoading,
     isSaving,
