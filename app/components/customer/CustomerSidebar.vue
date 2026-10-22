@@ -11,11 +11,20 @@ import {
   Package,
   Settings,
   ShoppingBag,
+  ShoppingCart,
   Store,
   Users,
   Wrench,
   X,
 } from 'lucide-vue-next'
+import { useCartStore } from '~~/app/stores/cart.store'
+
+interface NavItem {
+  label: string
+  to: string
+  icon: any
+  badge?: number | string
+}
 
 const props = withDefaults(
   defineProps<{
@@ -34,28 +43,35 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
+const cartStore = useCartStore()
 
 // الروابط مقسمة وفقاً لمجموعات التصميم المعتمدة في سولار هب
-const mainNav = [
+const mainNav: NavItem[] = [
   { label: 'الرئيسية', to: '/customer/dashboard', icon: Home },
   { label: 'المنتجات', to: '/customer/products', icon: Package },
   { label: 'المهندسون', to: '/customer/engineers', icon: Users },
   { label: 'الموردون', to: '/customer/stores', icon: Store },
 ]
 
-const commerceNav = [
+const commerceNav = computed<NavItem[]>(() => [
+  {
+    label: 'سلة المشتريات',
+    to: '/customer/cart',
+    icon: ShoppingCart,
+    badge: cartStore.totalItemsCount > 0 ? cartStore.totalItemsCount : undefined,
+  },
   { label: 'طلبات عروض الأسعار', to: '/customer/orders?tab=quotes', icon: FileText },
   { label: 'طلباتي', to: '/customer/orders', icon: ShoppingBag },
   { label: 'طلبات الخدمات', to: '/customer/services', icon: Wrench },
   { label: 'المفضلة', to: '/customer/wishlist', icon: Heart },
-]
+])
 
-const settingsNav = [
+const settingsNav: NavItem[] = [
   { label: 'الإشعارات', to: '/customer/notifications', icon: Bell },
   { label: 'الإعدادات', to: '/customer/settings', icon: Settings },
 ]
 
-const navigationGroups = [mainNav, commerceNav, settingsNav]
+const navigationGroups = computed<NavItem[][]>(() => [mainNav, commerceNav.value, settingsNav])
 
 function isActive(path: string) {
   if (path.includes('?')) {
@@ -133,15 +149,28 @@ function handleLinkClick() {
       <template v-for="(group, index) in navigationGroups" :key="index">
         <hr v-if="index" class="my-1.5 border-solar-navy-light/40 sm:my-2" />
         <div class="flex flex-col gap-1">
-          <CustomerSidebarLink v-for="item in group" :key="item.to" :label="item.label" :to="item.to" :icon="item.icon" :collapsed="isCollapsed && !isMobile" :active="isActive(item.to)" @navigate="handleLinkClick" />
+          <CustomerSidebarLink
+            v-for="item in group"
+            :key="item.to"
+            :label="item.label"
+            :to="item.to"
+            :icon="item.icon"
+            :badge="item.badge"
+            :collapsed="isCollapsed && !isMobile"
+            :active="isActive(item.to)"
+            @navigate="handleLinkClick"
+          />
         </div>
       </template>
     </nav>
 
     <!-- زر تسجيل الخروج السفلي -->
     <div class="shrink-0 p-3 border-t border-solar-navy-light/40">
-      <button type="button" @click="emit('unavailable', 'تسجيل الخروج')" aria-label="تسجيل الخروج"
-        class="group relative flex items-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow text-red-200 hover:bg-red-500/20 hover:text-red-100"
+      <button
+        type="button"
+        @click="emit('unavailable', 'تسجيل الخروج')"
+        aria-label="تسجيل الخروج"
+        class="group relative flex items-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow text-red-200 hover:bg-red-500/20 hover:text-red-100 cursor-pointer"
         :class="[isCollapsed && !isMobile ? 'justify-center p-3 rounded-xl' : 'gap-3.5 px-3.5 py-2.5 rounded-lg text-sm font-medium']"
       >
         <LogOut class="size-5 shrink-0" />
@@ -159,4 +188,3 @@ function handleLinkClick() {
     </div>
   </aside>
 </template>
-
