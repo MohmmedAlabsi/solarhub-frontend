@@ -5,197 +5,151 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  Loader2,
   PackageCheck,
+  PackageSearch,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Truck,
   Wrench,
 } from 'lucide-vue-next'
-import type { Product } from '~~/types/ecommerce'
+import { useCustomerProducts, type CustomerProductView } from '~~/app/composables/useCustomerProducts'
 
 definePageMeta({
   layout: 'customer',
 })
 
 useSeoMeta({
-  title: 'كتالوج المنتجات ومكونات الطاقة الكهروضوئية | SolarHub',
-  description: 'تصفح وشراء أكثر من 1,240 منتج أصلي من كبرى الماركات العالمية (Tier 1) مع ضمانات وفواتير ضريبية.',
+  title: 'كتالوج المنتجات ومكونات الطاقة الشمسية | SolarHub',
+  description: 'تصفح وشراء منتجات ومعدات الطاقة الكهروضوئية المعتمدة (Tier 1) من الموردين والوكلاء المعتمدين.',
 })
 
-// وضع العرض: إما إضافة مباشرة للسلة أو وضع طلب عروض الأسعار
+const {
+  categories,
+  brands,
+  governorates,
+  fetchCategories,
+  fetchBrands,
+  fetchGovernorates,
+  fetchStoreProducts,
+  fetchMasterProducts,
+} = useCustomerProducts()
+
+// أنماط العرض: إضافة للسلة (شراء فوري) أو طلب عرض سعر (RFQ)
 const displayMode = ref<'cart' | 'rfq'>('cart')
 const searchQuery = ref('')
-const selectedBrand = ref('الكل')
-const selectedCity = ref('كافة المناطق')
-const selectedCategory = ref('كافة الأنواع')
+const selectedBrand = ref<string | number>('all')
+const selectedGovernorate = ref<string | number>('all')
+const selectedCategory = ref<string | number>('all')
+
+const isLoading = ref(true)
+const storeProductsList = ref<CustomerProductView[]>([])
+const masterProductsList = ref<CustomerProductView[]>([])
+
+// ترقيم الصفحات
+const currentPage = ref(1)
+const totalItems = ref(0)
+const lastPage = ref(1)
 
 // نافذة RFQ
-const selectedProductForRfq = ref<Product | null>(null)
+const selectedProductForRfq = ref<any | null>(null)
 const isRfqModalOpen = ref(false)
 
-function openRfqModal(product: Product) {
+function openRfqModal(product: any) {
   selectedProductForRfq.value = product
   isRfqModalOpen.value = true
 }
 
-// قائمة المنتجات الثمانية المطابقة تماماً لصورة التصميم
-const products = ref<Product[]>([
-  {
-    id: '1',
-    name: 'لوح شمسي مونوكريستالين Jinko Tiger Pro 585W عالي الكفاءة',
-    category: 'ألواح كهروضوئية',
-    categoryType: 'panel',
-    brand: 'Jinko Solar',
-    model: 'Tiger Pro 585W',
-    storeName: 'متجر طاقة الرياض',
-    storeCity: 'الرياض',
-    price: 465,
-    currency: 'ر.س',
-    rating: 4.9,
-    reviewsCount: 48,
-    image: '/images/product-panel.png',
-    badge: 'Tier 1 Global',
-    specs: { power: '585W', efficiency: '21.5%', warranty: '25 سنة' },
-    inStock: true,
-  },
-  {
-    id: '2',
-    name: 'إنفرتر شمسي هجين Deye Hybrid 8kW ثلاثي الأوجه مع شاشة تفاعلية',
-    category: 'محولات هجينة',
-    categoryType: 'inverter',
-    brand: 'Deye',
-    model: 'SUN-8K-SG04LP3',
-    storeName: 'شركة نبراس الحلول',
-    storeCity: 'جدة',
-    price: 6200,
-    currency: 'ر.س',
-    rating: 4.8,
-    reviewsCount: 63,
-    image: '/images/product-inverter.png',
-    badge: 'ثلاثي الأوجه 8kW',
-    specs: { power: '8000W', voltage: '380V', warranty: '5 سنوات' },
-    inStock: true,
-  },
-  {
-    id: '3',
-    name: 'بطارية ليثيوم Pylontech US5000 4.8kWh دورات تفريغ فائقة',
-    category: 'تخزين ليثيوم',
-    categoryType: 'battery',
-    brand: 'Pylontech',
-    model: 'US5000',
-    storeName: 'مؤسسة طاقة الصحراء',
-    storeCity: 'الدمام',
-    price: 8450,
-    currency: 'ر.س',
-    rating: 5.0,
-    reviewsCount: 89,
-    image: '/images/product-battery.png',
-    badge: '6000+ دورة',
-    specs: { capacity: '4.8kWh', voltage: '48V', warranty: '10 سنوات' },
-    inStock: true,
-  },
-  {
-    id: '4',
-    name: 'لوح شمسي Longi Hi-MO 6 Explorer 575W تقنية HPBC المتقدمة',
-    category: 'ألواح كهروضوئية',
-    categoryType: 'panel',
-    brand: 'LONGi',
-    model: 'Hi-MO 6 575W',
-    storeName: 'شركة شمس الرياض',
-    storeCity: 'الرياض',
-    price: 520,
-    currency: 'ر.س',
-    rating: 4.9,
-    reviewsCount: 104,
-    image: '/images/product-kit.png',
-    badge: 'تقنية HPBC',
-    specs: { power: '575W', efficiency: '22.3%', warranty: '25 سنة' },
-    inStock: true,
-  },
-  {
-    id: '5',
-    name: 'إنفرتر مستقل ES Growatt SPF 5000 بقدرة 5kW مدمج بمنظم شحن',
-    category: 'محولات هجينة',
-    categoryType: 'inverter',
-    brand: 'Growatt',
-    model: 'SPF 5000 ES',
-    storeName: 'مجموعة الأمانة',
-    storeCity: 'جدة',
-    price: 4850,
-    currency: 'ر.س',
-    rating: 4.7,
-    reviewsCount: 34,
-    image: '/images/product-inverter.png',
-    badge: 'مستقل عن الشبكة',
-    specs: { power: '5000W', voltage: '48V', warranty: '5 سنوات' },
-    inStock: true,
-  },
-  {
-    id: '6',
-    name: 'مضخة مياه غاطسة شمسية Grundfos SQFlex للآبار والمزارع',
-    category: 'مضخات مياه',
-    categoryType: 'pump',
-    brand: 'Grundfos',
-    model: 'SQFlex 11-2',
-    storeName: 'مجموعة الأمانة',
-    storeCity: 'القصيم',
-    price: 11200,
-    currency: 'ر.س',
-    rating: 4.9,
-    reviewsCount: 51,
-    image: '/images/hero-solar.png',
-    badge: 'للآبار العميقة',
-    specs: { power: '1400W', origin: 'الدنمارك', warranty: '3 سنوات' },
-    inStock: true,
-  },
-  {
-    id: '7',
-    name: 'إنفرتر ذكي SUN2000-Huawei 10KTL كفاءة ومطابق للكود',
-    category: 'محولات هجينة',
-    categoryType: 'inverter',
-    brand: 'Huawei',
-    model: 'SUN2000-10KTL-M1',
-    storeName: 'شركة شمس الرياض',
-    storeCity: 'الرياض',
-    price: 9150,
-    currency: 'ر.س',
-    rating: 4.95,
-    reviewsCount: 42,
-    image: '/images/product-inverter.png',
-    badge: 'كود سعودي معتمد',
-    specs: { power: '10kW', efficiency: '98.6%', warranty: '10 سنوات' },
-    inStock: true,
-  },
-  {
-    id: '8',
-    name: 'منظم شحن شمسي SmartSolar MPPT 150/70-Tr بلوتوث ذكي',
-    category: 'منظمات MPPT',
-    categoryType: 'controller',
-    brand: 'Victron Energy',
-    model: 'SmartSolar 150/70',
-    storeName: 'مؤسسة طاقة الصحراء',
-    storeCity: 'الدمام',
-    price: 2150,
-    currency: 'ر.س',
-    rating: 5.0,
-    reviewsCount: 28,
-    image: '/images/product-panel.png',
-    badge: 'بلوتوث ذكي',
-    specs: { voltage: '150V', current: '70A', warranty: '5 سنوات' },
-    inStock: true,
-  },
-])
+// جلب البيانات الأولية
+const loadInitialFilters = async () => {
+  await Promise.allSettled([
+    fetchCategories(),
+    fetchBrands(),
+    fetchGovernorates(),
+  ])
+}
 
-// تصفية المنتجات
-const filteredProducts = computed(() => {
-  return products.value.filter((p) => {
-    const matchSearch = !searchQuery.value || p.name.includes(searchQuery.value) || p.brand.includes(searchQuery.value) || p.model.includes(searchQuery.value)
-    const matchBrand = selectedBrand.value === 'الكل' || p.brand.includes(selectedBrand.value)
-    const matchCity = selectedCity.value === 'كافة المناطق' || p.storeCity.includes(selectedCity.value)
-    const matchCategory = selectedCategory.value === 'كافة الأنواع' || p.category.includes(selectedCategory.value)
-    return matchSearch && matchBrand && matchCity && matchCategory
+// جلب المنتجات وفقاً للوضع والفلاتر
+const loadProducts = async () => {
+  isLoading.value = true
+  try {
+    if (displayMode.value === 'cart') {
+      // وضع الشراء الفوري والسلة: جلب عروض المتاجر المتاحة
+      const items = await fetchStoreProducts({
+        category_id: selectedCategory.value === 'all' ? undefined : selectedCategory.value,
+        governorate_id: selectedGovernorate.value === 'all' ? undefined : selectedGovernorate.value,
+      })
+      storeProductsList.value = items
+      totalItems.value = items.length
+      lastPage.value = Math.max(1, Math.ceil(items.length / 12))
+    } else {
+      // وضع عروض الأسعار: جلب الكتالوج المرجعي الشامل
+      const result = await fetchMasterProducts({
+        page: currentPage.value,
+        category_id: selectedCategory.value === 'all' ? undefined : selectedCategory.value,
+        brand_id: selectedBrand.value === 'all' ? undefined : selectedBrand.value,
+        search: searchQuery.value,
+      })
+      masterProductsList.value = result.products
+      totalItems.value = result.meta.total
+      lastPage.value = result.meta.last_page
+      currentPage.value = result.meta.current_page
+    }
+  } catch (err) {
+    console.error('Error loading customer products:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// مراقبة التبديل بين الأنماط وإعادة التحميل
+watch(displayMode, () => {
+  currentPage.value = 1
+  loadProducts()
+})
+
+// تصفية نتائج المتجر محلياً حسب البحث والموديل والماركة
+const displayedProducts = computed(() => {
+  if (displayMode.value === 'rfq') {
+    return masterProductsList.value
+  }
+
+  // في وضع السلة (store products): تصفية محلية فورية إضافية
+  return storeProductsList.value.filter((p) => {
+    const q = searchQuery.value.trim().toLowerCase()
+    const matchSearch =
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      p.brand.toLowerCase().includes(q) ||
+      p.model.toLowerCase().includes(q) ||
+      p.storeName.toLowerCase().includes(q)
+
+    const matchBrand =
+      selectedBrand.value === 'all' ||
+      String(p.brand).toLowerCase().includes(String(selectedBrand.value).toLowerCase())
+
+    return matchSearch && matchBrand
   })
+})
+
+function handleSearchSubmit() {
+  currentPage.value = 1
+  loadProducts()
+}
+
+function handlePageChange(page: number) {
+  if (page < 1 || page > lastPage.value) return
+  currentPage.value = page
+  loadProducts()
+  if (import.meta.client) {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
+onMounted(async () => {
+  await loadInitialFilters()
+  await loadProducts()
 })
 </script>
 
@@ -215,19 +169,19 @@ const filteredProducts = computed(() => {
           كتالوج المنتجات ومكونات الطاقة الكهروضوئية
         </h1>
         <p class="max-w-4xl text-sm leading-relaxed text-solar-text-secondary">
-          تصفح وشراء أكثر من 1,240 منتج أصلي من كبرى الماركات العالمية (Tier 1) مباشرة من الوكلاء والموزعين المعتمدين مع فواتير ضريبية وضمانات مصنعية حتى 25 عاماً.
+          تصفح وشراء أكثر من 240 منتج أصلي من كبرى الماركات العالمية (Tier 1) مباشرة من الوكلاء والموزعين المعتمدين مع فواتير ضريبية وضمانات مصنعية حتى 25 عاماً.
         </p>
       </div>
 
-      <!-- كبسولات الأرقام والشارات الإحصائية (مثل التصميم) -->
+      <!-- كبسولات الأرقام والشارات الإحصائية -->
       <div class="flex flex-wrap items-center gap-3 pt-2">
         <span class="inline-flex items-center gap-2 rounded-xl bg-solar-status-info-bg px-3.5 py-1.5 text-xs font-bold text-solar-status-info-text border border-blue-100">
           <Box class="size-4" />
-          <span>معدة مسجلة +1,240</span>
+          <span>معدة مسجلة +245</span>
         </span>
         <span class="inline-flex items-center gap-2 rounded-xl bg-solar-status-info-bg px-3.5 py-1.5 text-xs font-bold text-solar-status-info-text border border-blue-100">
           <ShieldCheck class="size-4" />
-          <span>متجر معتمد 86 متجر</span>
+          <span>وكلاء معتمدون</span>
         </span>
         <span class="inline-flex items-center gap-2 rounded-xl bg-solar-status-info-bg px-3.5 py-1.5 text-xs font-bold text-solar-status-info-text border border-blue-100">
           <Award class="size-4" />
@@ -240,16 +194,17 @@ const filteredProducts = computed(() => {
     <div class="flex flex-col gap-4 rounded-2xl border border-solar-border-card bg-white p-4 shadow-sm">
       <div class="flex flex-col gap-3 md:flex-row">
         <!-- حقل البحث -->
-        <div class="relative flex-1">
+        <form @submit.prevent="handleSearchSubmit" class="relative flex-1">
           <Search class="absolute top-3.5 right-3.5 size-4 text-solar-text-muted" />
           <input
             v-model="searchQuery"
             type="search"
-            placeholder="ابحث باسم المنتج، الموديل، الماركة (مثل: Jinko 585W, Deye 8kW, Pylontech US5000)..."
+            placeholder="ابحث باسم المنتج، الموديل، الماركة (مثل: Jinko, Deye, Pylontech)..."
             class="solar-input pr-10"
           />
-        </div>
-        <button type="button" class="btn-dark px-6">
+        </form>
+
+        <button type="button" @click="handleSearchSubmit" class="btn-dark px-6">
           <span>بحث</span>
         </button>
 
@@ -258,18 +213,18 @@ const filteredProducts = computed(() => {
           <button
             type="button"
             @click="displayMode = 'cart'"
-            class="rounded-lg px-3 py-2 transition-all"
+            class="rounded-lg px-3 py-2 transition-all cursor-pointer"
             :class="displayMode === 'cart' ? 'bg-solar-yellow text-solar-navy-dark shadow-sm' : 'text-solar-text-secondary hover:text-solar-text-heading'"
           >
-            إضافة للسلة
+            إضافة للسلة (شراء فوري)
           </button>
           <button
             type="button"
             @click="displayMode = 'rfq'"
-            class="rounded-lg px-3 py-2 transition-all"
+            class="rounded-lg px-3 py-2 transition-all cursor-pointer"
             :class="displayMode === 'rfq' ? 'bg-solar-navy text-white shadow-sm' : 'text-solar-text-secondary hover:text-solar-text-heading'"
           >
-            طلب عروض أسعار
+            طلب عروض أسعار (RFQ)
           </button>
         </div>
       </div>
@@ -281,39 +236,55 @@ const filteredProducts = computed(() => {
           تصفية النتائج:
         </span>
 
-        <select v-model="selectedBrand" class="rounded-lg border border-solar-border-input bg-white px-3 py-1.5 text-xs text-solar-text-body focus:outline-none">
-          <option value="الكل">الماركة: الكل</option>
-          <option value="Jinko">Jinko Solar</option>
-          <option value="LONGi">LONGi Solar</option>
-          <option value="Deye">Deye Inverters</option>
-          <option value="Growatt">Growatt</option>
-          <option value="Pylontech">Pylontech</option>
-          <option value="Huawei">Huawei</option>
+        <!-- فلتر التصنيف -->
+        <select
+          v-model="selectedCategory"
+          @change="loadProducts"
+          class="rounded-lg border border-solar-border-input bg-white px-3 py-1.5 text-xs text-solar-text-body focus:outline-none"
+        >
+          <option value="all">التصنيف: كافة الأنواع</option>
+          <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+            {{ cat.name_ar || cat.name_en }}
+          </option>
         </select>
 
-        <select v-model="selectedCity" class="rounded-lg border border-solar-border-input bg-white px-3 py-1.5 text-xs text-solar-text-body focus:outline-none">
-          <option value="كافة المناطق">المحافظة: كافة المناطق</option>
-          <option value="الرياض">منطقة الرياض</option>
-          <option value="جدة">منطقة مكة / جدة</option>
-          <option value="الدمام">المنطقة الشرقية / الدمام</option>
-          <option value="القصيم">منطقة القصيم</option>
+        <!-- فلتر الماركة -->
+        <select
+          v-model="selectedBrand"
+          @change="loadProducts"
+          class="rounded-lg border border-solar-border-input bg-white px-3 py-1.5 text-xs text-solar-text-body focus:outline-none"
+        >
+          <option value="all">الماركة: الكل</option>
+          <option v-for="b in brands" :key="b.id" :value="b.id || b.name">
+            {{ b.name }}
+          </option>
         </select>
 
-        <select v-model="selectedCategory" class="rounded-lg border border-solar-border-input bg-white px-3 py-1.5 text-xs text-solar-text-body focus:outline-none">
-          <option value="كافة الأنواع">النوع: كافة الأنواع</option>
-          <option value="ألواح">ألواح كهروضوئية</option>
-          <option value="محولات">محولات وإنفرترات</option>
-          <option value="ليثيوم">بطاريات تخزين</option>
-          <option value="مضخات">مضخات مياه شمسية</option>
-          <option value="منظمات">منظمات شحن MPPT</option>
+        <!-- فلتر المحافظة (في وضع السلة والمتاجر) -->
+        <select
+          v-if="displayMode === 'cart'"
+          v-model="selectedGovernorate"
+          @change="loadProducts"
+          class="rounded-lg border border-solar-border-input bg-white px-3 py-1.5 text-xs text-solar-text-body focus:outline-none"
+        >
+          <option value="all">المحافظة: كافة المناطق</option>
+          <option v-for="gov in governorates" :key="gov.id" :value="gov.id">
+            {{ gov.name_ar }}
+          </option>
         </select>
       </div>
     </div>
 
-    <!-- شبكة المنتجات (8 بطاقات) -->
-    <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <!-- مؤشر التحميل أثناء جلب المنتجات -->
+    <div v-if="isLoading" class="flex flex-col items-center justify-center py-20">
+      <Loader2 class="size-10 animate-spin text-solar-yellow mb-4" />
+      <p class="text-sm font-semibold text-solar-text-muted">جاري تحميل المنتجات من قاعدة البيانات المعتمدة...</p>
+    </div>
+
+    <!-- شبكة المنتجات عند اكتمال التحميل -->
+    <div v-else-if="displayedProducts.length > 0" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       <CustomerEcommerceProductCard
-        v-for="product in filteredProducts"
+        v-for="product in displayedProducts"
         :key="product.id"
         :product="product"
         :mode="displayMode"
@@ -321,29 +292,71 @@ const filteredProducts = computed(() => {
       />
     </div>
 
-    <!-- شريط الترقيم والتنقل بين الصفحات (Pagination) -->
-    <div class="flex flex-col items-center justify-between gap-4 rounded-xl border border-solar-border-card bg-white p-4 sm:flex-row">
+    <!-- الحالة الفارغة عند عدم العثور على نتائج -->
+    <div
+      v-else
+      class="flex flex-col items-center justify-center rounded-2xl border border-solar-border-card bg-white p-12 text-center shadow-sm"
+    >
+      <div class="flex size-20 items-center justify-center rounded-full bg-solar-bg-subtle text-solar-text-muted mb-4">
+        <PackageSearch class="size-10 stroke-[1.5]" />
+      </div>
+      <h3 class="text-lg font-bold text-solar-text-heading mb-1">لا توجد منتجات مطابقة لخيارات التصفية</h3>
+      <p class="text-xs text-solar-text-muted max-w-sm mb-5">
+        لم نتمكن من العثور على منتجات تطابق الفلاتر المحددة حالياً. حاول إعادة ضبط خيارات البحث أو التصفية.
+      </p>
+      <button
+        type="button"
+        @click="selectedCategory = 'all'; selectedBrand = 'all'; selectedGovernorate = 'all'; searchQuery = ''; loadProducts()"
+        class="btn-primary text-xs px-5 py-2"
+      >
+        إعادة ضبط خيارات الفلترة
+      </button>
+    </div>
+
+    <!-- شريط الترقيم والتنقل بين الصفحات (Pagination) في وضع RFQ والكتالوج -->
+    <div
+      v-if="!isLoading && lastPage > 1"
+      class="flex flex-col items-center justify-between gap-4 rounded-xl border border-solar-border-card bg-white p-4 sm:flex-row"
+    >
       <span class="text-xs text-solar-text-muted">
-        عرض 1 - {{ filteredProducts.length }} من أصل 1,240 منتج
+        صفحة {{ currentPage }} من {{ lastPage }} (إجمالي {{ totalItems }} منتج مسجل)
       </span>
 
       <div class="flex items-center gap-1.5 text-xs font-bold">
-        <button type="button" class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-muted hover:border-solar-navy-dark hover:text-solar-navy-dark">
+        <button
+          type="button"
+          @click="handlePageChange(currentPage - 1)"
+          :disabled="currentPage === 1"
+          class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-muted hover:border-solar-navy-dark hover:text-solar-navy-dark disabled:opacity-40 disabled:cursor-not-allowed"
+        >
           <ChevronRight class="size-4" />
         </button>
-        <button type="button" class="flex size-8 items-center justify-center rounded-lg bg-solar-navy-dark text-white">1</button>
-        <button type="button" class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle">2</button>
-        <button type="button" class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle">3</button>
-        <button type="button" class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle">4</button>
-        <span class="px-1 text-solar-text-muted">...</span>
-        <button type="button" class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle">42</button>
-        <button type="button" class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-muted hover:border-solar-navy-dark hover:text-solar-navy-dark">
+
+        <button
+          v-for="p in Math.min(lastPage, 6)"
+          :key="p"
+          type="button"
+          @click="handlePageChange(p)"
+          class="flex size-8 items-center justify-center rounded-lg border text-xs"
+          :class="currentPage === p ? 'bg-solar-navy-dark text-white border-solar-navy-dark' : 'border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle'"
+        >
+          {{ p }}
+        </button>
+
+        <span v-if="lastPage > 6" class="px-1 text-solar-text-muted">...</span>
+
+        <button
+          type="button"
+          @click="handlePageChange(currentPage + 1)"
+          :disabled="currentPage === lastPage"
+          class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-muted hover:border-solar-navy-dark hover:text-solar-navy-dark disabled:opacity-40 disabled:cursor-not-allowed"
+        >
           <ChevronLeft class="size-4" />
         </button>
       </div>
     </div>
 
-    <!-- بانر مميزات وضمانات سولار هب (موجود أسفل الكتالوج في التصميم) -->
+    <!-- بانر مميزات وضمانات سولار هب -->
     <section class="grid gap-4 rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm md:grid-cols-2 lg:grid-cols-4">
       <div class="flex items-start gap-3.5">
         <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-solar-status-info-bg text-solar-status-info-text">
@@ -351,7 +364,7 @@ const filteredProducts = computed(() => {
         </div>
         <div class="flex flex-col gap-1">
           <h2 class="text-sm font-bold text-solar-text-heading">وكلاء وموردون موثقون</h2>
-          <p class="text-xs leading-relaxed text-solar-text-muted">سجلات تجارية مفحوصة ومطابقة تامة للكود والمواصفات الخليجية القياسية.</p>
+          <p class="text-xs leading-relaxed text-solar-text-muted">سجلات تجارية مفحوصة ومطابقة تامة للكود والمواصفات القياسية المعتمدة.</p>
         </div>
       </div>
 
@@ -371,7 +384,7 @@ const filteredProducts = computed(() => {
         </div>
         <div class="flex flex-col gap-1">
           <h2 class="text-sm font-bold text-solar-text-heading">ضمانات معتمدة حتى 25 سنة</h2>
-          <p class="text-xs leading-relaxed text-solar-text-muted">فواتير إلكترونية ضريبية معتمدة وضمان خطي مباشر مع كل طلبية تشتريها.</p>
+          <p class="text-xs leading-relaxed text-solar-text-muted">فواتير إلكترونية معتمدة وضمان خطي مباشر مع كل طلبية تشتريها.</p>
         </div>
       </div>
 

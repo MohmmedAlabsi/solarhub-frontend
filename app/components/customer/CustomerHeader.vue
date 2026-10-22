@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Bell, ChevronDown, Menu, ShoppingCart, User } from 'lucide-vue-next'
 import { useCartStore } from '~~/app/stores/cart.store'
+import { useAuthStore } from '~~/app/stores/auth'
 
 withDefaults(defineProps<{ isMobileOpen?: boolean }>(), { isMobileOpen: false })
 const emit = defineEmits<{
@@ -9,17 +10,39 @@ const emit = defineEmits<{
 }>()
 
 const cartStore = useCartStore()
+const authStore = useAuthStore()
+const { logout } = useAuth()
 const { unreadCount } = useNotificationState()
 const isUserMenuOpen = ref(false)
 const accountMenu = ref<HTMLElement>()
 const accountButton = ref<HTMLButtonElement>()
 const route = useRoute()
+
+const userName = computed(() => {
+  return authStore.user?.name || 'حساب العميل'
+})
+
+const userRole = computed(() => {
+  if (authStore.user?.role === 'customer') return 'عميل معتمد'
+  return 'عميل SolarHub'
+})
+
 function closeAccountMenu(event: PointerEvent) {
   if (event.target instanceof Node && !accountMenu.value?.contains(event.target)) isUserMenuOpen.value = false
 }
 function escapeAccountMenu() { isUserMenuOpen.value = false; accountButton.value?.focus() }
+
+async function handleLogout() {
+  isUserMenuOpen.value = false
+  await logout()
+}
+
 watch(() => route.fullPath, () => { isUserMenuOpen.value = false })
-onMounted(() => document.addEventListener('pointerdown', closeAccountMenu))
+onMounted(() => {
+  document.addEventListener('pointerdown', closeAccountMenu)
+  // تحميل عناصر السلة مبكراً لتحديث العداد
+  cartStore.fetchCart()
+})
 onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMenu))
 </script>
 
@@ -89,9 +112,9 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
           <div class="flex size-7 sm:size-8 items-center justify-center rounded-lg bg-solar-navy text-white">
             <User class="size-3.5 sm:size-4" />
           </div>
-          <div class="text-right flex flex-col leading-tight">
-            <span class="text-xs font-bold text-solar-text-heading">وجدان</span>
-            <span class="text-[9px] sm:text-[10px] text-solar-text-muted hidden xs:inline">عميل مميز</span>
+          <div class="text-right flex flex-col leading-tight max-w-[120px]">
+            <span class="text-xs font-bold text-solar-text-heading truncate">{{ userName }}</span>
+            <span class="text-[9px] sm:text-[10px] text-solar-text-muted hidden xs:inline">{{ userRole }}</span>
           </div>
           <ChevronDown class="size-3.5 sm:size-4 text-solar-text-muted" />
         </button>
@@ -117,10 +140,15 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
             طلباتي ومشترياتي
           </NuxtLink>
           <hr class="my-1 border-solar-border-card" />
-          <button type="button" class="block w-full rounded-lg px-3 py-2 text-right text-xs font-semibold text-red-600 hover:bg-red-50" @click="isUserMenuOpen = false; emit('unavailable', 'تسجيل الخروج')">تسجيل الخروج</button>
+          <button
+            type="button"
+            class="block w-full rounded-lg px-3 py-2 text-right text-xs font-semibold text-red-600 hover:bg-red-50 cursor-pointer"
+            @click="handleLogout"
+          >
+            تسجيل الخروج
+          </button>
         </div>
       </div>
     </div>
   </header>
 </template>
-

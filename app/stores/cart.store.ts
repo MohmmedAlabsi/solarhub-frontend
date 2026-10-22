@@ -1,85 +1,58 @@
 import { defineStore } from 'pinia'
-import type { CartItem, Product } from '~~/types/ecommerce'
+import type { Product } from '~~/types/ecommerce'
+
+export interface CartStoreItem {
+  id?: number // cart item id in Laravel DB
+  product: Product
+  quantity: number
+  line_total?: number
+}
+
+function resolveProductImage(sp: any, catName?: string): string {
+  const mp = sp?.master_product || sp?.masterProduct
+  const img = mp?.images?.[0]?.image_url || mp?.images?.[0]?.image_path
+  if (img) return img
+
+  const text = `${catName || ''} ${mp?.title || ''}`.toLowerCase()
+  if (text.includes('panel') || text.includes('ألو') || text.includes('لوح')) return '/images/product-panel.png'
+  if (text.includes('invert') || text.includes('محو') || text.includes('هجين')) return '/images/product-inverter.png'
+  if (text.includes('batter') || text.includes('بطار') || text.includes('ليث')) return '/images/product-battery.png'
+  if (text.includes('pump') || text.includes('مضخ')) return '/images/hero-solar.png'
+  return '/images/product-kit.png'
+}
 
 export const useCartStore = defineStore('cart', () => {
-  // منتجات أولية مطابقة للتصاميم في سلة المشتريات
-  const items = ref<CartItem[]>([
-    {
-      product: {
-        id: '1',
-        name: 'لوح طاقة شمسية Jinko Tiger Pro 585W ثنائي الأوجه',
-        category: 'ألواح كهروضوئية',
-        categoryType: 'panel',
-        brand: 'Jinko Solar',
-        model: 'Tiger Pro 585W',
-        storeName: 'شركة شمس الرياض للمهمات الكهروضوئية',
-        storeCity: 'الرياض',
-        price: 485,
-        currency: 'ر.س',
-        rating: 4.9,
-        reviewsCount: 48,
-        image: '/images/product-panel.png',
-        badge: 'Tier 1 Global',
-        specs: { power: '585W', efficiency: '21.5%', warranty: '25 سنة' },
-        inStock: true,
-      },
-      quantity: 2,
-    },
-    {
-      product: {
-        id: '2',
-        name: 'إنفرتر طاقة شمسي هجين Growatt SPF 5000 ES بقدرة 5kW',
-        category: 'محولات هجينة',
-        categoryType: 'inverter',
-        brand: 'Growatt',
-        model: 'SPF 5000 ES',
-        storeName: 'شركة شمس الرياض للمهمات الكهروضوئية',
-        storeCity: 'الرياض',
-        price: 3150,
-        currency: 'ر.س',
-        rating: 4.7,
-        reviewsCount: 34,
-        image: '/images/product-inverter.png',
-        badge: 'مستقل عن الشبكة',
-        specs: { power: '5000W', voltage: '48V', warranty: '5 سنوات' },
-        inStock: true,
-      },
-      quantity: 1,
-    },
-    {
-      product: {
-        id: '3',
-        name: 'بطارية ليثيوم Pylontech US5000 48V 4.8kWh دورات تفريغ 6000+',
-        category: 'تخزين ليثيوم',
-        categoryType: 'battery',
-        brand: 'Pylontech',
-        model: 'US5000',
-        storeName: 'مؤسسة طاقة الصحراء للتوريدات المتقدمة',
-        storeCity: 'الدمام',
-        price: 6450,
-        currency: 'ر.س',
-        rating: 5.0,
-        reviewsCount: 89,
-        image: '/images/product-battery.png',
-        badge: '6000+ دورة',
-        specs: { capacity: '4.8kWh', voltage: '48V', warranty: '10 سنوات' },
-        inStock: true,
-      },
-      quantity: 1,
-    },
-  ])
+  const { $api } = useNuxtApp()
+  const tokenCookie = useCookie<string | null>('auth_token')
 
-  // المفضلة
+  const items = ref<CartStoreItem[]>([])
   const wishlist = ref<Product[]>([])
+  const isLoading = ref(false)
+  const isUpdating = ref<Record<string | number, boolean>>({})
+  const errorMessage = ref<string | null>(null)
+  const isInitialized = ref(false)
 
-  // إجمالي عدد العناصر
+  // هل المستخدم مسجل دخول؟
+  const isAuthenticated = computed(() => {
+    if (tokenCookie.value) return true
+    if (import.meta.client) {
+      return Boolean(localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token'))
+    }
+    return false
+  })
+
+  // إجمالي عدد العناصر في السلة
   const totalItemsCount = computed(() => {
-    return items.value.reduce((acc, item) => acc + item.quantity, 0)
+    return items.value.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0)
   })
 
   // المجموع الفرعي
   const subtotal = computed(() => {
-    return items.value.reduce((acc, item) => acc + item.product.price * item.quantity, 0)
+    return items.value.reduce((acc, item) => {
+      const price = Number(item.product?.price) || 0
+      const qty = Number(item.quantity) || 0
+      return acc + (item.line_total ?? price * qty)
+    }, 0)
   })
 
   // ضريبة القيمة المضافة 15%
@@ -87,69 +60,323 @@ export const useCartStore = defineStore('cart', () => {
     return Math.round(subtotal.value * 0.15 * 100) / 100
   })
 
-  // رسوم الشحن (مجاني في العرض)
-  const shippingFee = ref(0)
+  // رسوم الشحن (مجاني إذا تجاوز 1000 ر.س)
+  const shippingFee = computed(() => {
+    if (items.value.length === 0) return 0
+    return subtotal.value >= 1000 ? 0 : 50
+  })
 
   // الإجمالي الكلي
   const total = computed(() => {
-    return subtotal.value + vat.value + shippingFee.value
+    return Math.round((subtotal.value + vat.value + shippingFee.value) * 100) / 100
   })
 
-  // إضافة منتج للسلة
-  function addToCart(product: Product, quantity = 1) {
-    const existingIndex = items.value.findIndex(i => String(i.product.id) === String(product.id))
-    const existingItem = items.value[existingIndex]
-    if (existingItem) {
-      existingItem.quantity += quantity
-    } else {
-      items.value.push({ product, quantity })
-    }
-  }
-
-  // تحديث الكمية
-  function updateQuantity(productId: string | number, quantity: number) {
-    const item = items.value.find(i => String(i.product.id) === String(productId))
-    if (item) {
-      if (quantity <= 0) {
-        removeFromCart(productId)
-      } else {
-        item.quantity = quantity
+  /**
+   * حفظ محتويات السلة في التخزين المحلي للزوار غير المسجلين
+   */
+  const saveLocalCart = () => {
+    if (import.meta.client) {
+      try {
+        localStorage.setItem('solarhub_guest_cart', JSON.stringify(items.value))
+      } catch {
+        /* storage fallback */
       }
     }
   }
 
-  // حذف منتج من السلة
-  function removeFromCart(productId: string | number) {
-    items.value = items.value.filter(i => String(i.product.id) !== String(productId))
+  /**
+   * تحميل السلة من التخزين المحلي للزوار غير المسجلين
+   */
+  const loadLocalCart = () => {
+    if (import.meta.client) {
+      try {
+        const raw = localStorage.getItem('solarhub_guest_cart')
+        if (raw) {
+          items.value = JSON.parse(raw)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
-  // تفريغ السلة
-  function clearCart() {
+  /**
+   * تحويل استجابة عنصر سلة Laravel إلى CartStoreItem
+   */
+  const mapApiCartItem = (apiItem: any): CartStoreItem => {
+    const sp = apiItem.store_product || {}
+    const storeObj = sp.store || {}
+    const price = Number(sp.price) || 0
+    const qty = Number(apiItem.quantity) || 1
+    const lineTotal = Number(apiItem.line_total) || price * qty
+
+    const product: Product = {
+      id: sp.id || apiItem.id, // store_product_id
+      name: sp.title || 'منتج طاقة شمسية معتمد',
+      category: 'معدات كهروضوئية',
+      categoryType: 'panel',
+      brand: 'SolarHub Tier 1',
+      model: 'معتمد',
+      storeName: storeObj.company_name || 'المتجر المعتمد',
+      storeCity: 'اليمن',
+      price,
+      currency: 'ر.س',
+      rating: 4.9,
+      reviewsCount: 35,
+      image: resolveProductImage(sp),
+      badge: 'Tier 1 Global',
+      specs: { warranty: 'معتمد' },
+      inStock: (Number(sp.stock_quantity) || 1) > 0,
+    }
+
+    return {
+      id: apiItem.id,
+      quantity: qty,
+      product,
+      line_total: lineTotal,
+    }
+  }
+
+  /**
+   * جلب سلة المشتريات من مخدم Laravel
+   */
+  const fetchCart = async () => {
+    if (!isAuthenticated.value) {
+      loadLocalCart()
+      isInitialized.value = true
+      return
+    }
+
+    isLoading.value = true
+    errorMessage.value = null
+    try {
+      const res: any = await $api('/my/cart')
+      const cartData = res?.data || res
+      if (cartData && Array.isArray(cartData.items)) {
+        items.value = cartData.items.map(mapApiCartItem)
+      } else {
+        items.value = []
+      }
+    } catch (err: any) {
+      console.warn('Could not fetch server cart, falling back to local:', err?.message)
+      loadLocalCart()
+    } finally {
+      isLoading.value = false
+      isInitialized.value = true
+    }
+  }
+
+  /**
+   * إضافة منتج إلى سلة المشتريات
+   */
+  const addToCart = async (productOrStoreProduct: Product | any, quantity = 1) => {
+    const qty = Math.max(1, Number(quantity) || 1)
+    const storeProductId = Number(productOrStoreProduct.storeProductId || productOrStoreProduct.id)
+
+    // للمستخدم المسجل: إرسال الطلب فوراً إلى API السلة
+    if (isAuthenticated.value && storeProductId) {
+      isLoading.value = true
+      try {
+        const res: any = await $api('/my/cart/items', {
+          method: 'POST',
+          body: {
+            store_product_id: storeProductId,
+            quantity: qty,
+          },
+        })
+        const cartData = res?.data || res
+        if (cartData && Array.isArray(cartData.items)) {
+          items.value = cartData.items.map(mapApiCartItem)
+        }
+        return true
+      } catch (err: any) {
+        console.error('Failed to add item to API cart:', err)
+        // Fallback to local
+      } finally {
+        isLoading.value = false
+      }
+    }
+
+    // للمستخدم غير المسجل أو fallback
+    const productIdStr = String(productOrStoreProduct.id)
+    const existingIndex = items.value.findIndex(i => String(i.product.id) === productIdStr)
+
+    if (existingIndex > -1) {
+      const existing = items.value[existingIndex]
+      if (existing) {
+        existing.quantity += qty
+        existing.line_total = existing.quantity * (Number(existing.product.price) || 0)
+      }
+    } else {
+      const newProduct: Product = {
+        id: productOrStoreProduct.id,
+        name: productOrStoreProduct.name || productOrStoreProduct.title || 'منتج طاقة شمسية',
+        category: productOrStoreProduct.category || 'معدات طاقة شمسية',
+        categoryType: productOrStoreProduct.categoryType || 'panel',
+        brand: productOrStoreProduct.brand || 'معتمد',
+        model: productOrStoreProduct.model || '',
+        storeName: productOrStoreProduct.storeName || 'المتجر المعتمد',
+        storeCity: productOrStoreProduct.storeCity || 'اليمن',
+        price: Number(productOrStoreProduct.price) || 0,
+        currency: productOrStoreProduct.currency || 'ر.س',
+        rating: productOrStoreProduct.rating || 4.9,
+        reviewsCount: productOrStoreProduct.reviewsCount || 20,
+        image: productOrStoreProduct.image || '/images/product-panel.png',
+        badge: productOrStoreProduct.badge || 'Tier 1 Global',
+        specs: productOrStoreProduct.specs || {},
+        inStock: true,
+      }
+
+      items.value.push({
+        product: newProduct,
+        quantity: qty,
+        line_total: qty * (Number(newProduct.price) || 0),
+      })
+    }
+
+    saveLocalCart()
+    return true
+  }
+
+  /**
+   * تحديث كمية عنصر في السلة
+   */
+  const updateQuantity = async (productIdOrCartItemId: string | number, newQuantity: number) => {
+    const qty = Number(newQuantity)
+    if (qty <= 0) {
+      return removeFromCart(productIdOrCartItemId)
+    }
+
+    const item = items.value.find(
+      i => String(i.id) === String(productIdOrCartItemId) || String(i.product.id) === String(productIdOrCartItemId)
+    )
+    if (!item) return
+
+    // تحديث تفاؤلي سريع (Optimistic UI)
+    const oldQty = item.quantity
+    item.quantity = qty
+    item.line_total = qty * (Number(item.product.price) || 0)
+
+    const cartItemId = item.id
+    if (isAuthenticated.value && cartItemId) {
+      isUpdating.value[cartItemId] = true
+      try {
+        const res: any = await $api(`/my/cart/items/${cartItemId}`, {
+          method: 'PUT',
+          body: { quantity: qty },
+        })
+        const cartData = res?.data || res
+        if (cartData && Array.isArray(cartData.items)) {
+          items.value = cartData.items.map(mapApiCartItem)
+        }
+      } catch (err: any) {
+        console.error('Failed to update cart quantity on server:', err)
+        item.quantity = oldQty
+        item.line_total = oldQty * (Number(item.product.price) || 0)
+      } finally {
+        isUpdating.value[cartItemId] = false
+      }
+    } else {
+      saveLocalCart()
+    }
+  }
+
+  /**
+   * حذف عنصر من السلة
+   */
+  const removeFromCart = async (productIdOrCartItemId: string | number) => {
+    const itemIndex = items.value.findIndex(
+      i => String(i.id) === String(productIdOrCartItemId) || String(i.product.id) === String(productIdOrCartItemId)
+    )
+    if (itemIndex === -1) return
+
+    const item = items.value[itemIndex]
+    const cartItemId = item?.id
+
+    // إزالة محلية فورية
+    items.value.splice(itemIndex, 1)
+
+    if (isAuthenticated.value && cartItemId) {
+      try {
+        const res: any = await $api(`/my/cart/items/${cartItemId}`, {
+          method: 'DELETE',
+        })
+        const cartData = res?.data || res
+        if (cartData && Array.isArray(cartData.items)) {
+          items.value = cartData.items.map(mapApiCartItem)
+        }
+      } catch (err: any) {
+        console.error('Failed to delete item from server cart:', err)
+      }
+    } else {
+      saveLocalCart()
+    }
+  }
+
+  /**
+   * تفريغ السلة بالكامل
+   */
+  const clearCart = async () => {
     items.value = []
+    if (isAuthenticated.value) {
+      try {
+        await $api('/my/cart', { method: 'DELETE' })
+      } catch (err: any) {
+        console.error('Failed to clear cart on server:', err)
+      }
+    } else {
+      saveLocalCart()
+    }
   }
 
-  // تبديل المفضلة
-  function toggleWishlist(product: Product) {
+  /**
+   * إدارة قائمة المفضلة
+   */
+  const toggleWishlist = (product: Product) => {
     const index = wishlist.value.findIndex(p => String(p.id) === String(product.id))
     if (index > -1) {
       wishlist.value.splice(index, 1)
     } else {
       wishlist.value.push(product)
     }
+    if (import.meta.client) {
+      try {
+        localStorage.setItem('solarhub_wishlist', JSON.stringify(wishlist.value))
+      } catch {
+        /* storage fallback */
+      }
+    }
   }
 
-  function isInWishlist(productId: string | number) {
+  const isInWishlist = (productId: string | number) => {
     return wishlist.value.some(p => String(p.id) === String(productId))
+  }
+
+  // تحميل المفضلة عند التشغيل
+  if (import.meta.client) {
+    try {
+      const savedWishlist = localStorage.getItem('solarhub_wishlist')
+      if (savedWishlist) {
+        wishlist.value = JSON.parse(savedWishlist)
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   return {
     items,
     wishlist,
+    isLoading,
+    isUpdating,
+    errorMessage,
+    isInitialized,
     totalItemsCount,
     subtotal,
     vat,
     shippingFee,
     total,
+    fetchCart,
     addToCart,
     updateQuantity,
     removeFromCart,
@@ -158,4 +385,3 @@ export const useCartStore = defineStore('cart', () => {
     isInWishlist,
   }
 })
-
