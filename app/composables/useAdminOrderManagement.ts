@@ -49,7 +49,9 @@ export const useAdminOrderManagement = () => {
     if (!force && orders.value.length > 0) return orders.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/orders')
+      const res: any = await $fetch('/api/admin/orders', {
+        query: force ? { force: 'true' } : {}
+      })
       const apiData = Array.isArray(res) ? res : (res?.data || [])
       
       const transformed: AdminOrder[] = apiData.map((o: any) => ({
@@ -79,11 +81,13 @@ export const useAdminOrderManagement = () => {
         })) : [],
       }))
 
-      orders.value = transformed
-      return transformed
+      if (transformed.length > 0 || res?.status === 'success') {
+        orders.value = transformed
+      }
+      return orders.value
     } catch (err: any) {
-      notify(err?.message || 'تعذر جلب طلبات الشراء من الخادم')
-      return []
+      console.warn('Orders fetch non-blocking warning:', err)
+      return orders.value
     } finally {
       isLoading.value = false
     }
