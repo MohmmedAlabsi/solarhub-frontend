@@ -452,7 +452,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } finally {
       clearAuth()
-      navigateTo('/auth/login')
+      navigateTo('/auth/login', { replace: true })
     }
   }
 

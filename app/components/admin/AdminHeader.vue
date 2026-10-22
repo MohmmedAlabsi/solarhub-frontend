@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bell, ChevronDown, ExternalLink, Loader2, LogOut, Menu, Shield, User } from 'lucide-vue-next'
+import { Bell, ChevronDown, Home, LogOut, Menu, Shield, User } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../../stores/auth'
 
@@ -15,9 +15,7 @@ const route = useRoute()
 
 const authStore = useAuthStore()
 const { user } = storeToRefs(authStore)
-const { logout } = useAuth()
-
-const isLoggingOut = ref(false)
+const { openLogoutModal } = useAdminLogoutModal()
 
 const userName = computed(() => user.value?.name || 'مدير النظام')
 const userEmail = computed(() => user.value?.email || 'admin@solarhub.sa')
@@ -32,12 +30,6 @@ const userInitial = computed(() => {
   if (!user.value?.name) return 'م'
   return user.value.name.trim().charAt(0)
 })
-
-async function handleLogout() {
-  isLoggingOut.value = true
-  isUserMenuOpen.value = false
-  await logout()
-}
 
 function closeAccountMenu(event: PointerEvent) {
   if (event.target instanceof Node && !accountMenu.value?.contains(event.target)) {
@@ -119,7 +111,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
         <!-- قائمة المشرف المنسدلة -->
         <div
           v-if="isUserMenuOpen"
-          class="absolute left-0 mt-2 w-64 rounded-xl border border-solar-border-card bg-white p-2 shadow-dropdown z-50 text-right"
+          class="absolute left-0 mt-2 w-64 rounded-xl border border-solar-border-card bg-white p-2 shadow-dropdown z-50 text-right animate-in fade-in slide-in-from-top-2 duration-150"
         >
           <!-- بيانات المشرف المسجل دخوله حالياً -->
           <div class="px-3 py-2 border-b border-solar-border-card/60 mb-1">
@@ -141,12 +133,12 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
           </NuxtLink>
 
           <NuxtLink
-            to="/customer/dashboard"
+            to="/"
             class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-navy transition-colors"
             @click="isUserMenuOpen = false"
           >
-            <ExternalLink class="size-4 text-solar-text-muted" />
-            <span>الانتقال لبوابة العميل</span>
+            <Home class="size-4 text-solar-text-muted" />
+            <span>الانتقال إلى الرئيسية</span>
           </NuxtLink>
 
           <hr class="my-1 border-solar-border-card" />
@@ -154,13 +146,11 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
           <!-- زر تسجيل الخروج -->
           <button
             type="button"
-            :disabled="isLoggingOut"
-            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-right text-xs font-bold text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
-            @click="handleLogout"
+            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-right text-xs font-bold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+            @click="isUserMenuOpen = false; openLogoutModal()"
           >
-            <Loader2 v-if="isLoggingOut" class="size-4 animate-spin text-red-600" />
-            <LogOut v-else class="size-4 text-red-600" />
-            <span>{{ isLoggingOut ? 'جارٍ تسجيل الخروج...' : 'تسجيل الخروج' }}</span>
+            <LogOut class="size-4 text-red-600" />
+            <span>تسجيل الخروج</span>
           </button>
         </div>
       </div>

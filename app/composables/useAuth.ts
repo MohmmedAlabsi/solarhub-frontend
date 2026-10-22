@@ -285,7 +285,7 @@ export const useAuth = () => {
     } finally {
       authStore.clearAuth()
       isLoading.value = false
-      navigateTo('/auth/login')
+      navigateTo('/auth/login', { replace: true })
     }
   }
 

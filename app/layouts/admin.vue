@@ -4,6 +4,7 @@ import AppToast from '../components/common/AppToast.vue'
 import AdminFooter from '../components/admin/AdminFooter.vue'
 import AdminHeader from '../components/admin/AdminHeader.vue'
 import AdminSidebar from '../components/admin/AdminSidebar.vue'
+import AdminLogoutModal from '../components/admin/common/AdminLogoutModal.vue'
 
 const route = useRoute()
 const workspace = useAdminWorkspace()
@@ -141,6 +142,7 @@ const showUnavailable = (label: string) => {
     </div>
 
     <AppToast :message="noticeMessage || notice.message" class="!z-[100]" />
+    <AdminLogoutModal />
   </div>
 </template>
 

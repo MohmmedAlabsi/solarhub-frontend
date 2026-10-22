@@ -8,7 +8,6 @@ import {
   Database,
   FileText,
   Home,
-  Loader2,
   LogOut,
   Package,
   Settings,
@@ -39,13 +38,7 @@ const emit = defineEmits<{
 
 const route = useRoute()
 const { hasPermission } = useAdminPermissions()
-const { logout } = useAuth()
-const isLoggingOut = ref(false)
-
-async function handleLogout() {
-  isLoggingOut.value = true
-  await logout()
-}
+const { openLogoutModal } = useAdminLogoutModal()
 
 const navItems = [
   { label: 'الرئيسية', to: '/admin', icon: Home, matchPrefixes: ['/admin/dashboard'] },
@@ -160,15 +153,13 @@ function handleLinkClick() {
     <div class="shrink-0 p-3 border-t border-solar-navy-light/40">
       <button
         type="button"
-        @click="handleLogout"
-        :disabled="isLoggingOut"
+        @click="openLogoutModal"
         aria-label="تسجيل الخروج"
-        class="group relative flex items-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow text-red-200 hover:bg-red-500/20 hover:text-red-100 cursor-pointer disabled:opacity-50"
+        class="group relative flex items-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow text-red-200 hover:bg-red-500/20 hover:text-red-100 cursor-pointer"
         :class="[isCollapsed && !isMobile ? 'justify-center p-3 rounded-xl' : 'gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium w-full']"
       >
-        <Loader2 v-if="isLoggingOut" class="size-5 shrink-0 animate-spin text-red-300" />
-        <LogOut v-else class="size-5 shrink-0" />
-        <span v-if="!isCollapsed || isMobile" class="truncate">{{ isLoggingOut ? 'جارٍ تسجيل الخروج...' : 'تسجيل الخروج' }}</span>
+        <LogOut class="size-5 shrink-0" />
+        <span v-if="!isCollapsed || isMobile" class="truncate">تسجيل الخروج</span>
 
         <!-- Tooltip لتسجيل الخروج -->
         <div

@@ -39,6 +39,36 @@ function toggleSuspendedPreview() {
   }
 }
 
+onMounted(() => {
+  if (import.meta.client) {
+    // 1. إذا كان المستخدم قد سجل خروجه وقام بتحديث الصفحة (Reload)
+    if (sessionStorage.getItem('solar_just_logged_out') === '1') {
+      const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[]
+      const isReload = navEntries.length > 0 && navEntries[0]?.type === 'reload'
+
+      if (isReload) {
+        sessionStorage.removeItem('solar_just_logged_out')
+        navigateTo('/', { replace: true })
+        return
+      }
+
+      // 2. اعتراض زر العودة في المتصفح أو الهاتف لإعادته إلى الصفحة الرئيسية صفحة الهبوط
+      window.history.pushState({ page: 'login' }, '', window.location.href)
+      const handlePopState = () => {
+        if (sessionStorage.getItem('solar_just_logged_out') === '1') {
+          sessionStorage.removeItem('solar_just_logged_out')
+          navigateTo('/', { replace: true })
+        }
+      }
+
+      window.addEventListener('popstate', handlePopState)
+      onBeforeUnmount(() => {
+        window.removeEventListener('popstate', handlePopState)
+      })
+    }
+  }
+})
+
 async function handleSubmit() {
   errorMessage.value = ''
 
