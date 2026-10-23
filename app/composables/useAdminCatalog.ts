@@ -4,41 +4,76 @@ export const useAdminCatalog = () => {
   const { $api } = useNuxtApp()
   const { notify } = useAdminNotice()
 
+  const products = useState<MasterProduct[]>('admin_master_products_data', () => [])
   const categories = useState<Category[]>('admin_catalog_categories', () => [])
   const brands = useState<Brand[]>('admin_catalog_brands', () => [])
   const isLoading = ref(false)
   const isActionLoading = ref(false)
 
   /**
+   * جلب كافة منتجات الكتالوج المرجعي دفعة واحدة وتخزينها في الذاكرة لضمان سرعة فائقة
+   */
+  const fetchAllMasterProducts = async (force = false): Promise<MasterProduct[]> => {
+    if (!force && products.value.length > 0) {
+      return products.value
+    }
+
+    isLoading.value = true
+    try {
+      const res: any = await $api('/master-products?per_page=500')
+      let list: MasterProduct[] = []
+
+      if (Array.isArray(res)) {
+        list = res
+      } else if (Array.isArray(res?.data)) {
+        list = res.data
+      } else if (Array.isArray(res?.data?.data)) {
+        list = res.data.data
+      }
+
+      products.value = list
+      return list
+    } catch (err: any) {
+      console.error('Failed to fetch master products:', err)
+      notify('تعذر جلب منتجات الكتالوج المرجعي.')
+      return products.value
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
    * جلب التصنيفات
    */
-  const fetchCategories = async (): Promise<Category[]> => {
-    if (categories.value.length > 0) return categories.value
+  const fetchCategories = async (force = false): Promise<Category[]> => {
+    if (!force && categories.value.length > 0) return categories.value
     try {
       const res: any = await $api('/categories')
-      categories.value = Array.isArray(res) ? res : (res?.data || [])
-      return categories.value
+      const list = Array.isArray(res) ? res : (res?.data || [])
+      categories.value = list
+      return list
     } catch {
-      return []
+      return categories.value
     }
   }
 
   /**
    * جلب العلامات التجارية
    */
-  const fetchBrands = async (): Promise<Brand[]> => {
-    if (brands.value.length > 0) return brands.value
+  const fetchBrands = async (force = false): Promise<Brand[]> => {
+    if (!force && brands.value.length > 0) return brands.value
     try {
       const res: any = await $api('/brands')
-      brands.value = Array.isArray(res) ? res : (res?.data || [])
-      return brands.value
+      const list = Array.isArray(res) ? res : (res?.data || [])
+      brands.value = list
+      return list
     } catch {
-      return []
+      return brands.value
     }
   }
 
   /**
-   * جلب منتجات الكتالوج المرجعي مع التصفية والترقيم
+   * جلب منتجات الكتالوج المرجعي مع التصفية والترقيم (متوافق مع الاستدعاء المباشر)
    */
   const fetchMasterProducts = async (params: {
     page?: number
@@ -62,12 +97,8 @@ export const useAdminCatalog = () => {
 
       const currentPage = Number(params.page) || 1
       const perPage = 20
-
-      // Calculate total count accurately
       const total = Number(res?.meta?.total ?? res?._meta?.total ?? productsList.length)
       const lastPage = Number(res?.meta?.last_page ?? res?._meta?.last_page) || Math.max(1, Math.ceil(total / perPage))
-
-      
 
       const meta: PaginationMeta = {
         current_page: currentPage,
@@ -107,7 +138,7 @@ export const useAdminCatalog = () => {
   }
 
   /**
-   * إضافة منتج جديد للكتالوج المرجعي (يدعم رفع Datasheet PDF)
+   * إنشاء منتج مرجعي جديد في الكتالوج
    */
   const createMasterProduct = async (payload: FormData | Record<string, any>): Promise<MasterProduct> => {
     isActionLoading.value = true
@@ -116,8 +147,10 @@ export const useAdminCatalog = () => {
         method: 'POST',
         body: payload,
       })
+      const created = (res?.data ?? res) as MasterProduct
+      products.value.unshift(created)
       notify('تمت إضافة المنتج بنجاح إلى الكتالوج المرجعي!')
-      return (res?.data ?? res) as MasterProduct
+      return created
     } catch (err: any) {
       const msg = err?.data?.userMessage || 'تعذر إضافة المنتج. يرجى مراجعة الحقول.'
       notify(msg)
@@ -138,8 +171,13 @@ export const useAdminCatalog = () => {
         method: isFormData ? 'POST' : 'PUT',
         body: payload,
       })
+      const updated = (res?.data ?? res) as MasterProduct
+      const idx = products.value.findIndex(p => String(p.id) === String(id))
+      if (idx !== -1) {
+        products.value[idx] = { ...products.value[idx], ...updated }
+      }
       notify('تم تحديث بيانات المنتج بنجاح!')
-      return (res?.data ?? res) as MasterProduct
+      return updated
     } catch (err: any) {
       const msg = err?.data?.userMessage || 'تعذر تحديث المنتج.'
       notify(msg)
@@ -154,6 +192,11 @@ export const useAdminCatalog = () => {
    */
   const toggleProductStatus = async (product: MasterProduct): Promise<boolean> => {
     const newStatus = !product.is_active
+    const prevStatus = product.is_active
+
+    // تحديث متفائل فوري
+    product.is_active = newStatus
+
     try {
       await $api(`/master-products/${product.id}`, {
         method: 'PUT',
@@ -165,10 +208,10 @@ export const useAdminCatalog = () => {
           is_active: newStatus,
         },
       })
-      product.is_active = newStatus
       notify(newStatus ? 'تم تفعيل المنتج بنجاح في الكتالوج' : 'تم تعطيل المنتج وإيقافه مؤقتاً')
       return true
     } catch (err: any) {
+      product.is_active = prevStatus
       notify(err?.data?.userMessage || 'تعذر تغيير حالة المنتج.')
       return false
     }
@@ -179,6 +222,9 @@ export const useAdminCatalog = () => {
    */
   const deleteMasterProduct = async (id: number | string): Promise<boolean> => {
     isActionLoading.value = true
+    const prevProducts = [...products.value]
+    products.value = products.value.filter(p => String(p.id) !== String(id))
+
     try {
       await $api(`/master-products/${id}`, {
         method: 'DELETE',
@@ -186,6 +232,7 @@ export const useAdminCatalog = () => {
       notify('تم حذف المنتج من الكتالوج بنجاح.')
       return true
     } catch (err: any) {
+      products.value = prevProducts
       const msg = err?.data?.userMessage || 'تعذر حذف المنتج، قد يكون مرتبطاً بعروض أسعار أو طلبات متاجر.'
       notify(msg)
       return false
@@ -279,10 +326,12 @@ export const useAdminCatalog = () => {
   }
 
   return {
+    products,
     categories,
     brands,
     isLoading,
     isActionLoading,
+    fetchAllMasterProducts,
     fetchCategories,
     fetchBrands,
     fetchMasterProducts,
