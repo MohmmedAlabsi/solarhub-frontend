@@ -24,7 +24,7 @@ export function useAdminNotifications() {
           created_at: string
           createdAt?: string
         }>
-      }>('/api/admin/notifications')
+      }>('/admin/notifications')
 
       if (response && response.data) {
         notifications.value = response.data.map(item => ({
@@ -56,7 +56,7 @@ export function useAdminNotifications() {
         read_percentage: number | null
         created_at: string
       }
-    }>('/api/admin/notifications/broadcast', {
+    }>('/admin/notifications/broadcast', {
       method: 'POST',
       body: payload,
     })
