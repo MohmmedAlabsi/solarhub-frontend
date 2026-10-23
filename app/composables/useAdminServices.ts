@@ -4,6 +4,7 @@ const statusMap: Record<string, AdminServiceStatus> = {
   open_for_bids: 'open',
   open: 'open',
   awarded: 'awarded',
+  in_progress: 'executing',
   executing: 'executing',
   completed: 'completed',
   cancelled: 'cancelled',
@@ -31,7 +32,13 @@ export const useAdminServices = () => {
     try {
       let rawList: any[] = []
       try {
-        const res: any = await $api('/service-requests/open?per_page=100')
+        let res: any
+        try {
+          res = await $api('/service-requests?per_page=100')
+        } catch {
+          res = await $api('/service-requests/open?per_page=50')
+        }
+
         if (Array.isArray(res)) {
           rawList = res
         } else if (Array.isArray(res?.data)) {
@@ -40,7 +47,7 @@ export const useAdminServices = () => {
           rawList = res.data.data
         }
       } catch (err) {
-        console.warn('Could not fetch open service requests:', err)
+        console.warn('Could not fetch service requests:', err)
       }
 
       const mapped: AdminServiceRequest[] = rawList.map((item: any) => {
