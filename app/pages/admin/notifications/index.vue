@@ -111,7 +111,12 @@ const { page, filtered, rows, totalPages, pageSize } = useAdminTable(
             <td>
               <span class="inline-flex items-center gap-1 whitespace-nowrap rounded bg-solar-status-info-bg px-2 py-1 text-xs">
                 <Send class="size-3 text-solar-navy" />
-                {{ audienceLabels[notification.audience] || 'جميع المستخدمين' }}
+                <template v-if="notification.audience === 'specific' && notification.targetUser">
+                  مستخدم: {{ notification.targetUser.name }}
+                </template>
+                <template v-else>
+                  {{ audienceLabels[notification.audience] || 'جميع المستخدمين' }}
+                </template>
               </span>
             </td>
             <td>

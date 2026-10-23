@@ -159,7 +159,7 @@ export interface AdminRoleUser {
 }
 
 export type AdminApproval = 'approved' | 'pending' | 'rejected'
-export type AdminAudience = 'all' | 'customers' | 'suppliers' | 'engineers'
+export type AdminAudience = 'all' | 'customers' | 'suppliers' | 'engineers' | 'specific'
 export type AdminUserStatus = 'active' | 'inactive' | 'suspended'
 
 export interface AdminUser {
@@ -202,6 +202,7 @@ export interface AdminReview {
 }
 export interface AdminBroadcast {
   id: string; title: string; content: string; audience: AdminAudience
+  targetUser?: { id: number | string; name: string; email?: string } | null
   readPercentage: number | null; createdAt: string; simulated?: boolean
 }
 export interface AdminPlatformSettings {

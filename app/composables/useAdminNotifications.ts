@@ -31,7 +31,8 @@ export function useAdminNotifications() {
           id: item.id,
           title: item.title,
           content: item.content,
-          audience: (['all', 'customers', 'suppliers', 'engineers'].includes(item.audience) ? item.audience : 'all') as AdminAudience,
+          audience: (['all', 'customers', 'suppliers', 'engineers', 'specific'].includes(item.audience) ? item.audience : 'all') as AdminAudience,
+          targetUser: (item as any).target_user || (item as any).targetUser || null,
           readPercentage: item.readPercentage ?? item.read_percentage ?? null,
           createdAt: item.createdAt || item.created_at,
         }))
@@ -44,7 +45,12 @@ export function useAdminNotifications() {
     }
   }
 
-  async function broadcastNotification(payload: { title: string; content: string; audience: AdminAudience }) {
+  async function broadcastNotification(payload: {
+    title: string
+    content: string
+    audience: AdminAudience
+    user_id?: number | string | null
+  }) {
     const response = await $api<{
       status: string
       message?: string
@@ -53,6 +59,7 @@ export function useAdminNotifications() {
         title: string
         content: string
         audience: AdminAudience
+        target_user?: { id: number; name: string; email?: string } | null
         read_percentage: number | null
         created_at: string
       }
@@ -67,11 +74,12 @@ export function useAdminNotifications() {
         title: response.data.title,
         content: response.data.content,
         audience: response.data.audience,
+        targetUser: response.data.target_user || null,
         readPercentage: response.data.read_percentage ?? 0,
         createdAt: response.data.created_at,
       }
       notifications.value.unshift(newBroadcast)
-      notify('تم إرسال الإشعار العام إلى المستخدمين المستهدفين بنجاح.')
+      notify('تم إرسال الإشعار بنجاح.')
       return true
     }
     return false
