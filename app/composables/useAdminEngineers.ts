@@ -42,18 +42,25 @@ export const useAdminEngineers = () => {
       const mappedApproved: AdminEngineer[] = approvedList.map((item: any) => {
         const specialties = Array.isArray(item.specializations)
           ? item.specializations.map((s: any) => typeof s === 'string' ? s : s.name).filter(Boolean)
-          : ['أنظمة كهروضوئية هجينة']
+          : []
+
+        const governorate = item.governorate_name || item.governorate || item.user?.governorate?.name_ar || item.user?.governorate?.name_en || item.user?.governorate?.name || 'صنعاء'
+        const coords = parseCoordinates(item.location_coordinates || item.default_coordinates || item.user?.default_coordinates, governorate)
 
         return {
           id: String(item.id),
-          name: item.name || 'مهندس معتمد',
+          name: item.name || item.user?.name || 'مهندس معتمد',
           title: 'مهندس طاقة شمسية استشاري',
-          email: item.email || `${item.id}@solarhub.com`,
-          phone: item.phone || '77XXXXXXX',
-          city: item.governorate?.name_ar || 'اليمن',
-          license: item.license_number || `ENG-${item.id}042`,
-          licenseAuthority: 'نقابة المهندسين اليمنيين / الهيئة المعتمدة',
-          experience: Number(item.years_of_experience) || 4,
+          email: item.email || item.user?.email || '—',
+          phone: item.phone || item.user?.phone || '—',
+          city: governorate,
+          governorate,
+          coordinates: coords,
+          latitude: coords.lat,
+          longitude: coords.lng,
+          license: item.license_number || '—',
+          licenseAuthority: 'نقابة المهندسين اليمنيين / وزارة الأشغال',
+          experience: Number(item.years_of_experience) || 0,
           specialties: specialties.length ? specialties : ['تصميم ومطابقة أحمال'],
           approval: 'approved' as AdminApproval,
           approvedAt: item.approved_at || item.created_at || new Date().toISOString(),
@@ -61,30 +68,41 @@ export const useAdminEngineers = () => {
           rejectionReason: '',
           documents: item.cv_url
             ? [{ id: `cv-${item.id}`, name: 'السيرة الذاتية ورخصة المزاولة.pdf', size: '2.5 MB', url: item.cv_url }]
-            : [{ id: `lic-${item.id}`, name: 'شهادة الاعتماد المهني.pdf', size: '1.8 MB' }],
+            : [],
           image: item.profile_photo_path,
         }
       })
 
       const mappedPending: AdminEngineer[] = pendingList.map((item: any) => {
+        const specialties = Array.isArray(item.specializations)
+          ? item.specializations.map((s: any) => typeof s === 'string' ? s : s.name).filter(Boolean)
+          : []
+
+        const governorate = item.governorate_name || item.governorate || item.user?.governorate?.name_ar || item.user?.governorate?.name_en || item.user?.governorate?.name || 'صنعاء'
+        const coords = parseCoordinates(item.location_coordinates || item.default_coordinates || item.user?.default_coordinates, governorate)
+
         return {
           id: String(item.id),
           name: item.name || item.user?.name || 'طلب انضمام مهندس',
           title: 'متقدم للاعتماد الاستشاري',
-          email: item.email || item.user?.email || 'pending@solarhub.com',
-          phone: item.phone || item.user?.phone || '77XXXXXXX',
-          city: 'اليمن',
+          email: item.email || item.user?.email || '—',
+          phone: item.phone || item.user?.phone || '—',
+          city: governorate,
+          governorate,
+          coordinates: coords,
+          latitude: coords.lat,
+          longitude: coords.lng,
           license: item.license_number || 'قيد التدقيق',
           licenseAuthority: 'نقابة المهندسين / وزارة الأشغال',
-          experience: Number(item.years_of_experience) || 3,
-          specialties: ['فحص ومطابقة أنظمة طاقة'],
+          experience: Number(item.years_of_experience) || 0,
+          specialties: specialties.length ? specialties : ['فحص ومطابقة أنظمة طاقة'],
           approval: (item.approval_status || 'pending') as AdminApproval,
           approvedAt: undefined,
           bio: item.bio || 'مقدم طلب اعتماد جديد للانضمام لشبكة مهندسي المنصة المعتمدين.',
           rejectionReason: item.rejection_reason || '',
           documents: item.cv_url
             ? [{ id: `cv-${item.id}`, name: 'الملف المهني والسيرة الذاتية.pdf', size: '3.1 MB', url: item.cv_url }]
-            : [{ id: `doc-${item.id}`, name: 'وثائق التخرج ورخصة المزاولة.pdf', size: '2.0 MB' }],
+            : [],
         }
       })
 

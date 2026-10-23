@@ -59,15 +59,23 @@ export const useAdminStores = () => {
 
       // توحيد وتنسيق السجلات
       const mappedApproved: AdminSupplier[] = approvedList.map((item: any) => {
+        const governorate = item.governorate_name || item.governorate || item.user?.governorate?.name_ar || item.user?.governorate?.name_en || item.user?.governorate?.name || 'صنعاء'
+        const coords = parseCoordinates(item.location_coordinates || item.coordinates || item.user?.default_coordinates, governorate)
+
         return {
           id: String(item.id),
           name: item.company_name || 'متجر معتمد',
-          owner: item.name || item.owner || item.user?.name || 'مورد معتمد',
-          email: item.email || item.user?.email || `store${item.id}@solarhub.com`,
-          phone: item.whatsapp_number || item.phone || item.user?.phone || '77XXXXXXX',
+          owner: item.owner || item.name || item.user?.name || 'مورد معتمد',
+          email: item.email || item.user?.email || '—',
+          phone: item.whatsapp_number || item.phone || item.user?.phone || '—',
+          whatsapp: item.whatsapp_number || item.phone || '',
           commercialNumber: item.commercial_registry || '—',
           taxNumber: item.tax_number || '—',
-          city: item.user?.governorate?.name_ar || item.city || 'اليمن',
+          city: governorate,
+          governorate,
+          coordinates: coords,
+          latitude: coords.lat,
+          longitude: coords.lng,
           address: item.address_details || 'المركز الرئيسي',
           storeType: storeTypeMap[item.store_type] || (item.store_type as any) || 'موزع معتمد',
           approval: (item.approval_status || 'approved') as AdminApproval,
@@ -80,15 +88,23 @@ export const useAdminStores = () => {
       })
 
       const mappedPending: AdminSupplier[] = pendingList.map((item: any) => {
+        const governorate = item.governorate_name || item.governorate || item.user?.governorate?.name_ar || item.user?.governorate?.name_en || item.user?.governorate?.name || 'صنعاء'
+        const coords = parseCoordinates(item.location_coordinates || item.coordinates || item.user?.default_coordinates, governorate)
+
         return {
           id: String(item.id),
           name: item.company_name || 'طلب انضمام متجر',
-          owner: item.name || item.user?.name || 'مورد قيد المراجعة',
-          email: item.email || item.user?.email || `supplier${item.id}@solarhub.com`,
-          phone: item.phone || item.user?.phone || '77XXXXXXX',
+          owner: item.owner || item.name || item.user?.name || 'مورد قيد المراجعة',
+          email: item.email || item.user?.email || '—',
+          phone: item.phone || item.whatsapp_number || item.user?.phone || '—',
+          whatsapp: item.whatsapp_number || item.phone || '',
           commercialNumber: item.commercial_registry || '—',
           taxNumber: item.tax_number || '—',
-          city: item.user?.governorate?.name_ar || 'اليمن',
+          city: governorate,
+          governorate,
+          coordinates: coords,
+          latitude: coords.lat,
+          longitude: coords.lng,
           address: item.address_details || 'قيد التدقيق',
           storeType: storeTypeMap[item.store_type] || (item.store_type as any) || 'متجر متخصص',
           approval: (item.approval_status || 'pending') as AdminApproval,

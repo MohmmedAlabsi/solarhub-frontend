@@ -177,11 +177,15 @@ export interface AdminDocument { id: string; name: string; size: string; url?: s
 export interface AdminSupplier {
   id: string; name: string; owner: string; email: string; phone: string
   commercialNumber: string; taxNumber: string; city: string; address: string
-  storeType: 'وكيل معتمد' | 'متجر متخصص' | 'موزع رئيسي' | 'موزع معتمد'
+  governorate?: string; coordinates?: { lat: number; lng: number } | null
+  latitude?: number | null; longitude?: number | null; whatsapp?: string; logo?: string
+  storeType: 'وكيل معتمد' | 'متجر متخصص' | 'موزع رئيسي' | 'موزع معتمد' | string
   approval: AdminApproval; description: string; rejectionReason: string; document?: AdminDocument
 }
 export interface AdminEngineer {
   id: string; name: string; title: string; email: string; phone: string; city: string
+  governorate?: string; coordinates?: { lat: number; lng: number } | null
+  latitude?: number | null; longitude?: number | null
   license: string; licenseAuthority: string; experience: number; specialties: string[]
   approval: AdminApproval; approvedAt?: string; bio: string; rejectionReason: string
   documents: AdminDocument[]; image?: string
