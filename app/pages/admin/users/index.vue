@@ -4,7 +4,7 @@ import AdminSectionHeading from '../../../components/admin/workspace/AdminSectio
 import AdminModal from '../../../components/admin/common/AdminModal.vue'
 import AdminPagination from '../../../components/admin/common/AdminPagination.vue'
 import AdminDirectoryForm from '../../../components/admin/directory/AdminDirectoryForm.vue'
-import type { AdminUser } from '../../../../types/admin'
+import type { AdminUser, AdminUserStatus } from '../../../../types/admin'
 
 definePageMeta({ layout: 'admin' })
 useSeoMeta({ title: 'إدارة المستخدمين | SolarHub' })
@@ -29,23 +29,33 @@ async function handleRefresh() {
 }
 
 const query = ref('')
-const status = ref('all')
+const status = ref<string>('all')
 const addOpen = ref(false)
 const deleteOpen = ref(false)
 const selected = ref<AdminUser>()
 
+const statusLabels: Record<AdminUserStatus, string> = {
+  active: 'نشط',
+  inactive: 'غير نشط',
+  suspended: 'معلق',
+}
+
 const { page, filtered, rows, totalPages, pageSize } = useAdminTable(
   () => users.value,
-  u =>
-    adminMatches(query.value, u.name, u.email, u.phone) &&
-    (status.value === 'all' || u.active === (status.value === 'active')),
+  u => {
+    const currentStatus = u.status ?? (u.active ? 'active' : 'inactive')
+    return (
+      adminMatches(query.value, u.name, u.email, u.phone) &&
+      (status.value === 'all' || currentStatus === status.value)
+    )
+  },
   () => [query.value, status.value],
   10
 )
 
 async function changeStatus(user: AdminUser, event: Event) {
-  const newActive = (event.target as HTMLSelectElement).value === 'active'
-  await updateUserStatus(user.id, newActive)
+  const newStatus = (event.target as HTMLSelectElement).value as AdminUserStatus
+  await updateUserStatus(user.id, newStatus)
 }
 
 function remove() {
@@ -65,7 +75,7 @@ function exportList() {
       u.email,
       u.phone,
       u.city,
-      u.active ? 'نشط' : 'غير نشط',
+      statusLabels[u.status ?? (u.active ? 'active' : 'inactive')] || 'غير معروف',
       u.createdAt,
     ])
   )
@@ -76,7 +86,7 @@ function exportList() {
   <div class="admin-managed">
     <AdminSectionHeading
       title="إدارة المستخدمين"
-      description="عرض وإدارة حسابات المستخدمين المسجلين في منصة SolarHub وتعديل حالات النشاط مباشرة."
+      description="عرض وإدارة حسابات كافة المستخدمين المسجلين في منصة SolarHub وتعديل حالات النشاط مباشرة."
     >
       <button class="btn-outline" :disabled="isRefreshing" @click="handleRefresh">
         <RefreshCw class="size-4" :class="isRefreshing ? 'animate-spin' : ''" />
@@ -105,9 +115,10 @@ function exportList() {
       </div>
 
       <select v-model="status" class="solar-input" aria-label="حالة الحساب">
-        <option value="all">حالة الحساب: الكل</option>
+        <option value="all">كافة الحالات (الكل)</option>
         <option value="active">نشط</option>
         <option value="inactive">غير نشط</option>
+        <option value="suspended">معلق</option>
       </select>
     </div>
 
@@ -151,14 +162,21 @@ function exportList() {
             </td>
             <td>
               <select
-                :value="user.active ? 'active' : 'inactive'"
+                :value="user.status ?? (user.active ? 'active' : 'inactive')"
                 :aria-label="`حالة حساب ${user.name}`"
-                class="min-w-24 rounded-md border-0 px-2 py-1 text-xs focus:ring-2 focus:ring-solar-yellow cursor-pointer"
-                :class="user.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                class="min-w-24 rounded-md border-0 px-2 py-1 text-xs focus:ring-2 focus:ring-solar-yellow cursor-pointer font-medium"
+                :class="
+                  (user.status === 'active' || (!user.status && user.active))
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : user.status === 'suspended'
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'bg-slate-100 text-slate-600'
+                "
                 @change="changeStatus(user, $event)"
               >
                 <option value="active">نشط</option>
                 <option value="inactive">غير نشط</option>
+                <option value="suspended">معلق</option>
               </select>
             </td>
             <td class="whitespace-nowrap">{{ adminDate(user.createdAt) }}</td>

@@ -160,10 +160,18 @@ export interface AdminRoleUser {
 
 export type AdminApproval = 'approved' | 'pending' | 'rejected'
 export type AdminAudience = 'all' | 'customers' | 'suppliers' | 'engineers'
+export type AdminUserStatus = 'active' | 'inactive' | 'suspended'
+
 export interface AdminUser {
-  id: string; name: string; email: string; phone: string; city: string
-  role: 'عميل سكني' | 'عميل تجاري' | 'مهندس طاقة شمسية' | 'مورد معتمد'
-  active: boolean; createdAt: string
+  id: string
+  name: string
+  email: string
+  phone: string
+  city: string
+  role: 'عميل سكني' | 'عميل تجاري' | 'مهندس طاقة شمسية' | 'مورد معتمد' | string
+  active: boolean
+  status?: AdminUserStatus
+  createdAt: string
 }
 export interface AdminDocument { id: string; name: string; size: string; url?: string }
 export interface AdminSupplier {

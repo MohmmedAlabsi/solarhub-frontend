@@ -1,4 +1,4 @@
-import type { AdminUser } from '../../types/admin'
+import type { AdminUser, AdminUserStatus } from '../../types/admin'
 
 export const useAdminUsers = () => {
   const { $api } = useNuxtApp()
@@ -9,7 +9,7 @@ export const useAdminUsers = () => {
   const error = ref<string | null>(null)
 
   /**
-   * جلب قائمة المستخدمين من الخادم
+   * جلب كافة المستخدمين المسجلين في النظام (بما في ذلك النشطين وغير النشطين والمعلقين)
    */
   const fetchUsers = async (force = false): Promise<AdminUser[]> => {
     if (!force && users.value.length > 0) {
@@ -20,8 +20,10 @@ export const useAdminUsers = () => {
     error.value = null
 
     try {
-      const res: any = await $api('/users')
       let rawList: any[] = []
+
+      // 1. طلب قائمة المستخدمين مع تحديد حد أقصى (per_page=100) لجلب الجميع دفعة واحدة
+      const res: any = await $api('/users?per_page=100')
 
       if (Array.isArray(res)) {
         rawList = res
@@ -31,13 +33,59 @@ export const useAdminUsers = () => {
         rawList = res.data.data
       }
 
-      const mapped: AdminUser[] = rawList.map((item: any) => {
+      // 2. آلية احتياطية (Fallback): في حال كان الخادم يجلب 20 مستخدماً فقط لكل صفحة
+      if (rawList.length === 20) {
+        let nextPage = 2
+        let hasMore = true
+
+        while (hasMore) {
+          try {
+            const nextRes: any = await $api(`/users?page=${nextPage}`)
+            let nextBatch: any[] = []
+
+            if (Array.isArray(nextRes)) {
+              nextBatch = nextRes
+            } else if (Array.isArray(nextRes?.data)) {
+              nextBatch = nextRes.data
+            } else if (Array.isArray(nextRes?.data?.data)) {
+              nextBatch = nextRes.data.data
+            }
+
+            if (nextBatch.length > 0) {
+              rawList.push(...nextBatch)
+              if (nextBatch.length < 20) {
+                hasMore = false
+              } else {
+                nextPage++
+              }
+            } else {
+              hasMore = false
+            }
+          } catch (err) {
+            console.warn(`Could not fetch users page ${nextPage}:`, err)
+            hasMore = false
+          }
+        }
+      }
+
+      // تجنب أي تكرار عبر المعرف الفريد ID
+      const uniqueUsersMap = new Map<string, any>()
+      rawList.forEach(item => {
+        if (item && item.id != null) {
+          uniqueUsersMap.set(String(item.id), item)
+        }
+      })
+
+      const mapped: AdminUser[] = Array.from(uniqueUsersMap.values()).map((item: any) => {
         let role = 'عميل سكني'
         if (item.has_store) {
           role = 'مورد معتمد'
         } else if (item.has_engineer_profile) {
           role = 'مهندس طاقة شمسية'
         }
+
+        const userStatus: AdminUserStatus =
+          item.status === 'suspended' ? 'suspended' : item.status === 'inactive' ? 'inactive' : 'active'
 
         return {
           id: String(item.id),
@@ -46,17 +94,20 @@ export const useAdminUsers = () => {
           phone: item.phone || '—',
           city: item.governorate?.name_ar || 'اليمن',
           role: role as any,
-          active: item.status === 'active',
+          active: userStatus === 'active',
+          status: userStatus,
           createdAt: item.created_at || new Date().toISOString(),
         }
       })
 
-      // الاحتفاظ بالتعديلات التي قد تكون حدثت محلياً
+      // الاحتفاظ بالحالات المعدلة محلياً إذا كان هناك تفاعل سابق
       if (users.value.length > 0) {
-        const localStatusMap = new Map(users.value.map(u => [u.id, u.active]))
+        const localStatusMap = new Map(users.value.map(u => [u.id, { active: u.active, status: u.status }]))
         mapped.forEach(u => {
           if (localStatusMap.has(u.id)) {
-            u.active = localStatusMap.get(u.id)!
+            const local = localStatusMap.get(u.id)!
+            u.active = local.active
+            u.status = local.status
           }
         })
       }
@@ -73,31 +124,40 @@ export const useAdminUsers = () => {
   }
 
   /**
-   * تحديث حالة المستخدم (نشط / غير نشط) عبر الـ API
+   * تحديث حالة المستخدم (نشط / غير نشط / معلق) عبر الـ API
    */
-  const updateUserStatus = async (userId: string, newActive: boolean): Promise<boolean> => {
+  const updateUserStatus = async (userId: string, newStatus: AdminUserStatus): Promise<boolean> => {
     const targetUser = users.value.find(u => u.id === userId)
-    const prevActive = targetUser ? targetUser.active : !newActive
+    const prevStatus = targetUser?.status ?? (targetUser?.active ? 'active' : 'inactive')
+    const prevActive = targetUser?.active ?? true
 
-    // تحديث متفائل
+    // تحديث متفائل (Optimistic Update)
     if (targetUser) {
-      targetUser.active = newActive
+      targetUser.status = newStatus
+      targetUser.active = newStatus === 'active'
     }
 
     try {
       await $api(`/users/${userId}/status`, {
         method: 'PATCH',
         body: {
-          status: newActive ? 'active' : 'inactive',
+          status: newStatus,
         },
       })
 
-      notify(newActive ? 'تم تفعيل الحساب بنجاح.' : 'تم إلغاء تنشيط الحساب بنجاح.')
+      const statusMessages: Record<AdminUserStatus, string> = {
+        active: 'تم تنشيط الحساب بنجاح.',
+        inactive: 'تم إيقاف تنشيط الحساب بنجاح.',
+        suspended: 'تم تعليق / حظر الحساب بنجاح.',
+      }
+
+      notify(statusMessages[newStatus] || 'تم تحديث حالة المستخدم بنجاح.')
       return true
     } catch (err: any) {
       console.error('Failed to update user status:', err)
       // التراجع في حال الفشل
       if (targetUser) {
+        targetUser.status = prevStatus
         targetUser.active = prevActive
       }
       const msg = err?.userMessage || err?.data?.message || err?.message || 'فشل تحديث حالة المستخدم.'
