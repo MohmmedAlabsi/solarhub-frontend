@@ -72,7 +72,7 @@ export const useAdminServices = () => {
           id: String(item.id),
           client: item.customer?.name || 'عميل مسجل',
           service: item.service_type?.name || 'استشارة وتركيب منظومة طاقة',
-          city: item.governorate?.name_ar || item.governorate?.name || 'صنعاء',
+          city: item.governorate?.name_ar || item.governorate?.name || (typeof item.governorate === 'string' ? item.governorate : 'غير محدد'),
           capacity: capNum,
           status: statusMap[item.status] || 'open',
           location: item.location_details || 'موقع المشروع محدد في الاستمارة',
