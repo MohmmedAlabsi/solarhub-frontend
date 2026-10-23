@@ -31,7 +31,7 @@ export const useAdminServices = () => {
     try {
       let rawList: any[] = []
       try {
-        const res: any = await $api('/service-requests/open')
+        const res: any = await $api('/service-requests/open?per_page=100')
         if (Array.isArray(res)) {
           rawList = res
         } else if (Array.isArray(res?.data)) {

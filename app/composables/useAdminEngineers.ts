@@ -23,7 +23,7 @@ export const useAdminEngineers = () => {
       // 1. جلب المهندسين المعتمدين
       let approvedList: any[] = []
       try {
-        const approvedRes: any = await $api('/engineers')
+        const approvedRes: any = await $api('/engineers?per_page=100')
         approvedList = Array.isArray(approvedRes) ? approvedRes : (approvedRes?.data || [])
       } catch (err) {
         console.warn('Could not fetch approved engineers:', err)

@@ -36,8 +36,14 @@ export const useAuthStore = defineStore('auth', () => {
     default: () => [],
   })
 
-  const user = ref<User | null>(null)
-  const isInitialized = ref(false)
+  const authUserCookie = useCookie<any | null>('auth_user', {
+    maxAge: 60 * 60 * 24 * 7,
+    sameSite: 'lax',
+    default: () => null,
+  })
+
+  const user = ref<User | null>(authUserCookie.value || null)
+  const isInitialized = ref(!!authUserCookie.value)
   const isAuthenticated = computed(() => !!token.value && !!user.value)
   const isEmailVerified = computed(() => !!user.value?.isVerified)
   const userRole = computed<UserRole | null>(() => (user.value?.role as UserRole) || null)
@@ -58,9 +64,10 @@ export const useAuthStore = defineStore('auth', () => {
   function setUser(newUser: any | null) {
     if (!newUser) {
       user.value = null
+      authUserCookie.value = null
       authPermissionsCookie.value = []
     } else {
-      user.value = {
+      const normalizedUser: User = {
         id: newUser.id,
         name: newUser.name,
         email: newUser.email,
@@ -74,6 +81,8 @@ export const useAuthStore = defineStore('auth', () => {
         createdAt: newUser.created_at || newUser.createdAt || new Date().toISOString(),
         permissions: Array.isArray(newUser.permissions) ? newUser.permissions : (authPermissionsCookie.value || []),
       }
+      user.value = normalizedUser
+      authUserCookie.value = normalizedUser
     }
     isInitialized.value = true
   }
@@ -85,6 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
   function clearAuth() {
     user.value = null
     token.value = null
+    authUserCookie.value = null
     authPermissionsCookie.value = []
     isInitialized.value = true
     clearErrors()

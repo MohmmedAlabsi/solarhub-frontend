@@ -48,7 +48,7 @@ export const useAdminCatalog = () => {
   } = {}) => {
     isLoading.value = true
     try {
-      const query: Record<string, any> = {}
+      const query: Record<string, any> = { per_page: 100 }
       if (params.page) query.page = params.page
       if (params.category_id && params.category_id !== 'all') query.category_id = params.category_id
       if (params.brand_id && params.brand_id !== 'all') query.brand_id = params.brand_id

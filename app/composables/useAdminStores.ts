@@ -30,7 +30,7 @@ export const useAdminStores = () => {
       // 1. جلب المتاجر المعتمدة
       let approvedList: any[] = []
       try {
-        const approvedRes: any = await $api('/stores')
+        const approvedRes: any = await $api('/stores?per_page=100')
         if (Array.isArray(approvedRes)) {
           approvedList = approvedRes
         } else if (Array.isArray(approvedRes?.data)) {

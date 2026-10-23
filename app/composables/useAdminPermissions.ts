@@ -443,12 +443,25 @@ export const useAdminPermissions = () => {
    */
   const hasPermission = (permission: string | string[]): boolean => {
     const authStore = useAuthStore()
-    const currentUser = authStore.user
+    const currentUser = authStore.user || useCookie<any>('auth_user').value
+    const token = useCookie<string | null>('auth_token').value
     const authCookiePerms = useCookie<string[]>('auth_permissions').value || []
 
-    // إذا لم يكن هناك مستخدم مسجل دخوله في الجلسة
-    if (!currentUser) {
+    // إذا لم يكن هناك توكن ولا مستخدم مسجل دخوله في الجلسة
+    if (!token && !currentUser) {
       return false
+    }
+
+    // إذا توفر التوكن ولكن لم يكتمل تحميل كائن المستخدم بعد (أثناء تحديث الصفحة / SSR)
+    // نعرض عناصر القائمة لتفادي وميض السايدبار وظهور "الرئيسية" فقط
+    if (!currentUser) {
+      if (authCookiePerms && authCookiePerms.length > 0) {
+        if (Array.isArray(permission)) {
+          return permission.some(p => authCookiePerms.includes(p))
+        }
+        return authCookiePerms.includes(permission)
+      }
+      return true
     }
 
     // مدير النظام الرئيسي (Super Admin - User ID: 1) يمتلك كافة الصلاحيات بدون استثناء
@@ -469,7 +482,7 @@ export const useAdminPermissions = () => {
     }
 
     // إذا كان الحساب يحمل دور 'admin' ولم يتم تقييد صلاحياته بعد، يمنح الوصول الكامل
-    if (currentUser.role === 'admin') {
+    if (currentUser.role === 'admin' || !currentUser.role) {
       return true
     }
 
