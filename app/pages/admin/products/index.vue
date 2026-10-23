@@ -84,9 +84,9 @@ const brands = computed<Brand[]>(() => catalogData.value?.brands || [])
 const products = computed<MasterProduct[]>(() => catalogData.value?.products || [])
 const paginationMeta = computed<PaginationMeta>(() => catalogData.value?.meta || {
   current_page: page.value,
-  last_page: 5,
+  last_page: 1,
   per_page: 20,
-  total: 100,
+  total: 0,
 })
 
 // Debounced search watcher to sync URL query
@@ -410,7 +410,7 @@ function exportCatalogCsv() {
       <AdminPagination
         :current-page="paginationMeta.current_page || 1"
         :total-pages="paginationMeta.last_page || 1"
-        :total-count="paginationMeta.total || 100"
+        :total-count="paginationMeta.total || 0"
         :page-size="paginationMeta.per_page || 20"
         item-name="منتج مسجل بالكتالوج"
         @update:current-page="onPageChange"

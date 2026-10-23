@@ -48,7 +48,7 @@ export const useAdminCatalog = () => {
   } = {}) => {
     isLoading.value = true
     try {
-      const query: Record<string, any> = { per_page: 100 }
+      const query: Record<string, any> = { per_page: 20 }
       if (params.page) query.page = params.page
       if (params.category_id && params.category_id !== 'all') query.category_id = params.category_id
       if (params.brand_id && params.brand_id !== 'all') query.brand_id = params.brand_id
@@ -64,35 +64,10 @@ export const useAdminCatalog = () => {
       const perPage = 20
 
       // Calculate total count accurately
-      let total = res?._meta?.total ?? res?.meta?.total
-      let lastPage = res?._meta?.last_page ?? res?.meta?.last_page
+      const total = Number(res?.meta?.total ?? res?._meta?.total ?? productsList.length)
+      const lastPage = Number(res?.meta?.last_page ?? res?._meta?.last_page) || Math.max(1, Math.ceil(total / perPage))
 
-      if (total === undefined || total === null) {
-        const hasFilters = Boolean(
-          params.search?.trim() ||
-          (params.category_id && params.category_id !== 'all') ||
-          (params.brand_id && params.brand_id !== 'all')
-        )
-
-        if (hasFilters) {
-          if (productsList.length < perPage) {
-            total = (currentPage - 1) * perPage + productsList.length
-            lastPage = currentPage
-          } else {
-            // Filter matched at least current batch
-            total = Math.max(currentPage * perPage + 1, productsList.length)
-            lastPage = Math.max(currentPage + 1, Math.ceil(total / perPage))
-          }
-        } else {
-          // Total catalog records in the database is 100 (5 pages of 20 items)
-          total = 100
-          lastPage = Math.ceil(total / perPage)
-        }
-      }
-
-      if (!lastPage) {
-        lastPage = Math.max(1, Math.ceil(total / perPage))
-      }
+      
 
       const meta: PaginationMeta = {
         current_page: currentPage,
