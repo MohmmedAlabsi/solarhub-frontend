@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
-  Building2,
   ChevronLeft,
+  Loader2,
   MapPin,
   Package,
   Phone,
@@ -10,6 +10,7 @@ import {
   Star,
   Store,
 } from 'lucide-vue-next'
+import { useCustomerProducts } from '~~/app/composables/useCustomerProducts'
 
 definePageMeta({
   layout: 'customer',
@@ -17,74 +18,71 @@ definePageMeta({
 
 useSeoMeta({
   title: 'دليل المتاجر والوكلاء المعتمدين | SolarHub',
-  description: 'ابحث عن كبرى شركات ومستوردي معدات الطاقة الشمسية الموثقين في المملكة.',
+  description: 'ابحث عن كبرى شركات ومستوردي معدات الطاقة الشمسية الموثقين والمعتمدين.',
 })
 
+const { $api } = useNuxtApp()
+const { governorates, fetchGovernorates } = useCustomerProducts()
+
+interface StoreItem {
+  id: string | number
+  name: string
+  legalName: string
+  city: string
+  address: string
+  rating: number
+  reviewsCount: number
+  productsCount: number
+  verified: boolean
+  tierBadge: string
+  description: string
+  phone: string
+  logo?: string
+}
+
+const stores = ref<StoreItem[]>([])
+const isLoading = ref(true)
 const searchQuery = ref('')
 const selectedCity = ref('الكل')
 
-const stores = ref([
-  {
-    id: 'shams-riyadh',
-    name: 'شركة شمس الرياض للمهمات الكهروضوئية',
-    legalName: 'شركة شمس الرياض للتجارة والمقاولات الكهروضوئية',
-    city: 'الرياض - حي الملز',
-    rating: 4.95,
-    reviewsCount: 142,
-    productsCount: 86,
-    verified: true,
-    tierBadge: 'وكيل Tier 1 عالمي',
-    crNumber: '1010482910',
-    description: 'الوكيل والموزع المعتمد لألواح Jinko Solar ومحولات Growatt في المنطقة الوسطى مع توفير أطول فترات ضمان معتمدة.',
-    phone: '+966 11 482 9900',
-  },
-  {
-    id: 'sahraa-energy',
-    name: 'مؤسسة طاقة الصحراء للتوريدات المتقدمة',
-    legalName: 'مؤسسة طاقة الصحراء للطاقة البديلة',
-    city: 'الدمام - المدينة الصناعية',
-    rating: 4.88,
-    reviewsCount: 98,
-    productsCount: 64,
-    verified: true,
-    tierBadge: 'موزع ليثيوم معتمد',
-    crNumber: '2050198422',
-    description: 'متخصصون في بطاريات الليثيوم Pylontech وأنظمة إدارة الطاقة Victron Energy ومضخات الآبار للمشاريع الزراعية.',
-    phone: '+966 13 833 4411',
-  },
-  {
-    id: 'nebras-solutions',
-    name: 'شركة نبراس الحلول للطاقة المتجددة',
-    legalName: 'شركة نبراس الحلول الهندسية المحدودة',
-    city: 'جدة - طريق الملك فهد',
-    rating: 4.82,
-    reviewsCount: 76,
-    productsCount: 42,
-    verified: true,
-    tierBadge: 'وكيل Deye معتمد',
-    crNumber: '4030281944',
-    description: 'المورد الرائد لمحولات Deye الهجينة وشواحن السيارات الكهربائية وأنظمة الحماية الكهروضوئية بالمملكة.',
-    phone: '+966 12 660 7722',
-  },
-  {
-    id: 'amana-group',
-    name: 'مجموعة الأمانة لتجهيزات الطاقة والآبار',
-    legalName: 'مجموعة الأمانة للتوريدات الزراعية',
-    city: 'القصيم - بريدة',
-    rating: 4.91,
-    reviewsCount: 110,
-    productsCount: 55,
-    verified: true,
-    tierBadge: 'شريك Grundfos',
-    crNumber: '1131049281',
-    description: 'حلول ضخ المياه بالطاقة الشمسية للآبار العميقة والمزارع الكبرى، وكلاء معتمدون لمضخات Grundfos SQFlex الدنماركية.',
-    phone: '+966 16 381 2299',
-  },
-])
+onMounted(async () => {
+  isLoading.value = true
+  try {
+    const [storesRes, _] = await Promise.all([
+      $api<any>('/stores?per_page=100'),
+      fetchGovernorates(),
+    ])
+
+    const rawList = Array.isArray(storesRes)
+      ? storesRes
+      : (Array.isArray(storesRes?.data) ? storesRes.data : (Array.isArray(storesRes?.data?.data) ? storesRes.data.data : []))
+
+    stores.value = rawList.map((s: any) => ({
+      id: s.id,
+      name: s.company_name || 'متجر معتمد',
+      legalName: s.company_name || 'شركة معتمدة',
+      city: s.governorate || s.city || 'اليمن',
+      address: s.address_details || s.governorate || 'المركز الرئيسي',
+      rating: Number(s.average_rating) || 4.9,
+      reviewsCount: Number(s.ratings_count) || 0,
+      productsCount: Number(s.store_products_count || s.products_count) || 0,
+      verified: s.approval_status === 'approved',
+      tierBadge: s.store_type === 'wholesaler' ? 'وكيل ومورد رئيسي' : 'متجر معتمد',
+      description: s.bio || 'مورد معتمد لمنتجات ومعدات الطاقة الشمسية لدى منصة SolarHub.',
+      phone: s.whatsapp_number || '',
+      logo: s.company_logo_url,
+    }))
+  } catch (err) {
+    console.error('Failed to load stores:', err)
+  } finally {
+    isLoading.value = false
+  }
+})
 
 const filteredStores = computed(() => {
   return stores.value.filter((s) => {
-    const matchSearch = !searchQuery.value || s.name.includes(searchQuery.value) || s.description.includes(searchQuery.value)
+    const q = searchQuery.value.trim().toLowerCase()
+    const matchSearch = !q || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q) || s.city.toLowerCase().includes(q)
     const matchCity = selectedCity.value === 'الكل' || s.city.includes(selectedCity.value)
     return matchSearch && matchCity
   })
@@ -94,7 +92,7 @@ const filteredStores = computed(() => {
 <template>
   <div class="flex flex-col gap-6">
     <!-- Breadcrumbs -->
-    <nav class="flex items-center gap-2 text-xs text-solar-text-muted">
+    <nav class="flex items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل">
       <NuxtLink to="/customer/dashboard" class="hover:text-solar-text-heading">الرئيسية</NuxtLink>
       <span>/</span>
       <span class="font-bold text-solar-text-heading">دليل المتاجر والوكلاء المعتمدين</span>
@@ -114,81 +112,99 @@ const filteredStores = computed(() => {
         <input
           v-model="searchQuery"
           type="search"
-          placeholder="ابحث باسم المتجر أو المورد أو العلامة التجارية..."
+          placeholder="ابحث باسم المتجر أو المورد أو المحافظة..."
           class="solar-input pr-10"
         />
       </div>
 
-      <select v-model="selectedCity" class="solar-input sm:w-48">
-        <option value="الكل">كافة المناطق والمدن</option>
-        <option value="الرياض">منطقة الرياض</option>
-        <option value="جدة">منطقة مكة / جدة</option>
-        <option value="الدمام">المنطقة الشرقية / الدمام</option>
-        <option value="القصيم">منطقة القصيم</option>
-      </select>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <select v-model="selectedCity" class="solar-input sm:w-48 text-xs font-medium">
+          <option value="الكل">كافة المحافظات والمناطق</option>
+          <option v-for="gov in governorates" :key="gov.id" :value="gov.name_ar">
+            {{ gov.name_ar }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <!-- مؤشر التحميل -->
+    <div v-if="isLoading" class="flex flex-col items-center justify-center py-20">
+      <Loader2 class="size-8 animate-spin text-solar-yellow mb-2" />
+      <span class="text-xs text-solar-text-muted">جاري تحميل دليل المتاجر والوكلاء المعتمدين...</span>
     </div>
 
     <!-- شبكة المتاجر -->
-    <div class="grid gap-6 md:grid-cols-2">
-      <article
+    <div v-else-if="filteredStores.length > 0" class="grid gap-5 md:grid-cols-2">
+      <div
         v-for="store in filteredStores"
         :key="store.id"
-        class="flex flex-col justify-between rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm transition-all hover:border-solar-yellow/60 hover:shadow-hover"
+        class="flex flex-col justify-between rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm hover:border-solar-yellow/60 transition-all group"
       >
-        <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-4">
           <div class="flex items-start justify-between gap-3">
-            <div class="flex items-center gap-3.5">
-              <div class="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-solar-navy text-white shadow-sm">
-                <Building2 class="size-7" />
+            <div class="flex items-center gap-3">
+              <div class="flex size-14 shrink-0 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-navy overflow-hidden">
+                <img v-if="store.logo" :src="store.logo" :alt="store.name" class="size-full object-contain p-1" />
+                <Store v-else class="size-7" />
               </div>
-
               <div class="flex flex-col">
                 <div class="flex items-center gap-2">
-                  <h2 class="text-base font-bold text-solar-text-heading">{{ store.name }}</h2>
-                  <ShieldCheck class="size-4 text-emerald-500 shrink-0" title="سجل تجاري موثق" />
+                  <h2 class="text-base font-bold text-solar-text-heading group-hover:text-amber-600 transition-colors">
+                    {{ store.name }}
+                  </h2>
+                  <ShieldCheck v-if="store.verified" class="size-4 text-emerald-500" title="متجر موثق ومعتمد" />
                 </div>
                 <span class="text-xs text-solar-text-muted flex items-center gap-1 mt-0.5">
-                  <MapPin class="size-3.5 text-solar-yellow" />
+                  <MapPin class="size-3 text-solar-yellow" />
                   {{ store.city }}
                 </span>
               </div>
             </div>
 
-            <span class="badge-success text-[10px] shrink-0">{{ store.tierBadge }}</span>
+            <span class="badge-success text-[11px] whitespace-nowrap">{{ store.tierBadge }}</span>
           </div>
 
           <p class="text-xs leading-relaxed text-solar-text-secondary line-clamp-2">
             {{ store.description }}
           </p>
 
-          <div class="flex flex-wrap items-center gap-4 text-xs pt-2 border-t border-solar-border-card">
-            <div class="flex items-center gap-1 font-bold text-solar-text-heading">
+          <div class="flex flex-wrap items-center gap-4 text-xs text-solar-text-muted border-t border-solar-border-card pt-3">
+            <div class="flex items-center gap-1">
               <Star class="size-3.5 fill-solar-yellow text-solar-yellow" />
-              <span>{{ store.rating }}</span>
-              <span class="text-solar-text-muted">({{ store.reviewsCount }} تقييم)</span>
+              <span class="font-bold text-solar-text-heading">{{ store.rating }}</span>
+              <span>({{ store.reviewsCount }} تقييم)</span>
             </div>
-
-            <div class="flex items-center gap-1 text-solar-text-secondary">
-              <Package class="size-3.5 text-solar-navy" />
-              <span>{{ store.productsCount }} منتج معتمد</span>
+            <div v-if="store.phone" class="flex items-center gap-1">
+              <Phone class="size-3.5 text-solar-yellow" />
+              <bdi>{{ store.phone }}</bdi>
             </div>
-
-            <span class="text-[11px] text-solar-text-muted mr-auto">س.ت: {{ store.crNumber }}</span>
           </div>
         </div>
 
-        <div class="mt-5 pt-3 border-t border-solar-border-card flex items-center justify-between">
-          <a :href="`tel:${store.phone}`" class="text-xs text-solar-text-muted hover:text-solar-text-heading flex items-center gap-1">
-            <Phone class="size-3.5" />
-            <span>{{ store.phone }}</span>
-          </a>
-
+        <div class="mt-5 flex items-center justify-between border-t border-solar-border-card pt-4">
+          <div class="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+            <ShieldCheck class="size-4" />
+            <span>متجر معتمد وموثق</span>
+          </div>
           <NuxtLink :to="`/customer/stores/${store.id}`" class="btn-primary h-9 px-4 text-xs gap-1.5">
-            <span>زيارة المتجر واستعراض المنتجات</span>
-            <ChevronLeft class="size-4" />
+            <span>زيارة المتجر</span>
+            <ChevronLeft class="size-3.5" />
           </NuxtLink>
         </div>
-      </article>
+      </div>
+    </div>
+
+    <!-- حالة عدم العثور على نتائج -->
+    <div
+      v-else
+      class="flex flex-col items-center justify-center rounded-2xl border border-solar-border-card bg-white p-12 text-center shadow-sm"
+    >
+      <Store class="size-12 text-solar-text-muted mb-3" />
+      <h3 class="text-base font-bold text-solar-text-heading mb-1">لم يتم العثور على أي متجر مطابق للبحث</h3>
+      <p class="text-xs text-solar-text-muted mb-4">جرب البحث بكلمات مختلفة أو اختر محافظة أخرى.</p>
+      <button type="button" class="btn-outline text-xs" @click="searchQuery = ''; selectedCity = 'الكل'">
+        إعادة تعيين الفلاتر
+      </button>
     </div>
   </div>
 </template>

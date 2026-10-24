@@ -329,12 +329,57 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
+  function mapFavoriteToProduct(fav: any): Product {
+    const sp = fav.product || fav.store_product || fav
+    const mp = sp?.master_product || sp?.masterProduct || sp
+    const cat = mp?.category?.name || 'طاقة شمسية'
+    return {
+      id: sp?.id || fav.store_product_id,
+      name: mp?.title || mp?.name || 'منتج طاقة شمسية',
+      category: cat,
+      categoryType: 'panel',
+      brand: mp?.brand?.name || 'علامة معتمدة',
+      model: mp?.model_number || 'موديل قياسي',
+      storeName: sp?.store?.company_name || 'متجر معتمد',
+      storeCity: sp?.store?.address_details || 'اليمن',
+      price: Number(sp?.price || sp?.unit_price || 0),
+      currency: 'ر.س',
+      rating: 4.8,
+      reviewsCount: 12,
+      image: resolveProductImage(sp, cat),
+      inStock: (sp?.stock_quantity ?? 1) > 0,
+      stockQuantity: sp?.stock_quantity ?? 1,
+    }
+  }
+
   /**
-   * إدارة قائمة المفضلة
+   * جلب قائمة المفضلة من الخادم
    */
-  const toggleWishlist = (product: Product) => {
+  const fetchWishlist = async () => {
+    if (!tokenCookie.value) return
+    try {
+      const res: any = await $api('/favorites')
+      const rawList = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : [])
+      if (rawList.length > 0) {
+        wishlist.value = rawList.map(mapFavoriteToProduct)
+      } else {
+        wishlist.value = []
+      }
+      if (import.meta.client) {
+        localStorage.setItem('solarhub_wishlist', JSON.stringify(wishlist.value))
+      }
+    } catch (err) {
+      console.warn('Could not fetch server favorites, using local fallback:', err)
+    }
+  }
+
+  /**
+   * إدارة وتبديل حالة المنتج في المفضلة
+   */
+  const toggleWishlist = async (product: Product) => {
     const index = wishlist.value.findIndex(p => String(p.id) === String(product.id))
-    if (index > -1) {
+    const wasIn = index > -1
+    if (wasIn) {
       wishlist.value.splice(index, 1)
     } else {
       wishlist.value.push(product)
@@ -344,6 +389,36 @@ export const useCartStore = defineStore('cart', () => {
         localStorage.setItem('solarhub_wishlist', JSON.stringify(wishlist.value))
       } catch {
         /* storage fallback */
+      }
+    }
+
+    if (tokenCookie.value) {
+      try {
+        await $api(`/favorites/${product.id}/toggle`, { method: 'POST' })
+      } catch (err) {
+        console.warn('Failed to sync favorite with server:', err)
+      }
+    }
+  }
+
+  const removeFromWishlist = async (productId: string | number) => {
+    const index = wishlist.value.findIndex(p => String(p.id) === String(productId))
+    if (index > -1) {
+      wishlist.value.splice(index, 1)
+      if (import.meta.client) {
+        try {
+          localStorage.setItem('solarhub_wishlist', JSON.stringify(wishlist.value))
+        } catch {
+          /* storage fallback */
+        }
+      }
+    }
+
+    if (tokenCookie.value) {
+      try {
+        await $api(`/favorites/${productId}`, { method: 'DELETE' })
+      } catch (err) {
+        console.warn('Failed to delete favorite on server:', err)
       }
     }
   }
@@ -381,7 +456,9 @@ export const useCartStore = defineStore('cart', () => {
     updateQuantity,
     removeFromCart,
     clearCart,
+    fetchWishlist,
     toggleWishlist,
+    removeFromWishlist,
     isInWishlist,
   }
 })

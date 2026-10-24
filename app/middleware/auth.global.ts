@@ -1,37 +1,62 @@
-import { useAuthStore } from '~/stores/auth'
-
 export default defineNuxtRouteMiddleware(async (to) => {
-  const protectedPrefixes = ['/customer', '/admin', '/engineer', '/supplier']
-  const isProtected = protectedPrefixes.some(prefix => to.path === prefix || to.path.startsWith(`${prefix}/`))
-
   const token = useCookie<string | null>('auth_token')
-  const authStore = useAuthStore()
+  const { fetchCurrentUser, user } = useAuth()
 
-  if (isProtected) {
-    if (!token.value) {
-      return navigateTo('/auth/login')
+  const path = to.path
+
+  // قائمة المسارات العامة المتاحة للزوار بدون تسجيل دخول
+  const isAuthRoute = path.startsWith('/auth')
+  const isLandingPage = path === '/'
+
+  // المسارات المحمية التي تتطلب تسجيل الدخول إجبارياً
+  const isAdminRoute = path.startsWith('/admin')
+  const isEngineerRoute = path.startsWith('/engineer')
+  const isCustomerRoute = path.startsWith('/customer')
+  const isProtectedRoute = isAdminRoute || isEngineerRoute || isCustomerRoute
+
+  // 1. إذا كان المسار محمياً ولا يوجد توكن جلسة إطلاقاً
+  if (isProtectedRoute && !token.value) {
+    return navigateTo('/auth/login', { replace: true })
+  }
+
+  // 2. إذا كان المستخدم يحمل توكن جلسة ويزور صفحات تسجيل الدخول أو التسجيل
+  if (isAuthRoute && token.value) {
+    if (!user.value) {
+      await fetchCurrentUser()
     }
 
-    if (!authStore.user) {
-      const ok = await authStore.initAuth()
-      if (!ok || !authStore.user) {
-        return navigateTo('/auth/login')
+    if (user.value) {
+      const role = user.value.role
+      if (role === 'admin') {
+        return navigateTo('/admin', { replace: true })
+      } else if (role === 'engineer') {
+        return navigateTo('/engineer/dashboard', { replace: true })
+      } else {
+        return navigateTo('/customer/dashboard', { replace: true })
+      }
+    }
+  }
+
+  // 3. التحقق من صلاحية الجلسة واسترجاع المستخدم للمسارات المحمية
+  if (isProtectedRoute && token.value) {
+    if (!user.value) {
+      const fetched = await fetchCurrentUser()
+      if (!fetched) {
+        return navigateTo('/auth/login', { replace: true })
       }
     }
 
-    const role = authStore.user?.role
+    // 4. التحقق من تطابق الأدوار والوصول غير المصرح به
+    const currentRole = user.value?.role
 
-    // Role-based route protection
-    if (to.path.startsWith('/admin') && role !== 'admin') {
-      return navigateTo(authStore.getDashboardPath(role))
+    // لوحة تحكم الأدمن تتطلب دور admin حصراً
+    if (isAdminRoute && currentRole !== 'admin') {
+      return navigateTo('/auth/login', { replace: true })
     }
 
-    if (to.path.startsWith('/supplier') && role !== 'supplier' && role !== 'admin') {
-      return navigateTo(authStore.getDashboardPath(role))
-    }
-
-    if (to.path.startsWith('/engineer') && role !== 'engineer' && role !== 'admin') {
-      return navigateTo(authStore.getDashboardPath(role))
+    // لوحة المهندس تتطلب دور engineer (أو admin)
+    if (isEngineerRoute && currentRole !== 'engineer' && currentRole !== 'admin') {
+      return navigateTo('/auth/login', { replace: true })
     }
   }
 })

@@ -159,21 +159,33 @@ export interface AdminRoleUser {
 }
 
 export type AdminApproval = 'approved' | 'pending' | 'rejected'
-export type AdminAudience = 'all' | 'customers' | 'suppliers' | 'engineers'
+export type AdminAudience = 'all' | 'customers' | 'suppliers' | 'engineers' | 'specific'
+export type AdminUserStatus = 'active' | 'inactive' | 'suspended'
+
 export interface AdminUser {
-  id: string; name: string; email: string; phone: string; city: string
-  role: 'عميل سكني' | 'عميل تجاري' | 'مهندس طاقة شمسية' | 'مورد معتمد'
-  active: boolean; createdAt: string
+  id: string
+  name: string
+  email: string
+  phone: string
+  city: string
+  role: 'عميل سكني' | 'عميل تجاري' | 'مهندس طاقة شمسية' | 'مورد معتمد' | string
+  active: boolean
+  status?: AdminUserStatus
+  createdAt: string
 }
 export interface AdminDocument { id: string; name: string; size: string; url?: string }
 export interface AdminSupplier {
   id: string; name: string; owner: string; email: string; phone: string
   commercialNumber: string; taxNumber: string; city: string; address: string
-  storeType: 'وكيل معتمد' | 'متجر متخصص' | 'موزع رئيسي' | 'موزع معتمد'
+  governorate?: string; coordinates?: { lat: number; lng: number } | null
+  latitude?: number | null; longitude?: number | null; whatsapp?: string; logo?: string
+  storeType: 'وكيل معتمد' | 'متجر متخصص' | 'موزع رئيسي' | 'موزع معتمد' | string
   approval: AdminApproval; description: string; rejectionReason: string; document?: AdminDocument
 }
 export interface AdminEngineer {
   id: string; name: string; title: string; email: string; phone: string; city: string
+  governorate?: string; coordinates?: { lat: number; lng: number } | null
+  latitude?: number | null; longitude?: number | null
   license: string; licenseAuthority: string; experience: number; specialties: string[]
   approval: AdminApproval; approvedAt?: string; bio: string; rejectionReason: string
   documents: AdminDocument[]; image?: string
@@ -194,6 +206,7 @@ export interface AdminReview {
 }
 export interface AdminBroadcast {
   id: string; title: string; content: string; audience: AdminAudience
+  targetUser?: { id: number | string; name: string; email?: string } | null
   readPercentage: number | null; createdAt: string; simulated?: boolean
 }
 export interface AdminPlatformSettings {

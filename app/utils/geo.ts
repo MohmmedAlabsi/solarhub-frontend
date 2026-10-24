@@ -1,0 +1,80 @@
+export const governorateCoordinatesMap: Record<string, { lat: number; lng: number }> = {
+  'صنعاء': { lat: 15.3694, lng: 44.1910 },
+  'أمانة العاصمة': { lat: 15.3694, lng: 44.1910 },
+  'عدن': { lat: 12.7855, lng: 45.0187 },
+  'تعز': { lat: 13.5776, lng: 44.0175 },
+  'الحديدة': { lat: 14.7978, lng: 42.9545 },
+  'إب': { lat: 13.9667, lng: 44.1833 },
+  'مأرب': { lat: 15.4636, lng: 45.3258 },
+  'ذمار': { lat: 14.5427, lng: 44.4051 },
+  'حضرموت': { lat: 14.5385, lng: 49.1274 },
+  'المكلا': { lat: 14.5385, lng: 49.1274 },
+  'سيئون': { lat: 15.9431, lng: 48.7872 },
+  'عمران': { lat: 15.6592, lng: 43.9406 },
+  'حجة': { lat: 15.6942, lng: 43.6033 },
+  'الضالع': { lat: 13.6961, lng: 44.7314 },
+  'صعدة': { lat: 16.9402, lng: 43.7639 },
+  'شبوة': { lat: 14.5377, lng: 46.8319 },
+  'عتق': { lat: 14.5377, lng: 46.8319 },
+  'أبين': { lat: 13.1287, lng: 45.3804 },
+  'زنجبار': { lat: 13.1287, lng: 45.3804 },
+  'لحج': { lat: 13.0583, lng: 44.8828 },
+  'المهرة': { lat: 16.2079, lng: 52.1764 },
+  'الغيضة': { lat: 16.2079, lng: 52.1764 },
+  'البيضاء': { lat: 13.9852, lng: 45.5727 },
+  'الجوف': { lat: 16.7906, lng: 45.2289 },
+  'سقطرى': { lat: 12.4634, lng: 53.8237 },
+  'المحويت': { lat: 15.4701, lng: 43.5448 },
+  'ريمة': { lat: 14.6300, lng: 43.7100 },
+}
+
+/**
+ * دالة مساعدة لاستخراج الإحداثيات الجغرافية بدقة، أو الاستعانة بإحداثيات المحافظة في حال عدم تحديد موقع تفصيلي
+ */
+export function parseCoordinates(raw: any, governorateName?: string): { lat: number; lng: number } {
+  if (raw && typeof raw === 'object') {
+    const lat = Number(raw.lat ?? raw.latitude)
+    const lng = Number(raw.lng ?? raw.longitude)
+    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+      return { lat, lng }
+    }
+  }
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    // format "lat,lng"
+    if (trimmed.includes(',')) {
+      const parts = trimmed.split(',')
+      const lat = parseFloat(parts[0]?.trim())
+      const lng = parseFloat(parts[1]?.trim())
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        return { lat, lng }
+      }
+    }
+    // format JSON
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (parsed && typeof parsed === 'object') {
+        const lat = Number(parsed.lat ?? parsed.latitude)
+        const lng = Number(parsed.lng ?? parsed.longitude)
+        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+          return { lat, lng }
+        }
+      }
+    } catch {
+      // not JSON
+    }
+  }
+
+  // Fallback to governorate center
+  if (governorateName) {
+    for (const [key, coords] of Object.entries(governorateCoordinatesMap)) {
+      if (governorateName.includes(key) || key.includes(governorateName)) {
+        return coords
+      }
+    }
+  }
+
+  // Default Sana'a, Yemen
+  return { lat: 15.3694, lng: 44.1910 }
+}

@@ -9,7 +9,7 @@ interface AdminWorkspaceData {
 }
 export const approvalLabels: Record<AdminApproval,string> = {approved:'معتمد',pending:'قيد المراجعة',rejected:'مرفوض'}
 export const serviceStatusLabels: Record<AdminServiceStatus,string> = {open:'مفتوح لاستقبال العروض',awarded:'تمت الترسية',executing:'قيد التنفيذ',completed:'مكتمل',cancelled:'ملغي'}
-export const audienceLabels: Record<AdminAudience,string> = {all:'جميع المستخدمين',customers:'العملاء',suppliers:'الموردون والوكلاء',engineers:'المهندسون المعتمدون'}
+export const audienceLabels: Record<AdminAudience,string> = {all:'جميع المستخدمين',customers:'العملاء',suppliers:'الموردون والوكلاء',engineers:'المهندسون المعتمدون',specific:'مستخدم محدد'}
 export function useAdminWorkspace() {
   return useState<AdminWorkspaceData>('admin-workspace',()=>({
     users:structuredClone(adminUsers),suppliers:structuredClone(adminSuppliers),engineers:structuredClone(adminEngineers),services:structuredClone(adminServices),supplierReviews:structuredClone(adminSupplierReviews),engineerReviews:structuredClone(adminEngineerReviews),broadcasts:structuredClone(adminBroadcasts),

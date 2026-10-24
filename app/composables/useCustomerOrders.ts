@@ -135,7 +135,7 @@ export const useCustomerOrders = () => {
     isLoading.value = true
     error.value = null
     try {
-      const res: any = await $api('/my/orders')
+      const res: any = await $api('/my/orders?per_page=100')
       const list = Array.isArray(res) ? res : (res?.data || [])
       orders.value = list
       return list
@@ -229,7 +229,7 @@ export const useCustomerOrders = () => {
     isLoading.value = true
     error.value = null
     try {
-      const res: any = await $api('/my/quote-requests')
+      const res: any = await $api('/my/quote-requests?per_page=100')
       const list = Array.isArray(res) ? res : (res?.data || [])
       quoteRequests.value = list
       return list

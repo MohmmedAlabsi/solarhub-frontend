@@ -239,7 +239,7 @@ export const useCustomerProducts = () => {
     store_id?: number | string | null
   } = {}): Promise<CustomerProductView[]> => {
     try {
-      const query: Record<string, any> = {}
+      const query: Record<string, any> = { per_page: 100 }
       if (filters.governorate_id && filters.governorate_id !== 'all') query.governorate_id = filters.governorate_id
       if (filters.category_id && filters.category_id !== 'all') query.category_id = filters.category_id
       if (filters.store_id && filters.store_id !== 'all') query.store_id = filters.store_id
@@ -263,7 +263,7 @@ export const useCustomerProducts = () => {
     search?: string
   } = {}): Promise<{ products: CustomerProductView[]; meta: PaginationMeta }> => {
     try {
-      const query: Record<string, any> = {}
+      const query: Record<string, any> = { per_page: 100 }
       if (params.page) query.page = params.page
       if (params.category_id && params.category_id !== 'all') query.category_id = params.category_id
       if (params.brand_id && params.brand_id !== 'all') query.brand_id = params.brand_id
@@ -325,7 +325,7 @@ export const useCustomerProducts = () => {
 
       // جلب كافة عروض المتاجر لمقارنة العروض المتاحة لنفس المنتج
       try {
-        const allSpRes: any = await $api('/store-products')
+        const allSpRes: any = await $api('/store-products?per_page=100')
         allStoreProducts = Array.isArray(allSpRes) ? allSpRes : (allSpRes?.data || [])
       } catch {
         allStoreProducts = []

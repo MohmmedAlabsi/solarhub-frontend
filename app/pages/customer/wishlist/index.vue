@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, Heart, ShoppingCart, Trash2 } from 'lucide-vue-next'
+import { ArrowLeft, Heart, ShoppingCart, Trash2, Loader2 } from 'lucide-vue-next'
 import { useCartStore } from '~~/app/stores/cart.store'
 
 definePageMeta({
@@ -12,56 +12,31 @@ useSeoMeta({
 })
 
 const cartStore = useCartStore()
+const isLoading = ref(false)
+const addedToCartId = ref<string | number | null>(null)
 
-// إذا كانت المفضلة فارغة في البداية نضع منتج افتراضي لإظهار التصميم عند أول فتح
-onMounted(() => {
-  if (cartStore.wishlist.length === 0) {
-    cartStore.wishlist = [
-      {
-        id: '1',
-        name: 'لوح طاقة شمسية Jinko Tiger Pro 585W ثنائي الأوجه',
-        category: 'ألواح كهروضوئية',
-        categoryType: 'panel',
-        brand: 'Jinko Solar',
-        model: 'Tiger Pro 585W',
-        storeName: 'شركة شمس الرياض للمهمات الكهروضوئية',
-        storeCity: 'الرياض',
-        price: 485,
-        currency: 'ر.س',
-        rating: 4.9,
-        reviewsCount: 48,
-        image: '/images/product-panel.png',
-        badge: 'Tier 1 Global',
-        specs: { power: '585W' },
-        inStock: true,
-      },
-      {
-        id: '3',
-        name: 'بطارية ليثيوم Pylontech US5000 48V 4.8kWh دورات تفريغ 6000+',
-        category: 'تخزين ليثيوم',
-        categoryType: 'battery',
-        brand: 'Pylontech',
-        model: 'US5000',
-        storeName: 'مؤسسة طاقة الصحراء للتوريدات',
-        storeCity: 'الدمام',
-        price: 6450,
-        currency: 'ر.س',
-        rating: 5.0,
-        reviewsCount: 89,
-        image: '/images/product-battery.png',
-        badge: '6000+ دورة',
-        specs: { capacity: '4.8kWh' },
-        inStock: true,
-      },
-    ]
+onMounted(async () => {
+  isLoading.value = true
+  try {
+    await cartStore.fetchWishlist()
+  } finally {
+    isLoading.value = false
   }
 })
+
+async function handleAddToCart(product: any) {
+  await cartStore.addToCart(product, 1)
+  addedToCartId.value = product.id
+  setTimeout(() => {
+    addedToCartId.value = null
+  }, 2000)
+}
 </script>
 
 <template>
   <div class="flex flex-col gap-6">
     <!-- Breadcrumbs -->
-    <nav class="flex items-center gap-2 text-xs text-solar-text-muted">
+    <nav class="flex items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل">
       <NuxtLink to="/customer/dashboard" class="hover:text-solar-text-heading">الرئيسية</NuxtLink>
       <span>/</span>
       <span class="font-bold text-solar-text-heading">المفضلة</span>
@@ -76,9 +51,15 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- مؤشر التحميل -->
+    <div v-if="isLoading" class="flex flex-col items-center justify-center py-16">
+      <Loader2 class="size-8 animate-spin text-solar-yellow mb-2" />
+      <span class="text-xs text-solar-text-muted">جاري تحميل قائمة المفضلة من الخادم...</span>
+    </div>
+
     <!-- 1. الحالة الفارغة (المفضلة فارغة.png) -->
     <div
-      v-if="cartStore.wishlist.length === 0"
+      v-else-if="cartStore.wishlist.length === 0"
       class="flex flex-col items-center justify-center rounded-2xl border border-solar-border-card bg-white p-12 text-center shadow-sm"
     >
       <div class="flex size-24 items-center justify-center rounded-full bg-rose-50 text-rose-500 mb-4">
@@ -105,36 +86,43 @@ onMounted(() => {
           <span class="text-xs text-solar-text-muted">{{ product.category }}</span>
           <button
             type="button"
-            @click="cartStore.toggleWishlist(product)"
-            class="text-red-500 hover:text-red-700 p-1"
+            class="text-red-500 hover:text-red-700 p-1 cursor-pointer transition"
             title="حذف من المفضلة"
+            @click="cartStore.removeFromWishlist(product.id)"
           >
             <Trash2 class="size-4" />
           </button>
         </div>
 
-        <NuxtLink :to="`/customer/products/${product.id}`" class="my-3 flex h-40 items-center justify-center bg-solar-bg-subtle/50 rounded-xl p-2">
+        <NuxtLink
+          :to="`/customer/products/${product.id}`"
+          class="my-3 flex h-40 items-center justify-center bg-solar-bg-subtle/50 rounded-xl p-2"
+        >
           <img :src="product.image" :alt="product.name" class="h-full w-full object-contain" />
         </NuxtLink>
 
         <div class="flex flex-col gap-1 text-right">
-          <NuxtLink :to="`/customer/products/${product.id}`" class="text-sm font-bold text-solar-text-heading hover:text-amber-600 line-clamp-1">
+          <NuxtLink
+            :to="`/customer/products/${product.id}`"
+            class="text-sm font-bold text-solar-text-heading hover:text-amber-600 line-clamp-1"
+          >
             {{ product.name }}
           </NuxtLink>
           <span class="text-xs text-solar-text-muted">{{ product.storeName }}</span>
           <div class="mt-2 flex items-baseline justify-between">
-            <span class="text-base font-black text-solar-navy-dark">{{ product.price.toLocaleString() }} ر.س</span>
+            <span class="text-base font-black text-solar-navy-dark">{{ product.price.toLocaleString() }} {{ product.currency || 'ر.س' }}</span>
           </div>
         </div>
 
         <div class="mt-4 flex gap-2">
           <button
             type="button"
-            @click="cartStore.addToCart(product, 1)"
-            class="btn-primary flex-1 h-9 text-xs gap-1.5"
+            class="btn-primary flex-1 h-9 text-xs gap-1.5 cursor-pointer"
+            :disabled="addedToCartId === product.id"
+            @click="handleAddToCart(product)"
           >
             <ShoppingCart class="size-3.5" />
-            <span>نقل إلى السلة</span>
+            <span>{{ addedToCartId === product.id ? 'تمت الإضافة للسلة' : 'نقل إلى السلة' }}</span>
           </button>
         </div>
       </div>
