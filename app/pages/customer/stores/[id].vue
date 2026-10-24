@@ -204,17 +204,6 @@ onMounted(async () => {
       />
     </template>
 
-<<<<<<< HEAD
-    <!-- نافذة استعراض موقع المتجر والمستودع على الخريطة -->
-    <CommonMapLocationModal
-      :is-open="isMapModalOpen"
-      :current-location="store.locationCoordinates || store.address"
-      :title="`موقع متجر ${store.name} على الخريطة`"
-      subtitle="الموقع الفعلي للمتجر والمستودعات المعتمدة لاستلام وفحص البضائع وتنسيق الشحن"
-      @close="isMapModalOpen = false"
-      @select="isMapModalOpen = false"
-    />
-=======
     <!-- في حال عدم العثور على المتجر -->
     <div v-else class="flex flex-col items-center justify-center py-20 text-center">
       <Store class="size-12 text-solar-text-muted mb-3" />
@@ -223,6 +212,5 @@ onMounted(async () => {
         العودة إلى دليل المتاجر
       </NuxtLink>
     </div>
->>>>>>> origin/main
   </div>
 </template>
