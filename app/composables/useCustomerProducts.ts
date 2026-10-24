@@ -258,12 +258,14 @@ export const useCustomerProducts = () => {
    */
   const fetchMasterProducts = async (params: {
     page?: number
+    per_page?: number
     category_id?: number | string | null
     brand_id?: number | string | null
     search?: string
   } = {}): Promise<{ products: CustomerProductView[]; meta: PaginationMeta }> => {
     try {
-      const query: Record<string, any> = { per_page: 100 }
+      const perPage = params.per_page || 12
+      const query: Record<string, any> = { per_page: perPage }
       if (params.page) query.page = params.page
       if (params.category_id && params.category_id !== 'all') query.category_id = params.category_id
       if (params.brand_id && params.brand_id !== 'all') query.brand_id = params.brand_id
@@ -272,10 +274,9 @@ export const useCustomerProducts = () => {
       const res: any = await $api('/master-products', { query })
       const list: any[] = Array.isArray(res) ? res : (res?.data || [])
 
-      const currentPage = Number(params.page) || 1
-      const perPage = 20
-      const total = res?.meta?.total ?? res?._meta?.total ?? 245
-      const lastPage = res?.meta?.last_page ?? res?._meta?.last_page ?? Math.ceil(total / perPage)
+      const currentPage = Number(res?.meta?.current_page || params.page || 1)
+      const total = Number(res?.meta?.total ?? list.length)
+      const lastPage = Number(res?.meta?.last_page || Math.ceil(total / perPage) || 1)
 
       const meta: PaginationMeta = {
         current_page: currentPage,
@@ -292,7 +293,7 @@ export const useCustomerProducts = () => {
       console.error('Failed to load master products:', err)
       return {
         products: [],
-        meta: { current_page: 1, last_page: 1, per_page: 20, total: 0 },
+        meta: { current_page: 1, last_page: 1, per_page: 12, total: 0 },
       }
     }
   }

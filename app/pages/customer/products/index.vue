@@ -81,12 +81,13 @@ const loadProducts = async () => {
         governorate_id: selectedGovernorate.value === 'all' ? undefined : selectedGovernorate.value,
       })
       storeProductsList.value = items
-      totalItems.value = items.length
-      lastPage.value = Math.max(1, Math.ceil(items.length / 12))
+      totalItems.value = filteredStoreProducts.value.length
+      lastPage.value = Math.max(1, Math.ceil(filteredStoreProducts.value.length / 12))
     } else {
       // وضع عروض الأسعار: جلب الكتالوج المرجعي الشامل
       const result = await fetchMasterProducts({
         page: currentPage.value,
+        per_page: 12,
         category_id: selectedCategory.value === 'all' ? undefined : selectedCategory.value,
         brand_id: selectedBrand.value === 'all' ? undefined : selectedBrand.value,
         search: searchQuery.value,
@@ -110,12 +111,7 @@ watch(displayMode, () => {
 })
 
 // تصفية نتائج المتجر محلياً حسب البحث والموديل والماركة
-const displayedProducts = computed(() => {
-  if (displayMode.value === 'rfq') {
-    return masterProductsList.value
-  }
-
-  // في وضع السلة (store products): تصفية محلية فورية إضافية
+const filteredStoreProducts = computed(() => {
   return storeProductsList.value.filter((p) => {
     const q = searchQuery.value.trim().toLowerCase()
     const matchSearch =
@@ -133,6 +129,46 @@ const displayedProducts = computed(() => {
   })
 })
 
+// تحديث إجمالي العناصر والصفحات عند تغير الفلترة في وضع السلة
+watch([filteredStoreProducts, displayMode], () => {
+  if (displayMode.value === 'cart') {
+    totalItems.value = filteredStoreProducts.value.length
+    lastPage.value = Math.max(1, Math.ceil(filteredStoreProducts.value.length / 12))
+    if (currentPage.value > lastPage.value) {
+      currentPage.value = 1
+    }
+  }
+})
+
+// المنتجات المعروضة في الصفحة الحالية
+const displayedProducts = computed(() => {
+  if (displayMode.value === 'rfq') {
+    return masterProductsList.value
+  }
+
+  // في وضع السلة (store products): تقطيع حسب الصفحة الحالية (12 منتج لكل صفحة)
+  const pageSize = 12
+  const start = (currentPage.value - 1) * pageSize
+  return filteredStoreProducts.value.slice(start, start + pageSize)
+})
+
+// أرقام الصفحات المعروضة بشكل نافذة منزلقة
+const visiblePages = computed(() => {
+  const pages: number[] = []
+  const maxButtons = 5
+  let start = Math.max(1, currentPage.value - Math.floor(maxButtons / 2))
+  let end = Math.min(lastPage.value, start + maxButtons - 1)
+
+  if (end - start + 1 < maxButtons) {
+    start = Math.max(1, end - maxButtons + 1)
+  }
+
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
+})
+
 function handleSearchSubmit() {
   currentPage.value = 1
   loadProducts()
@@ -141,7 +177,9 @@ function handleSearchSubmit() {
 function handlePageChange(page: number) {
   if (page < 1 || page > lastPage.value) return
   currentPage.value = page
-  loadProducts()
+  if (displayMode.value === 'rfq') {
+    loadProducts()
+  }
   if (import.meta.client) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -213,18 +251,30 @@ onMounted(async () => {
           <button
             type="button"
             @click="displayMode = 'cart'"
-            class="rounded-lg px-3 py-2 transition-all cursor-pointer"
+            class="rounded-lg px-3 py-2 transition-all cursor-pointer flex items-center gap-1.5"
             :class="displayMode === 'cart' ? 'bg-solar-yellow text-solar-navy-dark shadow-sm' : 'text-solar-text-secondary hover:text-solar-text-heading'"
           >
-            إضافة للسلة (شراء فوري)
+            <span>عروض المتاجر (شراء فوري)</span>
+            <span
+              class="rounded-full px-1.5 py-0.5 text-[10px] font-black"
+              :class="displayMode === 'cart' ? 'bg-solar-navy text-white' : 'bg-solar-border-card text-solar-text-muted'"
+            >
+              {{ storeProductsList.length }}
+            </span>
           </button>
           <button
             type="button"
             @click="displayMode = 'rfq'"
-            class="rounded-lg px-3 py-2 transition-all cursor-pointer"
+            class="rounded-lg px-3 py-2 transition-all cursor-pointer flex items-center gap-1.5"
             :class="displayMode === 'rfq' ? 'bg-solar-navy text-white shadow-sm' : 'text-solar-text-secondary hover:text-solar-text-heading'"
           >
-            طلب عروض أسعار (RFQ)
+            <span>كتالوج المعدات الشامل (RFQ)</span>
+            <span
+              class="rounded-full px-1.5 py-0.5 text-[10px] font-black"
+              :class="displayMode === 'rfq' ? 'bg-solar-yellow text-solar-navy-dark' : 'bg-solar-border-card text-solar-text-muted'"
+            >
+              245+
+            </span>
           </button>
         </div>
       </div>
@@ -313,7 +363,7 @@ onMounted(async () => {
       </button>
     </div>
 
-    <!-- شريط الترقيم والتنقل بين الصفحات (Pagination) في وضع RFQ والكتالوج -->
+    <!-- شريط الترقيم والتنقل بين الصفحات (Pagination) -->
     <div
       v-if="!isLoading && lastPage > 1"
       class="flex flex-col items-center justify-between gap-4 rounded-xl border border-solar-border-card bg-white p-4 sm:flex-row"
@@ -328,28 +378,48 @@ onMounted(async () => {
           @click="handlePageChange(currentPage - 1)"
           :disabled="currentPage === 1"
           class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-muted hover:border-solar-navy-dark hover:text-solar-navy-dark disabled:opacity-40 disabled:cursor-not-allowed"
+          title="الصفحة السابقة"
         >
           <ChevronRight class="size-4" />
         </button>
 
         <button
-          v-for="p in Math.min(lastPage, 6)"
+          v-if="visiblePages[0] > 1"
+          type="button"
+          @click="handlePageChange(1)"
+          class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-xs text-solar-text-body hover:bg-solar-bg-subtle"
+        >
+          1
+        </button>
+        <span v-if="visiblePages[0] > 2" class="px-1 text-solar-text-muted">...</span>
+
+        <button
+          v-for="p in visiblePages"
           :key="p"
           type="button"
           @click="handlePageChange(p)"
           class="flex size-8 items-center justify-center rounded-lg border text-xs"
-          :class="currentPage === p ? 'bg-solar-navy-dark text-white border-solar-navy-dark' : 'border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle'"
+          :class="currentPage === p ? 'bg-solar-navy-dark text-white border-solar-navy-dark font-black' : 'border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle'"
         >
           {{ p }}
         </button>
 
-        <span v-if="lastPage > 6" class="px-1 text-solar-text-muted">...</span>
+        <span v-if="visiblePages[visiblePages.length - 1] < lastPage - 1" class="px-1 text-solar-text-muted">...</span>
+        <button
+          v-if="visiblePages[visiblePages.length - 1] < lastPage"
+          type="button"
+          @click="handlePageChange(lastPage)"
+          class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-xs text-solar-text-body hover:bg-solar-bg-subtle"
+        >
+          {{ lastPage }}
+        </button>
 
         <button
           type="button"
           @click="handlePageChange(currentPage + 1)"
           :disabled="currentPage === lastPage"
           class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-muted hover:border-solar-navy-dark hover:text-solar-navy-dark disabled:opacity-40 disabled:cursor-not-allowed"
+          title="الصفحة التالية"
         >
           <ChevronLeft class="size-4" />
         </button>
