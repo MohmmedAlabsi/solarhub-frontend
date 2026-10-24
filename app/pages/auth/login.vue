@@ -26,6 +26,12 @@ const errorMessage = ref('')
 const isSuspendedPreview = ref(false)
 const isVerifiedSuccess = computed(() => route.query.verified === 'true')
 
+const suspendedPreviewButtonText = computed(() =>
+  isSuspendedPreview.value
+    ? 'إلغاء معاينة الحساب المعلق'
+    : 'معاينة تنبيه الحساب المعلق'
+)
+
 function togglePassword() {
   showPassword.value = !showPassword.value
 }
@@ -98,11 +104,11 @@ async function handleSubmit() {
     if (result.user.role === 'customer') {
       router.push('/customer/dashboard')
     } else if (result.user.role === 'engineer') {
-      router.push('/customer/dashboard') // or engineer dashboard
+      router.push('/customer/dashboard')
     } else if (result.user.role === 'supplier') {
-      router.push('/customer/dashboard') // or supplier dashboard
+      router.push('/customer/dashboard')
     } else {
-      router.push('/admin/dashboard')
+      router.push('/customer/dashboard')
     }
   } else {
     if (result.status === 403 && (result.error?.includes('verify') || result.error?.includes('التحقق'))) {
@@ -122,41 +128,41 @@ async function handleSubmit() {
 
 <template>
   <div class="w-full max-w-[480px]">
-    <!-- بطاقة تسجيل الدخول المطابقة تماماً لتصميم تسجيل الدخول.png -->
-    <div class="rounded-3xl border border-solar-border-card/70 bg-white p-7 sm:p-10 shadow-xl text-right">
+    <!-- بطاقة تسجيل الدخول المتوافقة بالكامل مع الوضعين الداكن والنهاري -->
+    <div class="rounded-3xl border border-solar-border-card bg-solar-bg-card p-7 sm:p-10 shadow-xl text-right transition-colors duration-200">
       <!-- الشعار والعناوين -->
       <AuthHeader
         title="تسجيل الدخول"
         subtitle="أهلاً بك مجدداً في منصة حلول الطاقة الشمسية"
       />
 
-      <!-- رابط المعاينة السريعة للحساب المعلق (كما هو موضح في التصميم الأصلي) -->
+      <!-- رابط المعاينة السريعة للحساب المعلق -->
       <div class="mb-5 text-center">
         <button
           type="button"
           @click="toggleSuspendedPreview"
-          class="text-[11px] font-semibold text-solar-text-muted hover:text-solar-navy transition-colors select-none"
+          class="text-[11px] font-semibold text-solar-text-muted hover:text-solar-navy dark:hover:text-solar-yellow transition-colors select-none cursor-pointer"
         >
-          [{{ isSuspendedPreview ? 'إلغاء معاينة الحساب المعلق' : 'معاينة تنبيه الحساب المعلق' }}]
+          {{ suspendedPreviewButtonText }}
         </button>
       </div>
 
       <!-- تنبيه نجاح التحقق من البريد -->
       <div
         v-if="isVerifiedSuccess"
-        class="mb-6 flex items-start gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3.5 text-xs font-semibold text-emerald-800 leading-relaxed animate-in fade-in duration-200"
+        class="mb-6 flex items-start gap-2.5 rounded-2xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/90 dark:bg-emerald-950/40 p-3.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 leading-relaxed animate-in fade-in duration-200"
       >
-        <CheckCircle2 class="size-4.5 shrink-0 text-emerald-600 mt-0.5" />
+        <CheckCircle2 class="size-4.5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
         <span class="flex-1">تم تفعيل بريدك الإلكتروني بنجاح! يمكنك الآن تسجيل الدخول إلى حسابك.</span>
       </div>
 
       <!-- تنبيه الخطأ أو التعليق -->
       <div
         v-if="errorMessage"
-        class="mb-6 flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs font-semibold text-rose-700 leading-relaxed animate-in fade-in duration-200"
+        class="mb-6 flex items-start gap-2.5 rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/90 dark:bg-rose-950/40 p-3.5 text-xs font-semibold text-rose-700 dark:text-rose-300 leading-relaxed animate-in fade-in duration-200"
       >
         <AlertCircle class="size-4.5 shrink-0 text-rose-500 mt-0.5" />
-        <span class="flex-1">{{ errorMessage }}</span>
+        <span class="flex-1 break-words overflow-hidden">{{ errorMessage }}</span>
       </div>
 
       <form @submit.prevent="handleSubmit" class="flex flex-col gap-5">
@@ -172,10 +178,10 @@ async function handleSubmit() {
               id="login-input"
               v-model="form.login"
               type="text"
-              placeholder="xxxxxxx gl05example@domain.com"
+              placeholder="name@example.com أو 77xxxxxxx"
               dir="ltr"
-              class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 pl-11 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-left"
-              :class="{ 'border-rose-400 ring-1 ring-rose-200': errorMessage && !form.login.trim() }"
+              class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 pl-11 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-left"
+              :class="{ 'border-rose-400 ring-1 ring-rose-200 dark:ring-rose-900': errorMessage && !form.login.trim() }"
             />
             <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-solar-text-muted pointer-events-none">
               <User class="size-4.5" />
@@ -194,7 +200,7 @@ async function handleSubmit() {
             <!-- رابط نسيت كلمة المرور على الجانب الأيسر -->
             <NuxtLink
               to="/auth/forgot-password"
-              class="text-xs font-bold text-solar-navy hover:text-solar-yellow transition-colors"
+              class="text-xs font-bold text-solar-navy dark:text-solar-yellow hover:underline transition-colors"
             >
               نسيت كلمة المرور؟
             </NuxtLink>
@@ -206,13 +212,13 @@ async function handleSubmit() {
               v-model="form.password"
               :type="showPassword ? 'text' : 'password'"
               placeholder="أدخل كلمة المرور"
-              class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 pl-11 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
-              :class="{ 'border-rose-400 ring-1 ring-rose-200': errorMessage && !form.password }"
+              class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 pl-11 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
+              :class="{ 'border-rose-400 ring-1 ring-rose-200 dark:ring-rose-900': errorMessage && !form.password }"
             />
             <button
               type="button"
               @click="togglePassword"
-              class="absolute left-3.5 top-1/2 -translate-y-1/2 text-solar-text-muted hover:text-solar-navy transition-colors"
+              class="absolute left-3.5 top-1/2 -translate-y-1/2 text-solar-text-muted hover:text-solar-navy dark:hover:text-solar-yellow transition-colors cursor-pointer"
               :aria-label="showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'"
             >
               <EyeOff v-if="showPassword" class="size-4.5" />
@@ -221,13 +227,13 @@ async function handleSubmit() {
           </div>
         </div>
 
-        <!-- زر تسجيل الدخول الداكن -->
+        <!-- زر تسجيل الدخول المتجاوب بلون بارز في كلا الوضعين -->
         <button
           type="submit"
           :disabled="authStore.isLoading"
-          class="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1b2d42] text-xs sm:text-sm font-bold text-white shadow-md hover:bg-solar-navy-dark active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+          class="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark text-xs sm:text-sm font-black shadow-md hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
         >
-          <span v-if="authStore.isLoading" class="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          <span v-if="authStore.isLoading" class="size-4 border-2 border-white/30 dark:border-solar-navy/30 border-t-white dark:border-t-solar-navy rounded-full animate-spin" />
           <span>{{ authStore.isLoading ? 'جاري التحقق...' : 'تسجيل الدخول' }}</span>
           <ArrowLeft v-if="!authStore.isLoading" class="size-4" />
         </button>
@@ -238,7 +244,7 @@ async function handleSubmit() {
         <span>ليس لديك حساب في سولار هب؟ </span>
         <NuxtLink
           to="/auth/register"
-          class="font-black text-solar-navy hover:text-solar-yellow transition-colors underline decoration-solar-yellow/50 underline-offset-4"
+          class="font-black text-solar-navy dark:text-solar-yellow hover:underline transition-colors underline decoration-solar-yellow/50 underline-offset-4"
         >
           إنشاء حساب جديد
         </NuxtLink>

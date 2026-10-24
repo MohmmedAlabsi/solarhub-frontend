@@ -1,20 +1,30 @@
 <script setup lang="ts">
+import { useTheme } from '~/composables/useTheme'
+
 interface Props {
   title: string
   subtitle?: string
 }
 
 defineProps<Props>()
+const { isDark } = useTheme()
 </script>
 
 <template>
   <div class="flex flex-col items-center text-center mb-6 sm:mb-8">
-    <!-- شعار سولار هب المعتمد في أعلى بطاقات المصادقة -->
+    <!-- شعار سولار هب المعتمد الشفاف المتوافق مع الوضعين الداكن والنهاري -->
     <NuxtLink to="/" class="mb-4 inline-block transition-transform hover:scale-105" title="العودة للرئيسية">
       <img
-        src="/images/logo-expanded-trimmed.jpg"
+        v-if="!isDark"
+        src="/images/logo-expanded-dark-transparent.png"
         alt="Solar Hub"
-        class="h-10 sm:h-12 w-auto object-contain"
+        class="h-10 sm:h-12 w-auto object-contain drop-shadow-xs"
+      />
+      <img
+        v-else
+        src="/images/logo-expanded-transparent.png"
+        alt="Solar Hub"
+        class="h-10 sm:h-12 w-auto object-contain drop-shadow-xs"
       />
     </NuxtLink>
 

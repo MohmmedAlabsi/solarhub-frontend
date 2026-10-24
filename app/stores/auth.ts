@@ -14,6 +14,8 @@ export interface UserProfile {
     id: number
     name_ar: string
   } | string | null
+  default_coordinates?: string | null
+  store?: any
   has_store?: boolean
   has_engineer_profile?: boolean
   onboarding_status?: string
@@ -76,6 +78,8 @@ export const useAuthStore = defineStore('auth', () => {
         status: newUser.status,
         governorate: typeof newUser.governorate === 'object' ? newUser.governorate?.name_ar : newUser.governorate,
         isVerified: !!(newUser.email_verified || newUser.isVerified || newUser.email_verified_at),
+        default_coordinates: newUser.default_coordinates || null,
+        store: newUser.store || null,
         has_store: newUser.has_store,
         has_engineer_profile: newUser.has_engineer_profile,
         createdAt: newUser.created_at || newUser.createdAt || new Date().toISOString(),
@@ -262,12 +266,19 @@ export const useAuthStore = defineStore('auth', () => {
       const role = payload.role
 
       if (role === 'customer') {
-        const body = {
+        const body: Record<string, any> = {
           name: payload.name.trim(),
           email: payload.email.trim(),
           phone: payload.phone.trim(),
           password: payload.password,
           password_confirmation: payload.password_confirmation,
+        }
+
+        if (payload.governorate) body.governorate = payload.governorate
+        if (payload.governorate_id) body.governorate_id = payload.governorate_id
+        if (payload.location) {
+          body.location = payload.location
+          body.default_coordinates = `POINT(${payload.location.lng} ${payload.location.lat})`
         }
 
         const res = await apiRequest<any>('/auth/customer/register', {
@@ -303,6 +314,16 @@ export const useAuthStore = defineStore('auth', () => {
         // License number (required by backend)
         const license = engPayload.licenseNumber || engPayload.license_number || `SCE-${Math.floor(100000 + Math.random() * 900000)}`
         formData.append('license_number', license)
+
+        // Governorate & Coordinates
+        if (engPayload.governorate) formData.append('governorate', engPayload.governorate)
+        if (engPayload.governorate_id) formData.append('governorate_id', String(engPayload.governorate_id))
+        if (engPayload.location?.address) formData.append('address_details', engPayload.location.address)
+        if (engPayload.location?.lat && engPayload.location?.lng) {
+          const coordsStr = `POINT(${engPayload.location.lng} ${engPayload.location.lat})`
+          formData.append('location_coordinates', coordsStr)
+          formData.append('default_coordinates', coordsStr)
+        }
 
         // CV File
         if (engPayload.cvFile) {
@@ -349,9 +370,16 @@ export const useAuthStore = defineStore('auth', () => {
         const storeType = supPayload.storeType || supPayload.store_type || 'retailer'
         formData.append('store_type', storeType)
 
-        // Address details
-        const address = supPayload.addressDetails || supPayload.address_details || supPayload.governorate || 'المملكة العربية السعودية'
+        // Address details & Governorate
+        const address = supPayload.addressDetails || supPayload.address_details || supPayload.location?.address || supPayload.governorate || 'صنعاء'
         formData.append('address_details', address)
+        if (supPayload.governorate) formData.append('governorate', supPayload.governorate)
+        if (supPayload.governorate_id) formData.append('governorate_id', String(supPayload.governorate_id))
+        if (supPayload.location?.lat && supPayload.location?.lng) {
+          const coordsStr = `POINT(${supPayload.location.lng} ${supPayload.location.lat})`
+          formData.append('location_coordinates', coordsStr)
+          formData.append('default_coordinates', coordsStr)
+        }
 
         // Commercial register file
         if (supPayload.commercialRegisterFile) {
@@ -453,6 +481,102 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Reset password with token from email link
+   */
+  async function resetPassword(payload: {
+    email: string
+    token: string
+    password: string
+    password_confirmation: string
+  }) {
+    isLoading.value = true
+    try {
+      const res = await apiRequest<null>('/auth/reset-password', {
+        method: 'POST',
+        body: {
+          email: payload.email.trim(),
+          token: payload.token.trim(),
+          password: payload.password,
+          password_confirmation: payload.password_confirmation,
+        },
+      })
+
+      return { success: res.success, message: res.message, error: res.error, errors: res.errors }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Update authenticated user's own profile (PUT /my/profile)
+   */
+  async function updateProfile(data: {
+    name?: string
+    phone?: string
+    governorate_id?: number
+    default_coordinates?: string
+    current_password?: string
+    password?: string
+    password_confirmation?: string
+  }) {
+    isLoading.value = true
+    try {
+      const res = await apiRequest<any>('/my/profile', {
+        method: 'PUT',
+        body: data,
+      })
+
+      if (res.success && res.data) {
+        setUser(res.data)
+        return { success: true, user: user.value, message: res.message || 'تم تحديث الملف الشخصي بنجاح' }
+      }
+
+      return { success: false, error: res.error, errors: res.errors }
+    } finally {
+      isLoading.value = false
+    }
+  }
+  /**
+   * Update store details (location, address, whatsapp, bio, etc.)
+   */
+  async function updateStore(storeId: number | string, data: {
+    company_name?: string
+    address_details?: string
+    location_coordinates?: string
+    whatsapp_number?: string
+    store_type?: string
+    bio?: string
+  }) {
+    isLoading.value = true
+    try {
+      const res = await apiRequest<any>(`/stores/${storeId}`, {
+        method: 'PUT',
+        body: data,
+      })
+      if (res.success && res.data) {
+        if (user.value && (user.value as any).store) {
+          (user.value as any).store = { ...(user.value as any).store, ...res.data }
+        }
+        return { success: true, store: res.data, message: res.message || 'تم تحديث بيانات المتجر والمستودع بنجاح' }
+      }
+      return { success: false, error: res.error, errors: res.errors }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Get appropriate dashboard path based on role
+   */
+  function getDashboardPath(role?: string | null): string {
+    const targetRole = role || user.value?.role
+    if (targetRole === 'admin') return '/admin'
+    if (targetRole === 'supplier') return '/supplier/dashboard'
+    if (targetRole === 'engineer') return '/engineer/dashboard'
+    return '/customer/dashboard'
+  }
+
+  /**
    * Logout user and revoke Sanctum access token
    */
   async function logout() {
@@ -489,6 +613,10 @@ export const useAuthStore = defineStore('auth', () => {
     verifyOtp,
     resendOtp,
     forgotPassword,
+    resetPassword,
+    updateProfile,
+    updateStore,
+    getDashboardPath,
     logout,
   }
 })

@@ -5,7 +5,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const path = to.path
 
   // قائمة المسارات العامة المتاحة للزوار بدون تسجيل دخول
-  const isAuthPage = path.startsWith('/auth')
+  const isAuthRoute = path.startsWith('/auth')
   const isLandingPage = path === '/'
 
   // المسارات المحمية التي تتطلب تسجيل الدخول إجبارياً
@@ -20,7 +20,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   // 2. إذا كان المستخدم يحمل توكن جلسة ويزور صفحات تسجيل الدخول أو التسجيل
-  if (isAuthPage && token.value) {
+  if (isAuthRoute && token.value) {
     if (!user.value) {
       await fetchCurrentUser()
     }

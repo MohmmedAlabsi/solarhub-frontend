@@ -21,8 +21,8 @@ const policyLinks = [
 
 const contacts = [
   { icon: Mail, label: 'support@solarhub.energy', href: 'mailto:support@solarhub.energy' },
-  { icon: Phone, label: '+966 800 124 7652 / +966 11 400 0000', href: 'tel:+9668001247652' },
-  { icon: MapPin, label: 'المملكة العربية السعودية، الرياض · الجمهورية اليمنية، صنعاء', href: '#' },
+  { icon: Phone, label: '+967 1 400 000 / +967 777 000 000', href: 'tel:+9671400000' },
+  { icon: MapPin, label: 'الجمهورية اليمنية، صنعاء', href: '#' },
 ]
 </script>
 
@@ -111,7 +111,7 @@ const contacts = [
       <div class="container-page flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-white/50">
         <p>© 2025 منصة سولار هب (Solar Hub). جميع الحقوق محفوظة لرواد الطاقة النظيفة.</p>
         <p class="flex items-center gap-2">
-          <span>مطابق للمواصفات والمقاييس (SASO) والكود الهندسي (SEC)</span>
+          <span>مطابق لأعلى معايير الجودة والمواصفات الهندسية المعتمدة</span>
           <span>·</span>
           <span class="text-solar-yellow/80">نحو مستقبل طاقة مستدام ونظيف</span>
         </p>

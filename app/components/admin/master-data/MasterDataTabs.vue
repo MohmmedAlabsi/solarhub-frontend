@@ -18,7 +18,7 @@ function isActive(to: string) {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-solar-border-card bg-white p-2 shadow-2xs">
+  <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-solar-border-card bg-solar-bg-card p-2 shadow-2xs transition-colors duration-200">
     <NuxtLink
       v-for="tab in tabs"
       :key="tab.to"
@@ -26,7 +26,7 @@ function isActive(to: string) {
       class="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all duration-200 select-none"
       :class="[
         isActive(tab.to)
-          ? 'bg-solar-navy text-white shadow-md'
+          ? 'bg-solar-yellow text-solar-navy-dark font-black shadow-md'
           : 'text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-text-heading'
       ]"
     >

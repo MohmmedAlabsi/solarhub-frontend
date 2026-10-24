@@ -5,6 +5,7 @@ export interface CustomerProfileForm {
   email: string
   phone: string
   address: string
+  coordinates?: string
   twoFactorEnabled: boolean
   currentPassword: string
   newPassword: string

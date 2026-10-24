@@ -172,7 +172,7 @@ function handleChat() {
           type="button"
           @click="activeTab = 'overview'"
           class="pb-3 text-xs sm:text-sm font-black border-b-2 transition-all whitespace-nowrap"
-          :class="activeTab === 'overview' ? 'border-solar-yellow text-solar-navy-dark' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
+          :class="activeTab === 'overview' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
         >
           نظرة عامة
         </button>
@@ -180,7 +180,7 @@ function handleChat() {
           type="button"
           @click="activeTab = 'projects'"
           class="pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap"
-          :class="activeTab === 'projects' ? 'border-solar-yellow text-solar-navy-dark' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
+          :class="activeTab === 'projects' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
         >
           معرض المشاريع
         </button>
@@ -188,7 +188,7 @@ function handleChat() {
           type="button"
           @click="activeTab = 'certificates'"
           class="pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap"
-          :class="activeTab === 'certificates' ? 'border-solar-yellow text-solar-navy-dark' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
+          :class="activeTab === 'certificates' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
         >
           الاعتمادات والشهادات
         </button>
@@ -196,7 +196,7 @@ function handleChat() {
           type="button"
           @click="activeTab = 'reviews'"
           class="pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap"
-          :class="activeTab === 'reviews' ? 'border-solar-yellow text-solar-navy-dark' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
+          :class="activeTab === 'reviews' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
         >
           التقييمات والآراء ({{ engineer.reviewsCount }})
         </button>

@@ -83,3 +83,46 @@
 
   --solar-font-family: 'Cairo', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
 }
+
+/* ========================================================
+   7. DARK MODE TOKENS (الوضع الليلي المتكامل)
+   ======================================================== */
+html.dark {
+  /* أسطح وخلفيات الوضع الليلي */
+  --solar-bg-page: #0B131E;          /* خلفية الصفحة الداكنة العميقة */
+  --solar-bg-card: #131E2B;          /* خلفية البطاقات والحاويات الداكنة */
+  --solar-bg-subtle: #192738;        /* خلفية الأقسام والحقول المساعدة */
+
+  /* الإطارات والفواصل في الوضع الليلي */
+  --solar-border-card: #223449;      /* حدود البطاقات المريحة للعين */
+  --solar-border-input: #2B415A;     /* حدود حقول الإدخال */
+  --solar-border-focus: #F2B705;
+
+  /* ألوان النصوص في الوضع الليلي */
+  --solar-text-heading: #F8FAFC;     /* نصوص العناوين الرئيسية النقية والواضحة */
+  --solar-text-body: #CBD5E1;        /* نصوص الفقرات المريحة للقراءة */
+  --solar-text-secondary: #94A3B8;   /* النصوص الثانوية والتلميحات */
+  --solar-text-muted: #64748B;       /* التواريخ والملاحظات المصغرة */
+  --solar-text-disabled: #475569;
+
+  /* حالات الإشعارات والبادجات الداكنة المتناسقة */
+  --solar-success-bg: rgba(5, 150, 105, 0.18);
+  --solar-success-text: #34D399;
+  --solar-success-border: rgba(52, 211, 153, 0.3);
+
+  --solar-info-bg: rgba(37, 99, 235, 0.18);
+  --solar-info-text: #60A5FA;
+  --solar-info-border: rgba(96, 165, 250, 0.3);
+
+  --solar-warning-bg: rgba(245, 158, 11, 0.18);
+  --solar-warning-text: #FBBF24;
+  --solar-warning-border: rgba(251, 191, 36, 0.3);
+
+  --solar-danger-bg: rgba(220, 38, 38, 0.18);
+  --solar-danger-text: #F87171;
+  --solar-danger-border: rgba(248, 113, 113, 0.3);
+
+  /* ظلال الوضع الليلي */
+  --solar-shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
+  --solar-shadow-dropdown: 0 10px 30px -5px rgba(0, 0, 0, 0.7);
+}
