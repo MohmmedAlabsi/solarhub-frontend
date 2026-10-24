@@ -693,9 +693,9 @@ onUnmounted(() => {
           <button
             type="submit"
             :disabled="isSearching || !searchQuery.trim()"
-            class="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 rounded-xl bg-[#1b2d42] text-white text-xs font-bold hover:bg-solar-navy-dark transition-all shrink-0 cursor-pointer disabled:opacity-50 shadow-xs active:scale-[0.99]"
+            class="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 rounded-xl bg-[#1b2d42] dark:bg-solar-yellow text-white dark:text-solar-navy-dark text-xs font-bold hover:bg-solar-navy-dark dark:hover:bg-solar-yellow-hover transition-all shrink-0 cursor-pointer disabled:opacity-50 shadow-xs active:scale-[0.99]"
           >
-            <Search class="size-3.5 text-solar-yellow" />
+            <Search class="size-3.5 text-solar-yellow dark:text-solar-navy-dark" />
             <span>بحث وعكس على الخريطة</span>
           </button>
 
@@ -708,7 +708,7 @@ onUnmounted(() => {
             title="تحديد موقعي الحالي من الجهاز"
           >
             <Loader2 v-if="isLocatingUser" class="size-4 animate-spin text-solar-yellow" />
-            <Crosshair v-else class="size-4 text-solar-navy-dark" />
+            <Crosshair v-else class="size-4 text-solar-navy-dark dark:text-solar-yellow" />
             <span class="hidden sm:inline">{{ isLocatingUser ? 'جاري التحديد...' : 'موقعي الآن' }}</span>
           </button>
         </form>
@@ -767,12 +767,12 @@ onUnmounted(() => {
             <span>اسحب الدبوس أو انقر على أي نقطة لتثبيت موقعك</span>
           </div>
 
-                    <!-- مبدل نمط الخريطة (شوارع / قمر صناعي) -->
+          <!-- مبدل نمط الخريطة (شوارع / قمر صناعي) -->
           <div class="absolute top-3 left-3 z-10 flex items-center bg-solar-bg-card/95 backdrop-blur-xs rounded-xl shadow-md border border-solar-border-card p-1 gap-1 text-[11px] font-bold">
             <button
               type="button"
               @click="setTileLayer('streets')"
-              :class="currentMapType === 'streets' ? 'bg-[#1b2d42] text-white shadow-xs' : 'text-solar-text-muted hover:text-solar-navy-dark'"
+              :class="currentMapType === 'streets' ? 'bg-[#1b2d42] dark:bg-solar-yellow text-white dark:text-solar-navy-dark shadow-xs' : 'text-solar-text-muted hover:text-solar-navy-dark dark:hover:text-solar-yellow'"
               class="px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
             >
               خريطة الشوارع
@@ -780,7 +780,7 @@ onUnmounted(() => {
             <button
               type="button"
               @click="setTileLayer('satellite')"
-              :class="currentMapType === 'satellite' ? 'bg-[#1b2d42] text-white shadow-xs' : 'text-solar-text-muted hover:text-solar-navy-dark'"
+              :class="currentMapType === 'satellite' ? 'bg-[#1b2d42] dark:bg-solar-yellow text-white dark:text-solar-navy-dark shadow-xs' : 'text-solar-text-muted hover:text-solar-navy-dark dark:hover:text-solar-yellow'"
               class="px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
             >
               قمر صناعي

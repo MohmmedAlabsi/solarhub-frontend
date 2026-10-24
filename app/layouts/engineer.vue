@@ -5,7 +5,7 @@ import EngineerHeader from '../components/engineer/EngineerHeader.vue'
 import EngineerSidebar from '../components/engineer/EngineerSidebar.vue'
 
 const route = useRoute()
-useHead({ htmlAttrs: { class: 'engineer-portal' }, bodyAttrs: { class: 'engineer-portal' } })
+useHead({ bodyAttrs: { class: 'engineer-portal' } })
 
 const isCollapsed = ref(false)
 const isMobileOpen = ref(false)

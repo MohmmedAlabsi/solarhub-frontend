@@ -10,7 +10,6 @@ const route = useRoute()
 const workspace = useAdminWorkspace()
 const { notice } = useAdminNotice()
 useHead({
-  htmlAttrs: { class: 'admin-portal', lang: 'ar', dir: 'rtl' },
   bodyAttrs: { class: 'admin-portal bg-solar-bg-page' },
 })
 

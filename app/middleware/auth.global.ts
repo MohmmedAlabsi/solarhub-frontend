@@ -11,8 +11,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // المسارات المحمية التي تتطلب تسجيل الدخول إجبارياً
   const isAdminRoute = path.startsWith('/admin')
   const isEngineerRoute = path.startsWith('/engineer')
+  const isSupplierRoute = path.startsWith('/supplier')
   const isCustomerRoute = path.startsWith('/customer')
-  const isProtectedRoute = isAdminRoute || isEngineerRoute || isCustomerRoute
+  const isProtectedRoute = isAdminRoute || isEngineerRoute || isSupplierRoute || isCustomerRoute
 
   // 1. إذا كان المسار محمياً ولا يوجد توكن جلسة إطلاقاً
   if (isProtectedRoute && !token.value) {
@@ -26,9 +27,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
 
     if (user.value) {
-      const role = user.value.role
+      const role = (user.value.role || '').trim().toLowerCase()
       if (role === 'admin') {
         return navigateTo('/admin', { replace: true })
+      } else if (role === 'supplier') {
+        return navigateTo('/supplier/dashboard', { replace: true })
       } else if (role === 'engineer') {
         return navigateTo('/engineer/dashboard', { replace: true })
       } else {
@@ -47,10 +50,15 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
 
     // 4. التحقق من تطابق الأدوار والوصول غير المصرح به
-    const currentRole = user.value?.role
+    const currentRole = (user.value?.role || '').trim().toLowerCase()
 
     // لوحة تحكم الأدمن تتطلب دور admin حصراً
     if (isAdminRoute && currentRole !== 'admin') {
+      return navigateTo('/auth/login', { replace: true })
+    }
+
+    // لوحة المورد تتطلب دور supplier (أو admin)
+    if (isSupplierRoute && currentRole !== 'supplier' && currentRole !== 'admin') {
       return navigateTo('/auth/login', { replace: true })
     }
 

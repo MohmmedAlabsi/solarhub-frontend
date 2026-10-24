@@ -22,6 +22,8 @@ import {
   User,
 } from 'lucide-vue-next'
 import { useAuthStore } from '~/stores/auth'
+import { useTheme } from '~/composables/useTheme'
+import ThemeToggle from '~/components/common/ThemeToggle.vue'
 
 definePageMeta({
   middleware: 'auth',
@@ -33,6 +35,7 @@ useSeoMeta({
 })
 
 const authStore = useAuthStore()
+const { isDark } = useTheme()
 const user = computed(() => authStore.user)
 const userGovernorateName = computed(() => {
   const gov = user.value?.governorate
@@ -154,19 +157,26 @@ function handleConfirmOrder(orderId: string) {
 </script>
 
 <template>
-  <div dir="rtl" class="min-h-screen bg-slate-50 text-solar-text-heading antialiased pb-16">
+  <div dir="rtl" class="min-h-screen bg-solar-bg-page text-solar-text-heading antialiased pb-16 transition-colors duration-200">
     <!-- شريط المورد العلوي -->
-    <header class="sticky top-0 z-40 border-b border-solar-border-card bg-white shadow-xs">
+    <header class="sticky top-0 z-40 border-b border-solar-border-card bg-solar-bg-card shadow-xs transition-colors duration-200">
       <div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div class="flex items-center gap-4">
           <NuxtLink to="/" class="flex items-center gap-2">
             <img
+              v-if="!isDark"
               src="/images/logo-expanded-dark-transparent.png"
               alt="SolarHub"
               class="h-9 w-auto object-contain"
             />
+            <img
+              v-else
+              src="/images/logo-expanded-transparent.png"
+              alt="SolarHub"
+              class="h-9 w-auto object-contain"
+            />
           </NuxtLink>
-          <span class="hidden h-6 w-px bg-slate-200 sm:block" />
+          <span class="hidden h-6 w-px bg-solar-border-card sm:block" />
           <div class="hidden sm:flex items-center gap-2">
             <span class="rounded-lg bg-solar-navy px-2.5 py-1 text-xs font-black text-white">
               لوحة تحكم المتجر والمورد
@@ -175,20 +185,22 @@ function handleConfirmOrder(orderId: string) {
         </div>
 
         <div class="flex items-center gap-3">
+          <ThemeToggle />
+
           <NuxtLink
             to="/customer/settings"
-            class="flex items-center gap-2 rounded-xl border border-solar-border-card bg-white px-3.5 py-2 text-xs font-bold text-solar-text-heading hover:bg-slate-50 transition-colors"
+            class="flex items-center gap-2 rounded-xl border border-solar-border-card bg-solar-bg-card px-3.5 py-2 text-xs font-bold text-solar-text-heading hover:bg-solar-bg-subtle transition-colors"
           >
-            <User class="size-4 text-solar-navy" />
+            <User class="size-4 text-solar-navy dark:text-solar-yellow" />
             <span class="hidden sm:inline">بيانات المتجر والملف</span>
           </NuxtLink>
 
           <button
             type="button"
             @click="authStore.logout"
-            class="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/60 px-3.5 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100/80 transition-colors cursor-pointer"
+            class="flex items-center gap-1.5 rounded-xl border border-rose-200 dark:border-rose-800/40 bg-rose-50/60 dark:bg-rose-950/30 px-3.5 py-2 text-xs font-bold text-rose-700 dark:text-rose-400 hover:bg-rose-100/80 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
           >
-            <LogOut class="size-4 text-rose-600" />
+            <LogOut class="size-4 text-rose-600 dark:text-rose-400" />
             <span>خروج</span>
           </button>
         </div>

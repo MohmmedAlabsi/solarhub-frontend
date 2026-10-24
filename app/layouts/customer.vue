@@ -5,7 +5,7 @@ import CustomerHeader from '../components/customer/CustomerHeader.vue'
 import CustomerSidebar from '../components/customer/CustomerSidebar.vue'
 
 const route = useRoute()
-useHead({ htmlAttrs: { class: 'customer-portal' }, bodyAttrs: { class: 'customer-portal' } })
+useHead({ bodyAttrs: { class: 'customer-portal' } })
 const isCollapsed = ref(false)
 const isMobileOpen = ref(false)
 const noticeMessage = ref('')

@@ -100,16 +100,8 @@ async function handleSubmit() {
   })
 
   if (result.success && result.user) {
-    // Redirect based on role
-    if (result.user.role === 'customer') {
-      router.push('/customer/dashboard')
-    } else if (result.user.role === 'engineer') {
-      router.push('/customer/dashboard')
-    } else if (result.user.role === 'supplier') {
-      router.push('/customer/dashboard')
-    } else {
-      router.push('/customer/dashboard')
-    }
+    const targetPath = authStore.getDashboardPath(result.user.role)
+    router.push(targetPath)
   } else {
     if (result.status === 403 && (result.error?.includes('verify') || result.error?.includes('التحقق'))) {
       errorMessage.value = 'يرجى التحقق من بريدك الإلكتروني أولاً. جاري توجيهك لصفحة التحقق...'

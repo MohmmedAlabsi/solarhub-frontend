@@ -30,13 +30,13 @@ function handleRfq() {
 </script>
 
 <template>
-  <article class="group relative flex flex-col justify-between rounded-2xl border border-solar-border-card bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-hover">
+  <article class="group relative flex flex-col justify-between rounded-2xl border border-solar-border-card bg-white dark:bg-solar-bg-card p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-hover">
     <!-- رأس البطاقة: الشارة التمييزية + زر المفضلة -->
     <div class="flex items-center justify-between gap-2">
       <!-- الشارة (Tier 1, كود معتمد، دورات، إلخ) -->
       <span
         v-if="product.badge"
-        class="rounded-md bg-solar-yellow/20 px-2.5 py-1 text-[11px] font-bold text-solar-navy-dark truncate max-w-[170px]"
+        class="rounded-md bg-solar-yellow/20 px-2.5 py-1 text-[11px] font-bold text-solar-navy-dark dark:text-solar-yellow truncate max-w-[170px]"
       >
         {{ product.badge }}
       </span>
@@ -46,7 +46,7 @@ function handleRfq() {
       <button
         type="button"
         @click="cartStore.toggleWishlist(product)"
-        class="flex size-8 shrink-0 items-center justify-center rounded-full border border-solar-border-card bg-white text-solar-text-muted transition-colors hover:text-red-500 hover:border-red-200"
+        class="flex size-8 shrink-0 items-center justify-center rounded-full border border-solar-border-card bg-white dark:bg-solar-bg-card text-solar-text-muted transition-colors hover:text-red-500 hover:border-red-200"
         :aria-label="cartStore.isInWishlist(product.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'"
       >
         <Heart
@@ -57,7 +57,7 @@ function handleRfq() {
     </div>
 
     <!-- صورة المنتج مع تأثير تكبير لطيف -->
-    <NuxtLink :to="`/customer/products/${product.id}`" class="relative my-3 flex h-44 w-full items-center justify-center overflow-hidden rounded-xl bg-solar-bg-subtle/50 p-2">
+    <NuxtLink :to="`/customer/products/${product.id}`" class="relative my-3 flex h-44 w-full items-center justify-center overflow-hidden rounded-xl bg-solar-bg-subtle/50 dark:bg-slate-800/40 p-2">
       <img
         :src="product.image || '/images/product-panel.png'"
         :alt="product.name"
@@ -106,7 +106,7 @@ function handleRfq() {
     <div class="mt-4 flex flex-col gap-2">
       <!-- شريط الكمية وحالة الإضافة -->
       <div v-if="mode !== 'rfq' && !product.isQuoteOnly && product.price > 0" class="flex items-center gap-2">
-        <div class="flex h-10 items-center justify-between rounded-lg border border-solar-border-card bg-white px-2 text-xs font-bold w-24">
+        <div class="flex h-10 items-center justify-between rounded-lg border border-solar-border-card bg-white dark:bg-solar-bg-card px-2 text-xs font-bold w-24">
           <button
             type="button"
             @click="quantity > (product.minOrderQty || 1) ? quantity-- : null"

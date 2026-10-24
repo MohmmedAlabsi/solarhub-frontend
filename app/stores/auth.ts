@@ -569,7 +569,7 @@ export const useAuthStore = defineStore('auth', () => {
    * Get appropriate dashboard path based on role
    */
   function getDashboardPath(role?: string | null): string {
-    const targetRole = role || user.value?.role
+    const targetRole = (role || user.value?.role || '').trim().toLowerCase()
     if (targetRole === 'admin') return '/admin'
     if (targetRole === 'supplier') return '/supplier/dashboard'
     if (targetRole === 'engineer') return '/engineer/dashboard'

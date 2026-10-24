@@ -29,63 +29,9 @@ const store = ref<any | null>(null)
 const storeProducts = ref<CustomerProductView[]>([])
 const isMapModalOpen = ref(false)
 
-<<<<<<< HEAD
-const config = useRuntimeConfig()
-const apiBase = (config.public.apiBaseUrl as string) || (config.public.apiBase as string) || 'http://127.0.0.1:8000/api'
-
-// Fetch live store from backend if available
-const { data: apiStoreData } = await useFetch<any>(`${apiBase}/stores/${route.params.id}`, {
-  headers: { Accept: 'application/json' },
-  lazy: false,
-})
-
-const defaultStore = {
-  id: route.params.id || 'shams-riyadh',
-  name: 'شركة شمس الرياض للمهمات الكهروضوئية',
-  legalName: 'شركة شمس الرياض للتجارة والمقاولات الكهروضوئية ذ.م.م',
-  city: 'الرياض - حي الملز',
-  address: 'شارع صلاح الدين الأيوبي - مقابل الغرفة التجارية',
-  locationCoordinates: null as string | null,
-  phone: '+966 11 482 9900',
-  email: 'info@shams-riyadh.sa',
-  workingHours: 'السبت - الخميس: 8:00 ص - 6:00 م',
-  rating: 4.95,
-  reviewsCount: 142,
-  verified: true,
-  tierBadge: 'وكيل رئيسي Tier 1 معتمد',
-  crNumber: '1010482910',
-  vatNumber: '300192847200003',
-  description: 'تعتبر شركة شمس الرياض للمهمات الكهروضوئية من الرواد المعتمدين في استيراد وتوزيع مكونات الطاقة الشمسية عالية الجودة في المملكة منذ عام 2017. نوفر حلولاً شاملة تشمل الألواح عالية الكفاءة والمحولات الهجينة وأنظمة الحماية مع ضمانات مصنعية رسمية وإشراف هندسي معتمد.',
-}
-
-const store = computed(() => {
-  const backend = apiStoreData.value?.data
-  if (backend) {
-    return {
-      id: String(backend.id),
-      name: backend.company_name || 'متجر معتمد',
-      legalName: backend.company_name || 'متجر معتمد',
-      city: backend.address_details?.split('-')[0] || 'اليمن',
-      address: backend.address_details || 'صنعاء - اليمن',
-      locationCoordinates: backend.location_coordinates || null,
-      phone: backend.whatsapp_number || '+966 11 482 9900',
-      email: 'store@solarhub.com',
-      workingHours: 'السبت - الخميس: 8:00 ص - 6:00 م',
-      rating: Number(backend.average_rating) || 5.0,
-      reviewsCount: Number(backend.ratings_count) || 14,
-      verified: true,
-      tierBadge: backend.store_type === 'authorized_agent' ? 'وكيل معتمد' : backend.store_type === 'wholesaler' ? 'مورد جملة' : 'متجر تجزئة',
-      crNumber: backend.commercial_registry || '1010482910',
-      vatNumber: backend.tax_number || '300192847200003',
-      description: backend.bio || defaultStore.description,
-    }
-  }
-  return defaultStore
-=======
 useSeoMeta({
   title: () => (store.value ? `${store.value.name} | SolarHub` : 'الملف التعريفي للمتجر | SolarHub'),
   description: () => store.value?.description || 'المورد والوكيل المعتمد لمعدات الطاقة الشمسية.',
->>>>>>> origin/main
 })
 
 onMounted(async () => {
