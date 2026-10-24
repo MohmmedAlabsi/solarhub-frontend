@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  Building2,
   ChevronLeft,
   Loader2,
   MapPin,
@@ -36,7 +35,6 @@ interface StoreItem {
   productsCount: number
   verified: boolean
   tierBadge: string
-  crNumber: string
   description: string
   phone: string
   logo?: string
@@ -67,12 +65,11 @@ onMounted(async () => {
       address: s.address_details || s.governorate || 'المركز الرئيسي',
       rating: Number(s.average_rating) || 4.9,
       reviewsCount: Number(s.ratings_count) || 0,
-      productsCount: Number(s.store_products_count || s.products_count) || 12,
+      productsCount: Number(s.store_products_count || s.products_count) || 0,
       verified: s.approval_status === 'approved',
       tierBadge: s.store_type === 'wholesaler' ? 'وكيل ومورد رئيسي' : 'متجر معتمد',
-      crNumber: s.commercial_registry || '—',
       description: s.bio || 'مورد معتمد لمنتجات ومعدات الطاقة الشمسية لدى منصة SolarHub.',
-      phone: s.whatsapp_number || s.phone || '—',
+      phone: s.whatsapp_number || '',
       logo: s.company_logo_url,
     }))
   } catch (err) {
@@ -177,7 +174,7 @@ const filteredStores = computed(() => {
               <span class="font-bold text-solar-text-heading">{{ store.rating }}</span>
               <span>({{ store.reviewsCount }} تقييم)</span>
             </div>
-            <div class="flex items-center gap-1">
+            <div v-if="store.phone" class="flex items-center gap-1">
               <Phone class="size-3.5 text-solar-yellow" />
               <bdi>{{ store.phone }}</bdi>
             </div>
@@ -185,7 +182,10 @@ const filteredStores = computed(() => {
         </div>
 
         <div class="mt-5 flex items-center justify-between border-t border-solar-border-card pt-4">
-          <span class="text-xs font-medium text-solar-text-muted">سجل تجاري: {{ store.crNumber }}</span>
+          <div class="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+            <ShieldCheck class="size-4" />
+            <span>متجر معتمد وموثق</span>
+          </div>
           <NuxtLink :to="`/customer/stores/${store.id}`" class="btn-primary h-9 px-4 text-xs gap-1.5">
             <span>زيارة المتجر</span>
             <ChevronLeft class="size-3.5" />

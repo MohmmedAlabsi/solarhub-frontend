@@ -1,12 +1,8 @@
 <script setup lang="ts">
 import {
-  Award,
   Building2,
-  CheckCircle2,
   Clock,
-  ExternalLink,
   Loader2,
-  Mail,
   MapPin,
   Package,
   Phone,
@@ -43,7 +39,7 @@ onMounted(async () => {
   try {
     const [storeRes, productsRes] = await Promise.all([
       $api<any>(`/stores/${storeId}`).catch(() => null),
-      fetchStoreProducts({ store_id: storeId }).catch(() => ({ data: [] })),
+      fetchStoreProducts({ store_id: storeId }).catch(() => []),
     ])
 
     const rawStore = storeRes?.data || storeRes
@@ -58,21 +54,18 @@ onMounted(async () => {
         city: governorate,
         address: rawStore.address_details || governorate,
         coordinates: coords,
-        phone: rawStore.whatsapp_number || rawStore.phone || '—',
-        email: rawStore.email || rawStore.user?.email || '—',
+        phone: rawStore.whatsapp_number || '',
         workingHours: 'السبت - الخميس: 8:00 ص - 6:00 م',
         rating: Number(rawStore.average_rating) || 4.9,
         reviewsCount: Number(rawStore.ratings_count) || 0,
         verified: rawStore.approval_status === 'approved',
         tierBadge: rawStore.store_type === 'wholesaler' ? 'وكيل ومورد رئيسي' : 'متجر معتمد',
-        crNumber: rawStore.commercial_registry || '—',
-        vatNumber: rawStore.tax_number || '—',
         description: rawStore.bio || 'مورد معتمد لمعدات ومنظومات الطاقة الشمسية في منصة SolarHub.',
         logo: rawStore.company_logo_url,
       }
     }
 
-    storeProducts.value = productsRes?.data || []
+    storeProducts.value = Array.isArray(productsRes) ? productsRes : ((productsRes as any)?.data || [])
   } catch (err) {
     console.error('Error fetching store details:', err)
   } finally {
@@ -116,7 +109,7 @@ onMounted(async () => {
               <div class="flex flex-col">
                 <div class="flex items-center gap-2">
                   <h1 class="text-xl sm:text-2xl font-black text-solar-text-heading">{{ store.name }}</h1>
-                  <ShieldCheck v-if="store.verified" class="size-5 text-emerald-500" title="سجل تجاري معتمد" />
+                  <ShieldCheck v-if="store.verified" class="size-5 text-emerald-500" title="متجر معتمد وموثق" />
                 </div>
                 <span class="text-xs text-solar-text-muted flex items-center gap-1 mt-0.5">
                   <MapPin class="size-3 text-solar-yellow" />
@@ -125,7 +118,7 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div v-if="store.phone" class="flex items-center gap-2">
               <a :href="`tel:${store.phone}`" class="btn-primary h-10 px-4 text-xs gap-1.5">
                 <Phone class="size-4" />
                 <span>اتصال بالمبيعات</span>
@@ -137,7 +130,7 @@ onMounted(async () => {
             {{ store.description }}
           </p>
 
-          <!-- شبكة بيانات الاتصال والسجل والضريبة -->
+          <!-- شبكة بيانات المتجر والاعتماد -->
           <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 border-t border-solar-border-card pt-4 text-xs">
             <button
               type="button"
@@ -155,13 +148,13 @@ onMounted(async () => {
             </div>
 
             <div class="flex items-center gap-2.5 text-solar-text-secondary">
-              <Award class="size-4 text-solar-yellow shrink-0" />
-              <span>سجل تجاري: {{ store.crNumber }}</span>
+              <ShieldCheck class="size-4 text-emerald-500 shrink-0" />
+              <span>ضمان أصلي ومعتمد 100%</span>
             </div>
 
             <div class="flex items-center gap-2.5 text-solar-text-secondary">
-              <ShieldCheck class="size-4 text-solar-yellow shrink-0" />
-              <span>الرقم الضريبي: {{ store.vatNumber }}</span>
+              <Star class="size-4 fill-solar-yellow text-solar-yellow shrink-0" />
+              <span>التقييم: {{ store.rating }} ({{ store.reviewsCount }} تقييم)</span>
             </div>
           </div>
         </div>
@@ -186,10 +179,16 @@ onMounted(async () => {
 
         <div
           v-else
-          class="flex flex-col items-center justify-center rounded-2xl border border-solar-border-card bg-white p-10 text-center text-xs text-solar-text-muted"
+          class="flex flex-col items-center justify-center rounded-2xl border border-solar-border-card bg-white p-12 text-center"
         >
-          <Package class="size-8 text-solar-text-muted mb-2" />
-          <span>لم يقم هذا المتجر بإضافة منتجات حالياً.</span>
+          <Package class="size-10 text-solar-text-muted mb-2" />
+          <h3 class="text-sm font-bold text-solar-text-heading mb-1">لا توجد منتجات معروضة حالياً لهذا المتجر</h3>
+          <p class="text-xs text-solar-text-muted max-w-sm">
+            يمكنك تصفح باقي المتاجر أو استعراض الكتالوج المرجعي للمنتجات لطلب عروض أسعار.
+          </p>
+          <NuxtLink to="/customer/products" class="btn-primary text-xs mt-4">
+            تصفح كتالوج المنتجات
+          </NuxtLink>
         </div>
       </div>
 
