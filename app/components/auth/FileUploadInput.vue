@@ -58,15 +58,11 @@ function updateFileInfo(file: File) {
   const nameLower = file.name.toLowerCase()
   if (file.type === 'application/pdf' || nameLower.endsWith('.pdf')) {
     fileType.value = 'pdf'
-  } else if (file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(nameLower)) {
+  } else if (file.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(nameLower)) {
     fileType.value = 'image'
   } else {
     fileType.value = 'other'
   }
-}
-
-function triggerFileSelect() {
-  fileInputRef.value?.click()
 }
 
 function validateAndSetFile(file: File | null) {
@@ -74,29 +70,24 @@ function validateAndSetFile(file: File | null) {
 
   if (!file) {
     emit('update:modelValue', null)
-    fileName.value = ''
-    fileSizeText.value = ''
-    fileType.value = null
     return
   }
 
-  // 1. Check file size
+  // Check file size
   const maxBytes = props.maxSizeMb * 1024 * 1024
   if (file.size > maxBytes) {
-    errorMsg.value = `حجم الملف (${(file.size / (1024 * 1024)).toFixed(1)}MB) يتجاوز الحد الأقصى المسموح (${props.maxSizeMb} ميجابايت)`
-    if (fileInputRef.value) fileInputRef.value.value = ''
+    errorMsg.value = `حجم الملف يتجاوز الحد المسموح (${props.maxSizeMb} ميجابايت). يرجى اختيار ملف أصغر.`
     return
   }
 
-  // 2. Validate file type (PDF or Image or custom accept)
+  // Check extension / type
   const nameLower = file.name.toLowerCase()
   const isPdf = file.type === 'application/pdf' || nameLower.endsWith('.pdf')
-  const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(nameLower)
-  const isDoc = /\.(docx?)$/i.test(nameLower)
+  const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(nameLower)
+  const isDoc = /\.(doc|docx)$/i.test(nameLower)
 
-  if (!isPdf && !isImg && !isDoc) {
-    errorMsg.value = 'صيغة الملف غير مدعومة. يرجى اختيار ملف بصيغة PDF أو صورة صالحة (JPG, PNG)'
-    if (fileInputRef.value) fileInputRef.value.value = ''
+  if (!isPdf && !isImage && !isDoc) {
+    errorMsg.value = 'نوع الملف غير مدعوم. يرجى رفع ملف بصيغة PDF أو صورة واضحة (PNG, JPG).'
     return
   }
 
@@ -108,6 +99,10 @@ function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0] || null
   validateAndSetFile(file)
+}
+
+function triggerFileSelect() {
+  fileInputRef.value?.click()
 }
 
 function removeFile() {
@@ -150,26 +145,26 @@ function onDrop(e: DragEvent) {
 
       <!-- شارات الصيغ المقبولة بوضوح تام -->
       <div class="flex items-center gap-1.5 text-[10px] font-bold">
-        <span class="rounded bg-rose-100 text-rose-700 px-1.5 py-0.5 border border-rose-200">
+        <span class="rounded bg-rose-500/15 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 border border-rose-500/30">
           مستند PDF
         </span>
-        <span class="rounded bg-sky-100 text-sky-700 px-1.5 py-0.5 border border-sky-200">
+        <span class="rounded bg-sky-500/15 text-sky-600 dark:text-sky-400 px-1.5 py-0.5 border border-sky-500/30">
           صورة JPG / PNG
         </span>
       </div>
     </div>
 
-    <!-- صندوق الرفع التفاعلي -->
+    <!-- صندوق الرفع التفاعلي المتوافق مع الوضعين -->
     <div
-      class="group relative flex flex-col rounded-2xl border-2 transition-all cursor-pointer p-3.5 bg-white shadow-xs"
+      class="group relative flex flex-col rounded-2xl border-2 transition-all cursor-pointer p-3.5 bg-solar-bg-card dark:bg-solar-bg-subtle/50 shadow-xs"
       :class="[
         errorMsg
-          ? 'border-rose-400 bg-rose-50/20'
+          ? 'border-rose-400 bg-rose-50/20 dark:bg-rose-950/20'
           : isDragging
-            ? 'border-solar-yellow bg-amber-50/40 border-dashed scale-[1.01]'
+            ? 'border-solar-yellow bg-amber-50/40 dark:bg-amber-950/20 border-dashed scale-[1.01]'
             : fileName
-              ? 'border-emerald-300 bg-emerald-50/20'
-              : 'border-dashed border-slate-300 hover:border-solar-navy/70 hover:bg-slate-50/60'
+              ? 'border-emerald-400 dark:border-emerald-600 bg-emerald-50/20 dark:bg-emerald-950/20'
+              : 'border-dashed border-solar-border-card hover:border-solar-yellow hover:bg-solar-bg-subtle'
       ]"
       @dragover="onDragOver"
       @dragleave="onDragLeave"
@@ -192,8 +187,8 @@ function onDrop(e: DragEvent) {
             class="flex size-11 shrink-0 items-center justify-center rounded-xl font-black text-xs shadow-xs"
             :class="[
               fileType === 'pdf'
-                ? 'bg-rose-600 text-white shadow-rose-200'
-                : 'bg-sky-600 text-white shadow-sky-200'
+                ? 'bg-rose-600 text-white'
+                : 'bg-sky-600 text-white'
             ]"
           >
             <span v-if="fileType === 'pdf'">PDF</span>
@@ -203,15 +198,15 @@ function onDrop(e: DragEvent) {
           <!-- تفاصيل الملف -->
           <div class="flex flex-col overflow-hidden text-right">
             <div class="flex items-center gap-1.5">
-              <CheckCircle2 class="size-4 text-emerald-600 shrink-0" />
-              <span class="text-xs font-bold text-solar-navy-dark truncate" dir="ltr">
+              <CheckCircle2 class="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span class="text-xs font-bold text-solar-text-heading truncate" dir="ltr">
                 {{ fileName }}
               </span>
             </div>
-            <div class="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 font-medium">
+            <div class="flex items-center gap-2 mt-0.5 text-[11px] text-solar-text-muted font-medium">
               <span class="font-mono">{{ fileSizeText }}</span>
               <span>•</span>
-              <span :class="fileType === 'pdf' ? 'text-rose-700 font-bold' : 'text-sky-700 font-bold'">
+              <span :class="fileType === 'pdf' ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-sky-600 dark:text-sky-400 font-bold'">
                 {{ fileType === 'pdf' ? 'مستند PDF معتمد' : 'صورة معتمدة' }}
               </span>
             </div>
@@ -223,14 +218,14 @@ function onDrop(e: DragEvent) {
           <button
             type="button"
             @click.stop="triggerFileSelect"
-            class="rounded-lg bg-slate-100 hover:bg-solar-navy hover:text-white px-2.5 py-1.5 text-xs font-bold text-solar-navy transition-colors border border-slate-200 cursor-pointer"
+            class="rounded-lg bg-solar-bg-subtle hover:bg-solar-yellow hover:text-solar-navy-dark px-2.5 py-1.5 text-xs font-bold text-solar-text-heading transition-colors border border-solar-border-card cursor-pointer"
           >
             تغيير
           </button>
           <button
             type="button"
             @click.stop="removeFile"
-            class="flex size-8 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-100/70 transition-colors cursor-pointer"
+            class="flex size-8 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-100/70 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
             title="إلغاء الملف"
           >
             <X class="size-4.5" />
@@ -240,12 +235,12 @@ function onDrop(e: DragEvent) {
 
       <!-- الحالة 2: لم يتم اختيار ملف بعد (واجهة واضحة وجذابة) -->
       <div v-else class="flex items-center gap-3.5 select-none py-1">
-        <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-solar-navy group-hover:bg-solar-yellow/20 group-hover:text-solar-navy-dark transition-colors">
-          <UploadCloud class="size-6 text-solar-navy" />
+        <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-navy dark:text-solar-yellow group-hover:bg-solar-yellow group-hover:text-solar-navy-dark transition-colors">
+          <UploadCloud class="size-6" />
         </div>
 
         <div class="flex flex-col flex-1 text-right overflow-hidden">
-          <p class="text-xs font-bold text-solar-text-heading group-hover:text-solar-navy transition-colors truncate">
+          <p class="text-xs font-bold text-solar-text-heading group-hover:text-solar-yellow transition-colors truncate">
             {{ isDragging ? 'أفلت الملف هنا الآن...' : placeholder }}
           </p>
           <p class="text-[11px] text-solar-text-muted mt-0.5">
@@ -256,7 +251,7 @@ function onDrop(e: DragEvent) {
         <button
           type="button"
           @click.stop="triggerFileSelect"
-          class="shrink-0 rounded-xl bg-[#1b2d42] hover:bg-solar-navy px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+          class="shrink-0 rounded-xl bg-solar-navy-dark dark:bg-solar-yellow hover:opacity-90 px-3.5 py-2 text-xs font-bold text-white dark:text-solar-navy-dark shadow-xs transition-colors cursor-pointer"
         >
           استعراض
         </button>
@@ -264,7 +259,7 @@ function onDrop(e: DragEvent) {
     </div>
 
     <!-- رسالة الخطأ إن وجدت -->
-    <div v-if="errorMsg" class="flex items-center gap-1.5 text-[11px] font-bold text-rose-600 animate-in fade-in">
+    <div v-if="errorMsg" class="flex items-center gap-1.5 text-[11px] font-bold text-rose-600 dark:text-rose-400 animate-in fade-in">
       <AlertCircle class="size-4 shrink-0 text-rose-500" />
       <span>{{ errorMsg }}</span>
     </div>

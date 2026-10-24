@@ -25,7 +25,7 @@ const formattedTimer = computed(() => {
 })
 
 const maskedLogin = computed(() => {
-  if (!loginInput.value) return 'ahmed.solar***@gmail.com'
+  if (!loginInput.value) return 'user***@gmail.com'
   if (loginInput.value.includes('@')) {
     const [user, domain] = loginInput.value.split('@')
     const masked = user.slice(0, 3) + '***'
@@ -87,8 +87,8 @@ function resetToDefault() {
 
 <template>
   <div class="w-full max-w-[480px]">
-    <!-- بطاقة استعادة كلمة المرور مع الحالات الثلاث (الافتراضية، الخطأ، نجاح الإرسال) -->
-    <div class="rounded-3xl border border-solar-border-card/70 bg-white p-7 sm:p-10 shadow-xl text-right">
+    <!-- بطاقة استعادة كلمة المرور المتوافقة مع الوضعين الداكن والنهاري -->
+    <div class="rounded-3xl border border-solar-border-card bg-solar-bg-card p-7 sm:p-10 shadow-xl text-right transition-colors duration-200">
       <!-- 1. الحالة الافتراضية وحالة الخطأ -->
       <div v-if="currentState !== 'success'">
         <AuthHeader
@@ -96,10 +96,10 @@ function resetToDefault() {
           subtitle="أدخل البريد الإلكتروني أو رقم الجوال المسجل في حسابك وسنرسل لك رابطاً أو رمز تحقق لإعادة تعيين كلمة المرور بسهولة."
         />
 
-        <!-- تنبيه الخطأ العلوي المطابق لـ "استعادة كلمة المرور-خطأ التحقق.png" -->
+        <!-- تنبيه الخطأ العلوي -->
         <div
           v-if="currentState === 'error'"
-          class="mb-6 flex items-start gap-3 rounded-2xl border border-rose-200 bg-[#FFF2F2] p-4 text-xs font-semibold text-rose-700 leading-relaxed animate-in fade-in duration-200"
+          class="mb-6 flex items-start gap-3 rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/90 dark:bg-rose-950/40 p-4 text-xs font-semibold text-rose-700 dark:text-rose-300 leading-relaxed animate-in fade-in duration-200"
         >
           <AlertCircle class="size-5 shrink-0 text-rose-500 mt-0.5" />
           <span class="flex-1">
@@ -119,19 +119,19 @@ function resetToDefault() {
               id="recovery-input"
               v-model="loginInput"
               type="text"
-              placeholder="example@domain.com"
+              placeholder="example@domain.com أو 77xxxxxxx"
               dir="ltr"
               @input="resetToDefault"
-              class="h-12 w-full rounded-xl border bg-white px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:outline-none focus:ring-2 transition-all text-left"
+              class="h-12 w-full rounded-xl border bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:outline-none focus:ring-2 transition-all text-left"
               :class="[
                 currentState === 'error'
-                  ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-200 text-rose-800'
-                  : 'border-solar-border-card/80 focus:border-solar-yellow focus:ring-solar-yellow/20'
+                  ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-200 dark:ring-rose-900 text-rose-800 dark:text-rose-300'
+                  : 'border-solar-border-card focus:border-solar-yellow focus:ring-solar-yellow/20'
               ]"
             />
 
-            <!-- رسالة الخطأ تحت الحقل مباشرة المطابقة للتصميم -->
-            <div v-if="currentState === 'error'" class="flex items-center gap-1.5 text-[11px] font-bold text-rose-600 mt-1">
+            <!-- رسالة الخطأ تحت الحقل مباشرة -->
+            <div v-if="currentState === 'error'" class="flex items-center gap-1.5 text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1">
               <XCircle class="size-3.5 shrink-0" />
               <span>{{ errorMessage || 'البريد الإلكتروني المدخل غير مسجل لدينا في المنصة' }}</span>
             </div>
@@ -141,9 +141,9 @@ function resetToDefault() {
           <button
             type="submit"
             :disabled="authStore.isLoading"
-            class="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1b2d42] text-xs sm:text-sm font-bold text-white shadow-md hover:bg-solar-navy-dark active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+            class="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark text-xs sm:text-sm font-black shadow-md hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
           >
-            <span v-if="authStore.isLoading" class="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <span v-if="authStore.isLoading" class="size-4 border-2 border-white/30 dark:border-solar-navy/30 border-t-white dark:border-t-solar-navy rounded-full animate-spin" />
             <span>{{ authStore.isLoading ? 'جاري الإرسال...' : 'إرسال رابط / رمز الاستعادة' }}</span>
             <ArrowLeft v-if="!authStore.isLoading" class="size-4" />
           </button>
@@ -154,17 +154,17 @@ function resetToDefault() {
           <span>تذكرت كلمة المرور؟ </span>
           <NuxtLink
             to="/auth/login"
-            class="font-black text-solar-navy hover:text-solar-yellow transition-colors underline decoration-solar-yellow/50 underline-offset-4"
+            class="font-black text-solar-navy dark:text-solar-yellow hover:underline transition-colors underline decoration-solar-yellow/50 underline-offset-4"
           >
             العودة لتسجيل الدخول
           </NuxtLink>
         </div>
       </div>
 
-      <!-- 2. حالة نجاح الإرسال المطابقة تماماً لـ "استعادة كلمة المرور نجاح الأرسال.png" -->
+      <!-- 2. حالة نجاح الإرسال -->
       <div v-else class="flex flex-col items-center text-center animate-in fade-in duration-300">
-        <!-- أيقونة المغلف الأخضر الدائري -->
-        <div class="mb-5 flex size-20 items-center justify-center rounded-full bg-[#EAF7EE] text-emerald-600 shadow-xs">
+        <!-- أيقونة المغلف الدائري -->
+        <div class="mb-5 flex size-20 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shadow-xs border border-emerald-500/25">
           <Mail class="size-9 stroke-[2.2]" />
         </div>
 
@@ -174,14 +174,14 @@ function resetToDefault() {
 
         <p class="text-xs sm:text-sm text-solar-text-muted leading-relaxed max-w-sm mb-6">
           أرسلنا رابطاً مؤقتاً ورمز تحقق لإعادة تعيين كلمة المرور إلى البريد الإلكتروني / الجوال:
-          <span class="font-bold text-solar-navy-dark dir-ltr inline-block mx-1">{{ maskedLogin }}</span>.
+          <span class="font-bold text-solar-text-heading dir-ltr inline-block mx-1">{{ maskedLogin }}</span>.
           الرابط صالح لمدة 15 دقيقة.
         </p>
 
-        <!-- صندوق إعادة الإرسال الأزرق الفاتح -->
-        <div class="w-full rounded-2xl bg-[#EEF4FB] p-5 mb-6 flex flex-col items-center gap-1.5 text-xs text-solar-text-body">
+        <!-- صندوق إعادة الإرسال المتجاوب -->
+        <div class="w-full rounded-2xl bg-solar-bg-subtle border border-solar-border-card p-5 mb-6 flex flex-col items-center gap-1.5 text-xs text-solar-text-body">
           <span class="text-solar-text-muted">لم يصلك الرمز؟</span>
-          <span v-if="countdownSeconds > 0" class="font-bold text-solar-navy-dark">
+          <span v-if="countdownSeconds > 0" class="font-bold text-solar-text-heading">
             يمكنك طلب إعادة الإرسال خلال ({{ formattedTimer }})
           </span>
           <button
@@ -194,10 +194,10 @@ function resetToDefault() {
           </button>
         </div>
 
-        <!-- زر العودة لتسجيل الدخول الداكن -->
+        <!-- زر العودة لتسجيل الدخول -->
         <NuxtLink
           to="/auth/login"
-          class="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1b2d42] text-xs sm:text-sm font-bold text-white shadow-md hover:bg-solar-navy-dark active:scale-[0.99] transition-all cursor-pointer"
+          class="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark text-xs sm:text-sm font-black shadow-md hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer"
         >
           <span>العودة لتسجيل الدخول</span>
           <ArrowLeft class="size-4" />
@@ -205,9 +205,9 @@ function resetToDefault() {
 
         <!-- رابط المساعدة والتواصل مع الدعم الفني -->
         <div class="mt-8 border-t border-solar-border-card/60 pt-5 text-center text-xs text-solar-text-muted flex items-center justify-center gap-1.5">
-          <HelpCircle class="size-4 text-solar-navy" />
+          <HelpCircle class="size-4 text-solar-navy dark:text-solar-yellow" />
           <span>تحتاج إلى مساعدة إضافية؟ </span>
-          <NuxtLink to="/about" class="font-bold text-solar-navy hover:text-solar-yellow transition-colors underline">
+          <NuxtLink to="/about" class="font-bold text-solar-navy dark:text-solar-yellow hover:underline transition-colors underline">
             تواصل مع الدعم الفني
           </NuxtLink>
         </div>

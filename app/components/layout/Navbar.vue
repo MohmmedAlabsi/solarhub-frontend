@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { LayoutDashboard, LogIn, LogOut, Menu, ShieldCheck, Sun, User, UserPlus, X } from 'lucide-vue-next'
 import { useAuthStore } from '~/stores/auth'
+import { useTheme } from '~/composables/useTheme'
+import ThemeToggle from '~/components/common/ThemeToggle.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
+const { isDark } = useTheme()
 
 const dashboardPath = computed(() => authStore.getDashboardPath())
 const roleLabel = computed(() => {
@@ -33,12 +36,19 @@ const isMobileOpen = ref(false)
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 border-b border-solar-border-card bg-white/95 backdrop-blur-md transition-all shadow-sm">
+  <header class="sticky top-0 z-50 border-b border-solar-border-card bg-solar-bg-card/95 backdrop-blur-md transition-colors duration-200 shadow-sm">
     <nav class="container-page flex h-20 items-center justify-between gap-4" aria-label="التنقل الرئيسي لمنصة سولار هب">
-      <!-- شعار المنصة الكبير المعتمد -->
+      <!-- شعار المنصة الكبير المعتمد (يتغير تلقائياً حسب الوضع الداكن والنهاري) -->
       <NuxtLink to="/" class="flex items-center transition-transform hover:scale-[1.02]" aria-label="سولار هب - الرئيسية">
         <img
+          v-if="!isDark"
           src="/images/logo-expanded-dark-transparent.png"
+          alt="Solar Hub - Your Hub For Solar Solutions"
+          class="h-10 sm:h-12 w-auto max-w-[170px] sm:max-w-[200px] object-contain drop-shadow-sm"
+        />
+        <img
+          v-else
+          src="/images/logo-expanded-transparent.png"
           alt="Solar Hub - Your Hub For Solar Solutions"
           class="h-10 sm:h-12 w-auto max-w-[170px] sm:max-w-[200px] object-contain drop-shadow-sm"
         />
@@ -51,7 +61,7 @@ const isMobileOpen = ref(false)
             :to="link.to"
             class="relative py-2 text-sm font-semibold transition-all duration-200"
             :class="isLinkActive(link.to)
-              ? 'text-solar-navy-dark font-black border-b-2 border-solar-yellow pb-1'
+              ? 'text-solar-navy-dark dark:text-solar-yellow font-black border-b-2 border-solar-yellow pb-1'
               : 'text-solar-text-body hover:text-solar-text-heading hover:border-b-2 hover:border-solar-border-card pb-1'"
             :aria-current="isLinkActive(link.to) ? 'page' : undefined"
           >
@@ -60,8 +70,11 @@ const isMobileOpen = ref(false)
         </li>
       </ul>
 
-      <!-- أزرار تسجيل الدخول وإنشاء الحساب وبوابة العميل -->
+      <!-- أزرار تسجيل الدخول وإنشاء الحساب وبوابة العميل + زر الوضع الداكن -->
       <div class="hidden items-center gap-3 lg:flex">
+        <!-- زر تبديل الوضع الداكن/النهاري -->
+        <ThemeToggle />
+
         <template v-if="authStore.isAuthenticated">
           <!-- زر الانتقال للوحة التحكم الخاصة بالدور -->
           <NuxtLink
@@ -88,7 +101,7 @@ const isMobileOpen = ref(false)
           <button
             type="button"
             @click="authStore.logout"
-            class="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 px-2.5 py-2 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+            class="flex items-center gap-1 text-xs font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 px-2.5 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
             title="تسجيل الخروج"
           >
             <LogOut class="size-4" />
@@ -101,7 +114,7 @@ const isMobileOpen = ref(false)
             to="/auth/login"
             class="text-xs font-bold text-solar-text-heading px-3 py-2 rounded-lg hover:bg-solar-bg-subtle transition-colors flex items-center gap-1.5"
           >
-            <LogIn class="size-4 text-solar-navy" />
+            <LogIn class="size-4 text-solar-navy dark:text-solar-yellow" />
             <span>تسجيل الدخول</span>
           </NuxtLink>
 
@@ -115,22 +128,26 @@ const isMobileOpen = ref(false)
         </template>
       </div>
 
-      <!-- زر القائمة للأجهزة الذكية واللوحية -->
-      <button
-        type="button"
-        class="flex size-10 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-heading lg:hidden hover:bg-solar-bg-subtle active:scale-95 transition-all"
-        :aria-expanded="isMobileOpen"
-        aria-controls="mobile-nav-drawer"
-        @click="isMobileOpen = !isMobileOpen"
-      >
-        <span class="sr-only">{{ isMobileOpen ? 'إغلاق القائمة' : 'فتح القائمة' }}</span>
-        <X v-if="isMobileOpen" class="size-5" />
-        <Menu v-else class="size-5" />
-      </button>
+      <!-- عناصر الجوال: زر الوضع الداكن وزر القائمة -->
+      <div class="flex items-center gap-2 lg:hidden">
+        <ThemeToggle />
+
+        <button
+          type="button"
+          class="flex size-10 items-center justify-center rounded-xl border border-solar-border-card bg-solar-bg-card text-solar-text-heading hover:bg-solar-bg-subtle active:scale-95 transition-all"
+          :aria-expanded="isMobileOpen"
+          aria-controls="mobile-nav-drawer"
+          @click="isMobileOpen = !isMobileOpen"
+        >
+          <span class="sr-only">{{ isMobileOpen ? 'إغلاق القائمة' : 'فتح القائمة' }}</span>
+          <X v-if="isMobileOpen" class="size-5" />
+          <Menu v-else class="size-5" />
+        </button>
+      </div>
     </nav>
 
     <!-- قائمة الجوال المنسدلة -->
-    <div v-show="isMobileOpen" id="mobile-nav-drawer" class="border-t border-solar-border-card bg-white p-4 shadow-xl lg:hidden">
+    <div v-show="isMobileOpen" id="mobile-nav-drawer" class="border-t border-solar-border-card bg-solar-bg-card p-4 shadow-xl lg:hidden">
       <ul class="flex flex-col gap-1.5">
         <li v-for="link in navLinks" :key="link.to">
           <NuxtLink
@@ -156,7 +173,7 @@ const isMobileOpen = ref(false)
             <button
               type="button"
               @click="() => { isMobileOpen = false; authStore.logout(); }"
-              class="w-full text-center py-2 text-xs font-bold text-rose-600 bg-rose-50 rounded-xl"
+              class="w-full text-center py-2 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 rounded-xl"
             >
               تسجيل الخروج
             </button>

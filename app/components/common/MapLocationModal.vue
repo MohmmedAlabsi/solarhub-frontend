@@ -164,16 +164,59 @@ const selectedCoords = ref<{ lat: number; lng: number }>({
   lng: props.initialCoordinates?.lng || 44.1910,
 })
 const selectedGovernorate = ref('صنعاء')
+const currentMapType = ref<'streets' | 'satellite'>('streets')
 
 // Map elements
 const mapContainer = ref<HTMLElement | null>(null)
 let leafletMap: any = null
 let mapMarker: any = null
+let currentTileLayer: any = null
 let L: any = null
 
 const formattedCoordinates = computed(() => {
   return `${selectedCoords.value.lat.toFixed(5)}, ${selectedCoords.value.lng.toFixed(5)}`
 })
+
+// Parse coordinate string from DB or input (e.g. EWKB hex, "POINT(44.1910 15.3694)", or "15.3694, 44.1910")
+function parseCoordinateString(str?: string): { lat: number; lng: number } | null {
+  if (!str) return null
+  const trimmed = str.trim()
+
+  // 1. PostGIS EWKB Hex format (e.g. 0101000020E6100000...)
+  if (/^0101000020[0-9a-fA-F]{40}$/i.test(trimmed)) {
+    try {
+      const match = trimmed.match(/^0101000020[0-9a-fA-F]{8}([0-9a-fA-F]{16})([0-9a-fA-F]{16})$/i)
+      if (match) {
+        const hexToDouble = (hex: string) => {
+          const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)))
+          const view = new DataView(bytes.buffer)
+          return view.getFloat64(0, true) // little endian
+        }
+        const lng = hexToDouble(match[1])
+        const lat = hexToDouble(match[2])
+        if (!isNaN(lat) && !isNaN(lng)) return { lat, lng }
+      }
+    } catch {}
+  }
+
+  // 2. PostGIS WKT Point format (POINT(lng lat))
+  const pointMatch = trimmed.match(/POINT\s*\(\s*(-?\d+(\.\d+)?)[,\s]+(-?\d+(\.\d+)?)\s*\)/i)
+  if (pointMatch) {
+    const lng = parseFloat(pointMatch[1])
+    const lat = parseFloat(pointMatch[3])
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng }
+  }
+
+  // 3. Comma-separated format ("lat, lng")
+  const commaMatch = trimmed.match(/^(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)$/)
+  if (commaMatch) {
+    const lat = parseFloat(commaMatch[1])
+    const lng = parseFloat(commaMatch[3])
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng }
+  }
+
+  return null
+}
 
 // Match best initial coordinates based on location name or initial prop
 function syncInitialLocation() {
@@ -186,10 +229,17 @@ function syncInitialLocation() {
 
   if (props.currentLocation) {
     addressInput.value = props.currentLocation
-    const match = findLocalMatch(props.currentLocation)
-    if (match) {
-      selectedCoords.value = { lat: match.lat, lng: match.lng }
-      selectedGovernorate.value = match.governorate
+    const parsedCoords = parseCoordinateString(props.currentLocation)
+    if (parsedCoords) {
+      selectedCoords.value = parsedCoords
+      const nearest = findNearestPopular(parsedCoords.lat, parsedCoords.lng)
+      if (nearest) selectedGovernorate.value = nearest.governorate
+    } else {
+      const match = findLocalMatch(props.currentLocation)
+      if (match) {
+        selectedCoords.value = { lat: match.lat, lng: match.lng }
+        selectedGovernorate.value = match.governorate
+      }
     }
   }
 }
@@ -236,6 +286,28 @@ function findNearestPopular(lat: number, lng: number) {
   return closest
 }
 
+function setTileLayer(type: 'streets' | 'satellite') {
+  if (!leafletMap || !L) return
+  currentMapType.value = type
+  if (currentTileLayer) {
+    leafletMap.removeLayer(currentTileLayer)
+  }
+
+  if (type === 'satellite') {
+    // Esri ArcGIS World Imagery Satellite Tiles (high-res, no watermark, fast, free)
+    currentTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: '© Esri, Maxar, Earthstar Geographics',
+    }).addTo(leafletMap)
+  } else {
+    // Esri ArcGIS World Street Map (Full Arabic labels for Yemen & KSA, no API key, zero watermark)
+    currentTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: '© Esri, HERE, Garmin, USGS, NGA',
+    }).addTo(leafletMap)
+  }
+}
+
 // Initialize Leaflet Map with CartoDB Voyager tiles (High performance, no blocking)
 async function initMap() {
   if (!import.meta.client) return
@@ -268,12 +340,8 @@ async function initMap() {
     // RTL Zoom control on top right
     L.control.zoom({ position: 'topright' }).addTo(leafletMap)
 
-    // Ultra-reliable CartoDB Voyager Tiles (tested 200 OK without regional blocking)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd',
-      attribution: '© OpenStreetMap contributors, © CARTO',
-    }).addTo(leafletMap)
+    // Clean Esri ArcGIS World Street Map (Zero watermark, Arabic labels)
+    setTileLayer('streets')
 
     // SolarHub Brand Marker (Solar Navy #243B53 and Solar Yellow #F2B705)
     const customIcon = L.divIcon({
@@ -303,6 +371,7 @@ async function initMap() {
       const pos = mapMarker.getLatLng()
       updatePosition(pos.lat, pos.lng)
     })
+
 
     // Map click
     leafletMap.on('click', (e: any) => {
@@ -552,7 +621,7 @@ onUnmounted(() => {
       @click.self="emit('close')"
     >
       <div
-        class="relative w-full max-w-2xl max-h-[92vh] rounded-3xl bg-white p-5 sm:p-7 shadow-2xl border border-solar-border-card text-right flex flex-col gap-4 overflow-y-auto"
+        class="relative w-full max-w-2xl max-h-[92vh] rounded-3xl bg-solar-bg-card p-5 sm:p-7 shadow-2xl border border-solar-border-card text-right flex flex-col gap-4 overflow-y-auto"
         dir="rtl"
         role="dialog"
         aria-modal="true"
@@ -577,7 +646,7 @@ onUnmounted(() => {
           <button
             type="button"
             @click="emit('close')"
-            class="flex size-9 items-center justify-center rounded-xl text-solar-text-muted hover:bg-slate-100 hover:text-solar-navy-dark transition-colors cursor-pointer"
+            class="flex size-9 items-center justify-center rounded-xl text-solar-text-muted hover:bg-solar-bg-subtle hover:text-solar-yellow transition-colors cursor-pointer"
             aria-label="إغلاق النافذة"
           >
             <X class="size-5" />
@@ -594,7 +663,7 @@ onUnmounted(() => {
               @keydown.enter.prevent="executeSearch()"
               type="text"
               placeholder="اكتب اسم المنطقة، الحي، أو المدينة (مثال: صنعاء، حدة، السبعين، المكلا، الرياض)..."
-              class="w-full h-11 rounded-xl border border-solar-border-card bg-slate-50/90 px-3.5 pr-10 pl-9 text-xs font-semibold text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:bg-white focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-right"
+              class="w-full h-11 rounded-xl border border-solar-border-card bg-solar-bg-subtle px-3.5 pr-10 pl-9 text-xs font-semibold text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:bg-solar-bg-card focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-right"
             />
             <Search class="absolute top-1/2 -translate-y-1/2 right-3.5 size-4 text-solar-text-muted pointer-events-none" />
             <span v-if="isSearching" class="absolute top-1/2 -translate-y-1/2 left-3 size-4 text-solar-text-muted animate-spin">
@@ -604,7 +673,7 @@ onUnmounted(() => {
             <!-- قائمة اقتراحات البحث التلقائية المنسدلة -->
             <div
               v-if="searchResults.length > 0"
-              class="absolute top-full right-0 left-0 mt-1.5 z-50 rounded-2xl border border-solar-border-card bg-white p-1.5 shadow-xl max-h-56 overflow-y-auto"
+              class="absolute top-full right-0 left-0 mt-1.5 z-50 rounded-2xl border border-solar-border-card bg-solar-bg-card p-1.5 shadow-xl max-h-56 overflow-y-auto"
             >
               <button
                 v-for="(item, idx) in searchResults"
@@ -635,7 +704,7 @@ onUnmounted(() => {
             type="button"
             @click="locateUser"
             :disabled="isLocatingUser"
-            class="flex items-center justify-center gap-1.5 h-11 px-3.5 rounded-xl border border-solar-border-card bg-white text-xs font-bold text-solar-navy-dark hover:border-solar-navy hover:bg-slate-50 transition-all shrink-0 cursor-pointer disabled:opacity-50 shadow-xs active:scale-[0.99]"
+            class="flex items-center justify-center gap-1.5 h-11 px-3.5 rounded-xl border border-solar-border-card bg-solar-bg-subtle text-xs font-bold text-solar-text-heading hover:border-solar-yellow hover:text-solar-yellow transition-all shrink-0 cursor-pointer disabled:opacity-50 shadow-xs active:scale-[0.99]"
             title="تحديد موقعي الحالي من الجهاز"
           >
             <Loader2 v-if="isLocatingUser" class="size-4 animate-spin text-solar-yellow" />
@@ -682,7 +751,7 @@ onUnmounted(() => {
             :key="loc.name"
             type="button"
             @click="selectPreset(loc)"
-            class="inline-flex items-center gap-1 shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-bold text-solar-text-body hover:border-solar-yellow hover:bg-solar-yellow/20 hover:text-solar-navy-dark transition-all cursor-pointer"
+            class="inline-flex items-center gap-1 shrink-0 rounded-full border border-solar-border-card bg-solar-bg-subtle px-3 py-1 text-[11px] font-bold text-solar-text-body hover:border-solar-yellow hover:bg-solar-yellow hover:text-solar-navy-dark transition-all cursor-pointer"
           >
             <span>{{ loc.name.split(' - ')[1] || loc.name }}</span>
           </button>
@@ -698,14 +767,34 @@ onUnmounted(() => {
             <span>اسحب الدبوس أو انقر على أي نقطة لتثبيت موقعك</span>
           </div>
 
+                    <!-- مبدل نمط الخريطة (شوارع / قمر صناعي) -->
+          <div class="absolute top-3 left-3 z-10 flex items-center bg-solar-bg-card/95 backdrop-blur-xs rounded-xl shadow-md border border-solar-border-card p-1 gap-1 text-[11px] font-bold">
+            <button
+              type="button"
+              @click="setTileLayer('streets')"
+              :class="currentMapType === 'streets' ? 'bg-[#1b2d42] text-white shadow-xs' : 'text-solar-text-muted hover:text-solar-navy-dark'"
+              class="px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+            >
+              خريطة الشوارع
+            </button>
+            <button
+              type="button"
+              @click="setTileLayer('satellite')"
+              :class="currentMapType === 'satellite' ? 'bg-[#1b2d42] text-white shadow-xs' : 'text-solar-text-muted hover:text-solar-navy-dark'"
+              class="px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+            >
+              قمر صناعي
+            </button>
+          </div>
+
           <!-- شارة الإحداثيات الحية -->
-          <div class="absolute bottom-3 left-3 z-10 pointer-events-none rounded-lg bg-white/95 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold text-solar-navy-dark shadow-sm border border-slate-200 dir-ltr">
+          <div class="absolute bottom-3 left-3 z-10 pointer-events-none rounded-lg bg-solar-bg-card/95 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold text-solar-text-heading shadow-sm border border-solar-border-card dir-ltr">
             {{ formattedCoordinates }}
           </div>
         </div>
 
         <!-- حقل معاينة وتعديل العنوان المختار -->
-        <div class="flex flex-col gap-1.5 bg-slate-50 p-3 rounded-2xl border border-solar-border-card/70">
+        <div class="flex flex-col gap-1.5 bg-solar-bg-subtle p-3 rounded-2xl border border-solar-border-card/70">
           <label for="modal-address-input" class="text-xs font-bold text-solar-text-heading flex items-center justify-between">
             <span class="flex items-center gap-1.5">
               <MapPin class="size-3.5 text-solar-yellow" />
@@ -720,7 +809,7 @@ onUnmounted(() => {
             v-model="addressInput"
             type="text"
             placeholder="مثال: صنعاء - حدة - جولة الرويشان"
-            class="h-10 w-full rounded-xl border border-solar-border-card bg-white px-3 text-xs font-semibold text-solar-navy-dark focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-right"
+            class="h-10 w-full rounded-xl border border-solar-border-card bg-solar-bg-card px-3 text-xs font-semibold text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-right"
           />
         </div>
 
@@ -738,7 +827,7 @@ onUnmounted(() => {
           <button
             type="button"
             @click="emit('close')"
-            class="h-12 px-6 rounded-xl border border-solar-border-card bg-white text-xs font-bold text-solar-text-body hover:bg-slate-50 transition-colors cursor-pointer"
+            class="h-12 px-6 rounded-xl border border-solar-border-card bg-solar-bg-subtle text-xs font-bold text-solar-text-body hover:bg-solar-bg-card transition-colors cursor-pointer"
           >
             إلغاء
           </button>

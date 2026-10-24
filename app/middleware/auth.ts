@@ -9,6 +9,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
     if (to.path.startsWith('/admin')) {
       return navigateTo('/', { replace: true })
     }
+
+
+    
     return navigateTo('/auth/login', { replace: true })
   }
 

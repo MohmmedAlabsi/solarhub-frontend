@@ -24,6 +24,8 @@ export interface User {
   avatar?: string
   isVerified: boolean
   isSuspended?: boolean
+  default_coordinates?: string | null
+  store?: any
   has_store?: boolean
   has_engineer_profile?: boolean
   createdAt: string

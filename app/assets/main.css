@@ -10,9 +10,20 @@
     overflow-x: clip;
   }
   body {
-    @apply bg-solar-bg-page font-sans text-solar-text-heading antialiased;
+    @apply bg-solar-bg-page font-sans text-solar-text-heading antialiased transition-colors duration-200;
     max-width: 100%;
     overflow-x: clip;
+  }
+
+  html.dark body {
+    background-color: var(--solar-bg-page);
+    color: var(--solar-text-heading);
+  }
+
+  html.dark select,
+  html.dark input,
+  html.dark textarea {
+    color-scheme: dark;
   }
 
   /* The customer layout owns scrolling, matching main's independent content panel. */
@@ -36,6 +47,13 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
   }
+
+  html.dark ::-webkit-scrollbar-thumb {
+    background: #243b53;
+  }
+  html.dark ::-webkit-scrollbar-thumb:hover {
+    background: #334e68;
+  }
 }
 
 @layer components {
@@ -53,8 +71,19 @@
   .btn-dark, .btn-solar-dark {
     @apply btn bg-solar-navy-dark text-white hover:bg-solar-navy-hover active:bg-solar-navy shadow-sm;
   }
+  html.dark .btn-dark,
+  html.dark .btn-solar-dark {
+    background-color: var(--solar-primary);
+    color: #0C253C;
+    font-weight: 800;
+  }
+  html.dark .btn-dark:hover,
+  html.dark .btn-solar-dark:hover {
+    background-color: var(--solar-primary-hover);
+  }
+
   .btn-outline {
-    @apply btn border border-solar-border-card bg-white text-solar-text-heading hover:bg-solar-bg-subtle;
+    @apply btn border border-solar-border-card bg-solar-bg-card text-solar-text-heading hover:bg-solar-bg-subtle;
   }
   .btn-success {
     @apply btn bg-solar-status-success text-white hover:bg-emerald-700 shadow-sm;
@@ -65,25 +94,25 @@
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold;
   }
   .badge-info {
-    @apply badge bg-solar-status-info-bg text-solar-status-info-text border border-blue-200;
+    @apply badge bg-solar-status-info-bg text-solar-status-info-text border border-blue-200 dark:border-blue-800/40;
   }
   .badge-warning {
-    @apply badge bg-solar-status-warning-bg text-solar-status-warning-text border border-amber-200;
+    @apply badge bg-solar-status-warning-bg text-solar-status-warning-text border border-amber-200 dark:border-amber-800/40;
   }
   .badge-success {
-    @apply badge bg-solar-status-success-bg text-solar-status-success-text border border-emerald-200;
+    @apply badge bg-solar-status-success-bg text-solar-status-success-text border border-emerald-200 dark:border-emerald-800/40;
   }
   .badge-danger {
-    @apply badge bg-solar-status-danger-bg text-solar-status-danger-text border border-rose-200;
+    @apply badge bg-solar-status-danger-bg text-solar-status-danger-text border border-rose-200 dark:border-rose-800/40;
   }
 
   /* Card Container */
   .solar-card {
-    @apply rounded-xl sm:rounded-2xl border border-solar-border-card bg-solar-bg-card p-4 sm:p-5 shadow-card transition-shadow hover:shadow-hover;
+    @apply rounded-xl sm:rounded-2xl border border-solar-border-card bg-solar-bg-card p-4 sm:p-5 shadow-card transition-all hover:shadow-hover;
   }
 
   /* Form Inputs */
   .solar-input {
-    @apply w-full rounded-lg border border-solar-border-input bg-white px-3 sm:px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm text-solar-text-heading placeholder-solar-text-muted transition-colors focus:border-solar-yellow focus:outline-none focus:ring-1 focus:ring-solar-yellow;
+    @apply w-full rounded-lg border border-solar-border-input bg-solar-bg-card px-3 sm:px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm text-solar-text-heading placeholder-solar-text-muted transition-colors focus:border-solar-yellow focus:outline-none focus:ring-1 focus:ring-solar-yellow;
   }
 }

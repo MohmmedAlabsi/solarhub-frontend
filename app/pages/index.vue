@@ -46,8 +46,19 @@ const topCategories = [
   { label: 'أدوات التحكم', sub: 'Smart Trackers & MPPT', icon: Cpu, query: 'controller' },
 ]
 
-// تبويبات المنتجات
-const activeProductTab = ref<'all' | 'panel' | 'inverter' | 'battery' | 'kit'>('all')
+// قائمة تبويبات المنتجات
+const productTabs = [
+  { id: 'all', label: 'الكل' },
+  { id: 'panel', label: 'ألواح شمسية' },
+  { id: 'inverter', label: 'محولات هجينة' },
+  { id: 'battery', label: 'بطاريات ليثيوم' },
+  { id: 'kit', label: 'أنظمة متكاملة' },
+] as const
+
+type ProductTabId = typeof productTabs[number]['id']
+
+// التبويب النشط
+const activeProductTab = ref<ProductTabId>('all')
 
 const filteredProducts = computed(() => {
   if (activeProductTab.value === 'all') {
@@ -84,13 +95,13 @@ function handleProjectCta() {
 <template>
   <div class="flex flex-col gap-16 sm:gap-24 pb-20">
     <!-- 1. البانر الرئيسي للزائر (Hero Section) المطابق لـ visitor_1.png -->
-    <section class="relative overflow-hidden bg-gradient-to-b from-white via-solar-bg-subtle/40 to-white pt-8 sm:pt-14 pb-12 sm:pb-16 border-b border-solar-border-card/60">
+    <section class="relative overflow-hidden bg-gradient-to-b from-solar-bg-card via-solar-bg-subtle/50 to-solar-bg-page pt-8 sm:pt-14 pb-12 sm:pb-16 border-b border-solar-border-card/60 transition-colors duration-200">
       <div class="container-page grid items-center gap-10 lg:grid-cols-12 lg:gap-12">
         <!-- النص والبيانات على اليمين (RTL) -->
         <div class="flex flex-col gap-5 lg:col-span-7 text-right">
-          <div class="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/80 px-3.5 py-1 text-xs font-bold text-emerald-800 shadow-sm">
+          <div class="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/80 dark:bg-emerald-950/40 px-3.5 py-1 text-xs font-bold text-emerald-800 dark:text-emerald-300 shadow-sm">
             <span class="size-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>منصة الطاقة المتجددة المعتمدة في اليمن والمملكة</span>
+            <span>منصة الطاقة المتجددة المعتمدة في اليمن</span>
           </div>
 
           <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-solar-text-heading leading-[1.25] tracking-tight">
@@ -100,7 +111,7 @@ function handleProjectCta() {
           </h1>
 
           <p class="text-sm sm:text-base leading-relaxed text-solar-text-body max-w-2xl">
-            ربط مباشر بأفضل المتاجر المعتمدة والمهندسين المرخصين في المملكة لتصميم وتركيب أنظمة طاقة شمسية مستدامة وعالية الكفاءة بضمانات رسمية معتمدة.
+            ربط مباشر بأفضل المتاجر المعتمدة والمهندسين المرخصين لتصميم وتركيب أنظمة طاقة شمسية مستدامة وعالية الكفاءة بضمانات رسمية معتمدة.
           </p>
 
           <div class="flex flex-wrap items-center gap-3.5 pt-2">
@@ -112,9 +123,9 @@ function handleProjectCta() {
             <button
               type="button"
               @click="handleProjectCta"
-              class="btn-outline h-12 px-6 text-sm font-bold gap-2 bg-white hover:bg-solar-bg-subtle"
+              class="btn-outline h-12 px-6 text-sm font-bold gap-2"
             >
-              <FileText class="size-4.5 text-solar-navy" />
+              <FileText class="size-4.5 text-solar-navy dark:text-solar-yellow" />
               <span>طلب استشارة / طرح مشروع</span>
             </button>
 
@@ -131,7 +142,7 @@ function handleProjectCta() {
 
         <!-- الصورة على اليسار -->
         <div class="relative lg:col-span-5">
-          <div class="relative overflow-hidden rounded-3xl border border-solar-border-card bg-white p-2 shadow-2xl">
+          <div class="relative overflow-hidden rounded-3xl border border-solar-border-card bg-solar-bg-card p-2 shadow-2xl">
             <img
               src="/images/hero-solar.png"
               alt="محطة ألواح طاقة شمسية كهروضوئية متكاملة"
@@ -158,7 +169,7 @@ function handleProjectCta() {
         <div class="solar-card flex flex-col justify-between p-6 sm:p-7 hover:-translate-y-1 transition-all duration-300">
           <div>
             <div class="flex items-center justify-between mb-4">
-              <span class="flex size-12 items-center justify-center rounded-2xl bg-solar-yellow/15 text-solar-navy-dark">
+              <span class="flex size-12 items-center justify-center rounded-2xl bg-solar-yellow/15 text-solar-navy-dark dark:text-solar-yellow">
                 <Sun class="size-6 text-amber-500" />
               </span>
               <span class="text-[11px] font-black text-solar-text-muted">المسار الأول</span>
@@ -194,7 +205,7 @@ function handleProjectCta() {
         <div class="solar-card flex flex-col justify-between p-6 sm:p-7 hover:-translate-y-1 transition-all duration-300 border-solar-yellow/40">
           <div>
             <div class="flex items-center justify-between mb-4">
-              <span class="flex size-12 items-center justify-center rounded-2xl bg-solar-yellow/15 text-solar-navy-dark">
+              <span class="flex size-12 items-center justify-center rounded-2xl bg-solar-yellow/15 text-solar-navy-dark dark:text-solar-yellow">
                 <Users class="size-6 text-amber-500" />
               </span>
               <span class="text-[11px] font-black text-solar-text-muted">المسار الثاني</span>
@@ -230,14 +241,14 @@ function handleProjectCta() {
         <div class="solar-card flex flex-col justify-between p-6 sm:p-7 hover:-translate-y-1 transition-all duration-300">
           <div>
             <div class="flex items-center justify-between mb-4">
-              <span class="flex size-12 items-center justify-center rounded-2xl bg-solar-yellow/15 text-solar-navy-dark">
+              <span class="flex size-12 items-center justify-center rounded-2xl bg-solar-yellow/15 text-solar-navy-dark dark:text-solar-yellow">
                 <Store class="size-6 text-amber-500" />
               </span>
               <span class="text-[11px] font-black text-solar-text-muted">المسار الثالث</span>
             </div>
             <h3 class="text-base sm:text-lg font-black text-solar-text-heading mb-2">التواصل مع المتاجر والموردين</h3>
             <p class="text-xs text-solar-text-body leading-relaxed mb-6">
-              تواصل مع كبار الموزعين والوكلاء المعتمدين في المملكة، اطلب عروض أسعار للمشاريع الكبيرة، واحصل على فواتير ضريبية وشهادات جودة.
+              تواصل مع كبار الموزعين والوكلاء المعتمدين، اطلب عروض أسعار للمشاريع الكبيرة، واحصل على فواتير رسمية وشهادات جودة.
             </p>
 
             <ul class="flex flex-col gap-2.5 text-xs text-solar-text-body mb-8">
@@ -277,12 +288,12 @@ function handleProjectCta() {
           v-for="cat in topCategories"
           :key="cat.label"
           :to="`/products?type=${cat.query}`"
-          class="flex flex-col items-center justify-center text-center p-4 sm:p-5 rounded-2xl bg-white border border-solar-border-card shadow-sm hover:border-solar-yellow hover:shadow-md transition-all group"
+          class="flex flex-col items-center justify-center text-center p-4 sm:p-5 rounded-2xl bg-solar-bg-card border border-solar-border-card shadow-sm hover:border-solar-yellow hover:shadow-md transition-all group"
         >
-          <span class="flex size-13 sm:size-14 items-center justify-center rounded-2xl bg-solar-bg-subtle text-solar-navy group-hover:bg-solar-yellow group-hover:text-solar-navy-dark transition-colors mb-3">
+          <span class="flex size-13 sm:size-14 items-center justify-center rounded-2xl bg-solar-bg-subtle text-solar-navy dark:text-solar-yellow group-hover:bg-solar-yellow group-hover:text-solar-navy-dark transition-colors mb-3">
             <component :is="cat.icon" class="size-6.5" />
           </span>
-          <h3 class="text-xs sm:text-sm font-black text-solar-text-heading group-hover:text-solar-navy transition-colors">{{ cat.label }}</h3>
+          <h3 class="text-xs sm:text-sm font-black text-solar-text-heading group-hover:text-solar-navy dark:group-hover:text-solar-yellow transition-colors">{{ cat.label }}</h3>
           <span class="text-[10px] text-solar-text-muted mt-0.5 truncate w-full">{{ cat.sub }}</span>
         </NuxtLink>
       </div>
@@ -296,53 +307,36 @@ function handleProjectCta() {
           <h2 class="text-2xl sm:text-3xl font-black text-solar-text-heading mt-1">أحدث وأبرز المنتجات الشمسية</h2>
         </div>
 
-        <!-- أزرار التبويبات -->
-        <div class="flex items-center gap-1.5 p-1 rounded-xl bg-white border border-solar-border-card shadow-sm text-xs font-bold overflow-x-auto">
+        <!-- أزرار التبويبات التفاعلية المتجاوبة -->
+        <div class="flex items-center gap-1.5 p-1 rounded-xl bg-solar-bg-card border border-solar-border-card shadow-sm text-xs font-bold overflow-x-auto">
           <button
+            v-for="tab in productTabs"
+            :key="tab.id"
             type="button"
-            @click="activeProductTab = 'all'"
-            class="px-3 py-1.5 rounded-lg transition-all whitespace-nowrap"
-            :class="activeProductTab === 'all' ? 'bg-solar-navy-dark text-white font-black' : 'text-solar-text-body hover:text-solar-text-heading'"
+            @click="activeProductTab = tab.id"
+            class="px-3.5 py-1.5 rounded-lg transition-all duration-200 whitespace-nowrap cursor-pointer select-none"
+            :class="activeProductTab === tab.id
+              ? 'bg-solar-yellow text-solar-navy-dark font-black shadow-sm'
+              : 'text-solar-text-body hover:text-solar-text-heading hover:bg-solar-bg-subtle'"
           >
-            الكل
-          </button>
-          <button
-            type="button"
-            @click="activeProductTab = 'panel'"
-            class="px-3 py-1.5 rounded-lg transition-all whitespace-nowrap"
-            :class="activeProductTab === 'panel' ? 'bg-solar-navy-dark text-white font-black' : 'text-solar-text-body hover:text-solar-text-heading'"
-          >
-            ألواح شمسية
-          </button>
-          <button
-            type="button"
-            @click="activeProductTab = 'inverter'"
-            class="px-3 py-1.5 rounded-lg transition-all whitespace-nowrap"
-            :class="activeProductTab === 'inverter' ? 'bg-solar-navy-dark text-white font-black' : 'text-solar-text-body hover:text-solar-text-heading'"
-          >
-            محولات هجينة
-          </button>
-          <button
-            type="button"
-            @click="activeProductTab = 'battery'"
-            class="px-3 py-1.5 rounded-lg transition-all whitespace-nowrap"
-            :class="activeProductTab === 'battery' ? 'bg-solar-navy-dark text-white font-black' : 'text-solar-text-body hover:text-solar-text-heading'"
-          >
-            بطاريات ليثيوم
-          </button>
-          <button
-            type="button"
-            @click="activeProductTab = 'kit'"
-            class="px-3 py-1.5 rounded-lg transition-all whitespace-nowrap"
-            :class="activeProductTab === 'kit' ? 'bg-solar-navy-dark text-white font-black' : 'text-solar-text-body hover:text-solar-text-heading'"
-          >
-            أنظمة متكاملة
+            {{ tab.label }}
           </button>
         </div>
       </div>
 
       <!-- بطاقات المنتجات الأربعة المطابقة لتصميم visitor_1.png -->
       <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <!-- حالة عدم وجود منتجات -->
+        <div
+          v-if="filteredProducts.length === 0"
+          class="col-span-full flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-solar-border-card bg-solar-bg-card"
+        >
+          <Package class="size-12 text-solar-text-muted mb-3 opacity-60" />
+          <h4 class="text-sm font-bold text-solar-text-heading">لا توجد منتجات متوفرة حالياً في هذا القسم</h4>
+          <p class="text-xs text-solar-text-muted mt-1">يرجى اختيار تبويب آخر لعرض المنتجات.</p>
+        </div>
+
+        <!-- بطاقات المنتجات -->
         <div
           v-for="product in filteredProducts"
           :key="product.id"
@@ -357,13 +351,13 @@ function handleProjectCta() {
                 class="h-full w-full object-contain"
                 loading="lazy"
               />
-              <span class="absolute bottom-2 left-2 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold text-solar-navy shadow-sm">
+              <span class="absolute bottom-2 left-2 rounded-md bg-solar-bg-card/90 px-2 py-0.5 text-[10px] font-bold text-solar-navy dark:text-solar-yellow border border-solar-border-card/40 shadow-sm">
                 {{ product.brand }}
               </span>
               <button
                 type="button"
                 @click="handleProductQuote(product.name)"
-                class="absolute top-2 left-2 flex size-7 items-center justify-center rounded-full bg-white/90 text-solar-text-muted hover:text-rose-500 shadow-sm"
+                class="absolute top-2 left-2 flex size-7 items-center justify-center rounded-full bg-solar-bg-card/90 text-solar-text-muted hover:text-rose-500 border border-solar-border-card/40 shadow-sm"
                 aria-label="إضافة للمفضلة"
               >
                 <Heart class="size-3.5" />
@@ -403,7 +397,7 @@ function handleProjectCta() {
             </button>
             <NuxtLink
               :to="`/products/${product.id}`"
-              class="text-center text-xs font-bold text-solar-text-body hover:text-solar-navy transition-colors flex items-center justify-center gap-1"
+              class="text-center text-xs font-bold text-solar-text-body hover:text-solar-navy dark:hover:text-solar-yellow transition-colors flex items-center justify-center gap-1"
             >
               <span>عرض تفاصيل المنتج</span>
               <ArrowLeft class="size-3" />
@@ -428,7 +422,7 @@ function handleProjectCta() {
           <span class="text-xs font-black text-solar-yellow uppercase tracking-widest">خبرات هندسية موثقة</span>
           <h2 class="text-2xl sm:text-3xl font-black text-solar-text-heading mt-1">مهندسون واستشاريون موثوقون لمشروعك</h2>
           <p class="text-xs text-solar-text-muted mt-1 max-w-xl">
-            اختر مهندسك المعتمد لتصميم ومراجعة مخططاتك الشمسية وضمان مطابقتها للكود السعودي والمواصفات العالمية.
+            اختر مهندسك المعتمد لتصميم ومراجعة مخططاتك الشمسية وضمان مطابقتها لأعلى المعايير والمواصفات الهندسية العالمية.
           </p>
         </div>
 
@@ -447,8 +441,8 @@ function handleProjectCta() {
           <div>
             <!-- رأس بطاقة المهندس: الصورة مع النقطة الخضراء والبادج المعتمد المطابق لـ visitor_1.png -->
             <div class="flex items-start justify-between gap-3 mb-3">
-              <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                <CheckCircle2 class="size-3 text-emerald-600" />
+              <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <CheckCircle2 class="size-3 text-emerald-600 dark:text-emerald-400" />
                 <span>معتمد</span>
               </span>
 
@@ -456,16 +450,16 @@ function handleProjectCta() {
                 <img
                   :src="eng.avatar"
                   :alt="eng.name"
-                  class="w-14 h-14 shrink-0 rounded-full object-cover border-2 border-solar-yellow ring-2 ring-white shadow-sm"
+                  class="w-14 h-14 shrink-0 rounded-full object-cover border-2 border-solar-yellow ring-2 ring-solar-bg-card shadow-sm"
                 />
-                <span class="absolute bottom-0 left-0 size-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+                <span class="absolute bottom-0 left-0 size-3 rounded-full bg-emerald-500 ring-2 ring-solar-bg-card" />
               </div>
             </div>
 
             <!-- الاسم والتخصص والوصف بعرض كامل وتنسيق متناسق -->
             <div class="text-right mb-3">
               <h3 class="text-base font-black text-solar-text-heading">{{ eng.name }}</h3>
-              <p class="text-xs font-bold text-solar-navy mt-0.5">{{ eng.specialty }}</p>
+              <p class="text-xs font-bold text-solar-navy dark:text-solar-yellow mt-0.5">{{ eng.specialty }}</p>
               <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mt-1.5">
                 {{ eng.bio }}
               </p>
@@ -474,18 +468,18 @@ function handleProjectCta() {
             <!-- معلومات الخبرة والموقع والمشاريع -->
             <div class="grid grid-cols-2 gap-2 text-[11px] text-solar-text-muted border-y border-solar-border-card/60 py-3 mb-4">
               <span class="flex items-center gap-1.5 truncate">
-                <Clock class="size-3.5 text-solar-navy shrink-0" />
+                <Clock class="size-3.5 text-solar-navy dark:text-solar-yellow shrink-0" />
                 {{ eng.experience.split('(')[0] }}
               </span>
               <span class="flex items-center gap-1.5 truncate">
-                <MapPin class="size-3.5 text-solar-navy shrink-0" />
+                <MapPin class="size-3.5 text-solar-navy dark:text-solar-yellow shrink-0" />
                 {{ eng.city.split('،')[0] }}
               </span>
               <span class="flex items-center gap-1.5">
                 <Star class="size-3.5 fill-amber-400 text-amber-400 shrink-0" />
                 <span class="font-bold text-solar-text-heading">{{ eng.rating }}</span> ({{ eng.reviewsCount }} تقييم)
               </span>
-              <span class="flex items-center gap-1.5 font-semibold text-solar-navy">
+              <span class="flex items-center gap-1.5 font-semibold text-solar-navy dark:text-solar-yellow">
                 <Award class="size-3.5 text-solar-yellow shrink-0" />
                 {{ eng.projectsCount }} مشروع منجز
               </span>
@@ -503,7 +497,7 @@ function handleProjectCta() {
             </button>
             <NuxtLink
               :to="`/engineers/${eng.id}`"
-              class="text-center text-xs font-bold text-solar-text-body hover:text-solar-navy transition-colors flex items-center justify-center gap-1"
+              class="text-center text-xs font-bold text-solar-text-body hover:text-solar-navy dark:hover:text-solar-yellow transition-colors flex items-center justify-center gap-1"
             >
               <span>عرض الملف الشخصي</span>
               <ArrowLeft class="size-3" />
@@ -520,7 +514,7 @@ function handleProjectCta() {
           <span class="text-xs font-black text-solar-yellow uppercase tracking-widest">شركاء التوريد الموثوقون</span>
           <h2 class="text-2xl sm:text-3xl font-black text-solar-text-heading mt-1">المتاجر والوكلاء المعتمدون</h2>
           <p class="text-xs text-solar-text-muted mt-1 max-w-xl">
-            متاجر رسمية مرخصة توفر فواتير ضريبية، شحن سريع لجميع مدن المملكة، وضمانات المصنّعين الأصلية.
+            متاجر رسمية مرخصة توفر فواتير معتمدة، شحن سريع لجميع المحافظات والمدن، وضمانات المصنّعين الأصلية.
           </p>
         </div>
 
@@ -539,8 +533,8 @@ function handleProjectCta() {
           <div>
             <!-- الرأس والبادج -->
             <div class="flex items-start justify-between gap-3 mb-4">
-              <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200">
-                <ShieldCheck class="size-3 text-blue-600" />
+              <span class="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                <ShieldCheck class="size-3 text-blue-600 dark:text-blue-400" />
                 <span>{{ store.badge }}</span>
               </span>
 
@@ -561,7 +555,7 @@ function handleProjectCta() {
             <!-- إحصائيات المتجر -->
             <div class="grid grid-cols-2 gap-2 text-center p-2.5 rounded-xl bg-solar-bg-subtle mb-4">
               <div>
-                <span class="block text-sm font-black text-solar-navy-dark">{{ store.productsCount }}</span>
+                <span class="block text-sm font-black text-solar-navy-dark dark:text-solar-yellow">{{ store.productsCount }}</span>
                 <span class="text-[10px] text-solar-text-muted">منتج معتمد</span>
               </div>
               <div class="border-r border-solar-border-card">
@@ -575,7 +569,7 @@ function handleProjectCta() {
               <span
                 v-for="tag in store.tags"
                 :key="tag"
-                class="rounded-md bg-white border border-solar-border-card px-2 py-0.5 text-[10px] text-solar-text-body font-medium"
+                class="rounded-md bg-solar-bg-card border border-solar-border-card px-2 py-0.5 text-[10px] text-solar-text-body font-medium"
               >
                 {{ tag }}
               </span>
@@ -595,7 +589,7 @@ function handleProjectCta() {
 
     <!-- 7. بانر طلب العروض والمناقصات (CTA Banner) المطابق لـ visitor_1.png -->
     <section class="container-page">
-      <div class="relative overflow-hidden rounded-3xl bg-solar-navy-dark p-8 sm:p-12 lg:p-14 text-white shadow-2xl">
+      <div class="relative overflow-hidden rounded-3xl bg-solar-navy-dark p-8 sm:p-12 lg:p-14 text-white shadow-2xl border border-white/10">
         <div class="grid gap-8 lg:grid-cols-12 items-center">
           <!-- الجانب الأيمن: النص والعنوان والزر -->
           <div class="flex flex-col gap-4 lg:col-span-7">

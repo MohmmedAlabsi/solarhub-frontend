@@ -149,24 +149,24 @@ async function handleSubmit() {
     errorMessage.value = 'يرجى إدخال الاسم الكامل'
     return
   }
-  if (!form.email.trim() || !form.email.includes('@')) {
-    errorMessage.value = 'يرجى إدخال بريد إلكتروني صحيح'
+
+  if (!form.email.trim()) {
+    errorMessage.value = 'يرجى إدخال البريد الإلكتروني'
     return
   }
+
   if (!form.phone.trim()) {
     errorMessage.value = 'يرجى إدخال رقم الجوال'
     return
   }
-  const phoneRegex = /^\+?[0-9]{7,20}$/
-  if (!phoneRegex.test(form.phone.trim())) {
-    errorMessage.value = 'يرجى إدخال رقم جوال صحيح (بين 7 و 20 رقماً)'
+
+  if (!form.password) {
+    errorMessage.value = 'يرجى إدخال كلمة المرور'
     return
   }
 
-  // Password rules matching Laravel backend: min 8, letters, mixedCase, numbers
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/
-  if (!passwordRegex.test(form.password)) {
-    errorMessage.value = 'كلمة المرور يجب أن تتكون من 8 خانات على الأقل، وتحتوي على حرف كبير وحرف صغير ورقم (مثال: SolarHub2026)'
+  if (form.password.length < 8) {
+    errorMessage.value = 'كلمة المرور يجب أن لا تقل عن 8 خانات'
     return
   }
 
@@ -174,31 +174,32 @@ async function handleSubmit() {
     errorMessage.value = 'كلمتا المرور غير متطابقتين'
     return
   }
+
   if (!form.governorate) {
     errorMessage.value = 'يرجى اختيار المحافظة / المنطقة'
     return
   }
-  if (!form.locationText) {
-    form.locationText = `${form.governorate} - مركز المحافظة`
-    form.locationCoordinates = getGovernorateCoords(form.governorate)
+
+  if (!form.locationText.trim()) {
+    errorMessage.value = 'يرجى تحديد الموقع الجغرافي أو إدخال عنوانك بالتفصيل'
+    return
   }
 
-  // Engineer specific
+  // Role-specific validations
   if (selectedRole.value === 'engineer') {
     if (!form.licenseNumber.trim()) {
-      errorMessage.value = 'يرجى إدخال رقم الترخيص المهني أو رقم الاعتماد'
+      errorMessage.value = 'يرجى إدخال رقم الترخيص أو الاعتماد المهني للمهندس'
       return
     }
     if (!form.cvFile) {
-      errorMessage.value = 'يرجى إرفاق شهادة الاعتماد المهني أو السيرة الذاتية (ملف PDF أو صورة)'
+      errorMessage.value = 'يرجى إرفاق شهادة الاعتماد المهني أو وثيقة السيرة الذاتية (PDF أو صورة)'
       return
     }
   }
 
-  // Supplier specific
   if (selectedRole.value === 'supplier') {
     if (!form.companyName.trim()) {
-      errorMessage.value = 'يرجى إدخال اسم المتجر / الشركة'
+      errorMessage.value = 'يرجى إدخال اسم المتجر أو الشركة'
       return
     }
     if (!form.commercialRegistry.trim()) {
@@ -206,27 +207,40 @@ async function handleSubmit() {
       return
     }
     if (!form.commercialRegisterFile) {
-      errorMessage.value = 'يرجى إرفاق وثيقة السجل التجاري (ملف PDF أو صورة)'
+      errorMessage.value = 'يرجى رفع صورة أو ملف السجل التجاري بصيغة PDF أو صورة واضحة'
       return
     }
   }
 
+  // Format coordinates into WKT POINT(lng lat) for PostgreSQL PostGIS geography column
+  let formattedCoordinates: string | undefined
+  if (form.locationCoordinates && form.locationCoordinates.lat && form.locationCoordinates.lng) {
+    formattedCoordinates = `POINT(${form.locationCoordinates.lng.toFixed(6)} ${form.locationCoordinates.lat.toFixed(6)})`
+  } else {
+    const defaultCoords = getGovernorateCoords(form.governorate)
+    if (defaultCoords) {
+      formattedCoordinates = `POINT(${defaultCoords.lng.toFixed(6)} ${defaultCoords.lat.toFixed(6)})`
+    }
+  }
+
+  const selectedGovId = getGovernorateIdByName(form.governorate)
+
   const result = await authStore.register({
-    role: selectedRole.value,
-    name: form.name,
-    email: form.email,
-    phone: form.phone,
+    name: form.name.trim(),
+    email: form.email.trim(),
+    phone: form.phone.trim(),
     password: form.password,
     password_confirmation: form.confirmPassword,
+    role: selectedRole.value,
     governorate: form.governorate,
-    governorate_id: getGovernorateIdByName(form.governorate) || undefined,
-    location: form.locationCoordinates
-      ? { ...form.locationCoordinates, address: form.locationText }
-      : undefined,
-    companyName: form.companyName,
-    licenseNumber: form.licenseNumber,
-    commercialRegistry: form.commercialRegistry,
-    storeType: form.storeType,
+    governorate_id: selectedGovId || undefined,
+    city: form.governorate,
+    default_coordinates: formattedCoordinates,
+    location_coordinates: formattedCoordinates,
+    company_name: form.companyName.trim() || undefined,
+    license_number: form.licenseNumber.trim() || undefined,
+    commercial_registry: form.commercialRegistry.trim() || undefined,
+    store_type: selectedRole.value === 'supplier' ? form.storeType : undefined,
     addressDetails: `${form.governorate} - ${form.locationText}`,
     cvFile: form.cvFile,
     commercialRegisterFile: form.commercialRegisterFile,
@@ -252,8 +266,8 @@ async function handleSubmit() {
 
 <template>
   <div class="w-full max-w-[520px]">
-    <!-- بطاقة إنشاء حساب المطابقة تماماً لتصاميم العميل والمهندس والمورد -->
-    <div class="rounded-3xl border border-solar-border-card/70 bg-white p-7 sm:p-10 shadow-xl text-right">
+    <!-- بطاقة إنشاء حساب المتوافقة بالكامل مع الوضعين الداكن والنهاري -->
+    <div class="rounded-3xl border border-solar-border-card bg-solar-bg-card p-7 sm:p-10 shadow-xl text-right transition-colors duration-200">
       <!-- الشعار والعناوين التفاعلية حسب نوع الحساب -->
       <AuthHeader
         title="إنشاء حساب جديد"
@@ -266,7 +280,7 @@ async function handleSubmit() {
       <!-- تنبيه الأخطاء -->
       <div
         v-if="errorMessage"
-        class="mb-6 flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs font-semibold text-rose-700 leading-relaxed animate-in fade-in duration-200"
+        class="mb-6 flex items-start gap-2.5 rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/90 dark:bg-rose-950/40 p-3.5 text-xs font-semibold text-rose-700 dark:text-rose-300 leading-relaxed animate-in fade-in duration-200"
       >
         <AlertCircle class="size-4.5 shrink-0 text-rose-500 mt-0.5" />
         <span class="flex-1">{{ errorMessage }}</span>
@@ -284,7 +298,7 @@ async function handleSubmit() {
             v-model="form.name"
             type="text"
             placeholder="مثال: عبدالله محمد"
-            class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
+            class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
           />
         </div>
 
@@ -300,7 +314,7 @@ async function handleSubmit() {
             type="email"
             placeholder="name@example.com"
             dir="ltr"
-            class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-left"
+            class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-left"
           />
         </div>
 
@@ -314,9 +328,9 @@ async function handleSubmit() {
             id="phone"
             v-model="form.phone"
             type="tel"
-            placeholder="05xxxxxxxx"
+            placeholder="77xxxxxxx أو 71xxxxxxx"
             dir="ltr"
-            class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-left"
+            class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-left"
           />
         </div>
 
@@ -331,13 +345,13 @@ async function handleSubmit() {
               id="password"
               v-model="form.password"
               :type="showPassword ? 'text' : 'password'"
-              placeholder="أدخل كلمة المرور"
-              class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 pl-11 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
+              placeholder="أدخل كلمة المرور (8 خانات على الأقل)"
+              class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 pl-11 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
             />
             <button
               type="button"
               @click="showPassword = !showPassword"
-              class="absolute left-3.5 top-1/2 -translate-y-1/2 text-solar-text-muted hover:text-solar-navy transition-colors"
+              class="absolute left-3.5 top-1/2 -translate-y-1/2 text-solar-text-muted hover:text-solar-navy dark:hover:text-solar-yellow transition-colors cursor-pointer"
             >
               <EyeOff v-if="showPassword" class="size-4.5" />
               <Eye v-else class="size-4.5" />
@@ -357,12 +371,12 @@ async function handleSubmit() {
               v-model="form.confirmPassword"
               :type="showConfirmPassword ? 'text' : 'password'"
               placeholder="أعد إدخال كلمة المرور"
-              class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 pl-11 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
+              class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 pl-11 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
             />
             <button
               type="button"
               @click="showConfirmPassword = !showConfirmPassword"
-              class="absolute left-3.5 top-1/2 -translate-y-1/2 text-solar-text-muted hover:text-solar-navy transition-colors"
+              class="absolute left-3.5 top-1/2 -translate-y-1/2 text-solar-text-muted hover:text-solar-navy dark:hover:text-solar-yellow transition-colors cursor-pointer"
             >
               <EyeOff v-if="showConfirmPassword" class="size-4.5" />
               <Eye v-else class="size-4.5" />
@@ -380,7 +394,7 @@ async function handleSubmit() {
             <select
               id="governorate"
               v-model="form.governorate"
-              class="h-12 w-full appearance-none rounded-xl border border-solar-border-card/80 bg-white px-3.5 pl-10 text-xs font-medium text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all cursor-pointer"
+              class="h-12 w-full appearance-none rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 pl-10 text-xs font-medium text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all cursor-pointer"
             >
               <option value="" disabled selected>اختر المحافظة / المنطقة</option>
               <option v-for="gov in governorates" :key="gov" :value="gov">
@@ -398,8 +412,8 @@ async function handleSubmit() {
               <span>الموقع الجغرافي</span>
               <span class="text-rose-500">*</span>
             </label>
-            <span v-if="form.locationCoordinates" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-emerald-200/60">
-              <Check class="size-3 text-emerald-600 stroke-[3]" />
+            <span v-if="form.locationCoordinates" class="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md flex items-center gap-1 border border-emerald-200/60 dark:border-emerald-800/40">
+              <Check class="size-3 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
               <span>محدد ومفعل</span>
             </span>
           </div>
@@ -411,7 +425,7 @@ async function handleSubmit() {
                 v-model="form.locationText"
                 type="text"
                 placeholder="انقر على الخريطة أو اكتب عنوانك بالتفصيل"
-                class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 pr-3.5 pl-9 text-xs font-semibold text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-right"
+                class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 pr-3.5 pl-9 text-xs font-semibold text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-right"
               />
               <MapPin class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-solar-yellow pointer-events-none" />
             </div>
@@ -420,10 +434,10 @@ async function handleSubmit() {
             <button
               type="button"
               @click="isMapModalOpen = true"
-              class="flex items-center justify-center gap-1.5 h-12 px-3 sm:px-4 rounded-xl bg-[#1b2d42] text-white text-xs font-bold hover:bg-solar-navy-dark active:scale-[0.98] transition-all shrink-0 cursor-pointer shadow-xs"
+              class="flex items-center justify-center gap-1.5 h-12 px-3 sm:px-4 rounded-xl bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark text-xs font-black hover:opacity-90 active:scale-[0.98] transition-all shrink-0 cursor-pointer shadow-xs"
               title="فتح الخريطة التفاعلية والبحث بالمنطقة"
             >
-              <MapIcon class="size-4 text-solar-yellow" />
+              <MapIcon class="size-4" />
               <span>الخريطة</span>
             </button>
 
@@ -432,19 +446,19 @@ async function handleSubmit() {
               type="button"
               @click="quickLocateUser"
               :disabled="isQuickLocating"
-              class="flex items-center justify-center gap-1.5 h-12 px-2.5 sm:px-3 rounded-xl border border-solar-border-card/80 bg-slate-50 text-xs font-bold text-solar-navy-dark hover:bg-slate-100 hover:border-solar-navy active:scale-[0.98] transition-all shrink-0 cursor-pointer disabled:opacity-50 shadow-xs"
+              class="flex items-center justify-center gap-1.5 h-12 px-2.5 sm:px-3 rounded-xl border border-solar-border-card bg-solar-bg-subtle text-xs font-bold text-solar-text-heading hover:border-solar-yellow hover:text-solar-yellow active:scale-[0.98] transition-all shrink-0 cursor-pointer disabled:opacity-50 shadow-xs"
               title="تحديد موقعي الآن عبر الـ GPS في جهازي"
             >
               <Loader2 v-if="isQuickLocating" class="size-4 animate-spin text-solar-yellow" />
-              <Crosshair v-else class="size-4 text-solar-navy-dark" />
+              <Crosshair v-else class="size-4 text-solar-navy dark:text-solar-yellow" />
               <span class="hidden sm:inline">{{ isQuickLocating ? 'جاري...' : 'موقعي' }}</span>
             </button>
           </div>
 
           <!-- تفاصيل الإحداثيات المسجلة -->
           <div v-if="form.locationCoordinates" class="flex items-center justify-between text-[11px] text-solar-text-muted px-1">
-            <span class="text-slate-500 font-medium">الإحداثيات الحالية:</span>
-            <span class="font-mono text-solar-navy-dark font-bold dir-ltr">
+            <span class="font-medium">الإحداثيات الحالية:</span>
+            <span class="font-mono text-solar-text-heading font-bold dir-ltr">
               {{ form.locationCoordinates.lat.toFixed(4) }}, {{ form.locationCoordinates.lng.toFixed(4) }}
             </span>
           </div>
@@ -461,8 +475,8 @@ async function handleSubmit() {
               id="licenseNumber"
               v-model="form.licenseNumber"
               type="text"
-              placeholder="مثال: SCE-849201 أو رقم القيد الهندسي"
-              class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
+              placeholder="مثال: رقم القيد أو رخصة مزاولة المهنة"
+              class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
             />
           </div>
 
@@ -489,7 +503,7 @@ async function handleSubmit() {
               v-model="form.companyName"
               type="text"
               placeholder="مثال: متجر الطاقة المتجددة المتقدمة"
-              class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
+              class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
             />
           </div>
 
@@ -503,7 +517,7 @@ async function handleSubmit() {
               v-model="form.commercialRegistry"
               type="text"
               placeholder="مثال: 1010789234"
-              class="h-12 w-full rounded-xl border border-solar-border-card/80 bg-white px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
+              class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all"
             />
           </div>
 
@@ -516,7 +530,7 @@ async function handleSubmit() {
               <select
                 id="storeType"
                 v-model="form.storeType"
-                class="h-12 w-full appearance-none rounded-xl border border-solar-border-card/80 bg-white px-3.5 pl-10 text-xs font-medium text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all cursor-pointer"
+                class="h-12 w-full appearance-none rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 pl-10 text-xs font-medium text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all cursor-pointer"
               >
                 <option value="authorized_agent">وكيل رسمي / معتمد</option>
                 <option value="wholesaler">موزع معتمد / تاجر جملة</option>
@@ -537,24 +551,24 @@ async function handleSubmit() {
           />
         </div>
 
-        <!-- زر إنشاء الحساب الداكن -->
+        <!-- زر إنشاء الحساب المتجاوب بلون بارز في كلا الوضعين -->
         <button
           type="submit"
           :disabled="authStore.isLoading"
-          class="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1b2d42] text-xs sm:text-sm font-bold text-white shadow-md hover:bg-solar-navy-dark active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+          class="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark text-xs sm:text-sm font-black shadow-md hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
         >
-          <span v-if="authStore.isLoading" class="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          <span v-if="authStore.isLoading" class="size-4 border-2 border-white/30 dark:border-solar-navy/30 border-t-white dark:border-t-solar-navy rounded-full animate-spin" />
           <span>{{ authStore.isLoading ? 'جاري إنشاء الحساب...' : submitButtonText }}</span>
           <ArrowLeft v-if="!authStore.isLoading" class="size-4" />
         </button>
       </form>
 
-      <!-- صندوق الانتقال لتسجيل الدخول المطابق للتصميم تماماً -->
-      <div class="mt-6 rounded-2xl bg-[#F6F8FB] p-3.5 text-center text-xs text-solar-text-body font-medium">
+      <!-- صندوق الانتقال لتسجيل الدخول -->
+      <div class="mt-6 rounded-2xl bg-solar-bg-subtle border border-solar-border-card p-3.5 text-center text-xs text-solar-text-body font-medium transition-colors">
         <span>لديك حساب بالفعل في سولار هب؟ </span>
         <NuxtLink
           to="/auth/login"
-          class="font-black text-solar-navy-dark hover:text-solar-yellow transition-colors"
+          class="font-black text-solar-navy dark:text-solar-yellow hover:underline transition-colors"
         >
           تسجيل الدخول
         </NuxtLink>

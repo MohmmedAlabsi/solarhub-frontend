@@ -30,8 +30,8 @@ function selectRole(role: UserRole) {
       </label>
     </div>
 
-    <!-- شريط التبديل الثلاثي المطابق للتصميم تماماً -->
-    <div class="grid grid-cols-3 gap-1 rounded-2xl bg-[#EEF2F6] p-1.5 shadow-inner">
+    <!-- شريط التبديل الثلاثي المتوافق بالكامل مع الوضعين الداكن والنهاري -->
+    <div class="grid grid-cols-3 gap-1 rounded-2xl bg-solar-bg-subtle border border-solar-border-card p-1.5 shadow-inner transition-colors duration-200">
       <button
         v-for="role in roles"
         :key="role.id"
@@ -40,8 +40,8 @@ function selectRole(role: UserRole) {
         class="h-11 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center cursor-pointer select-none"
         :class="[
           modelValue === role.id
-            ? 'bg-[#1b2d42] text-white shadow-md font-black'
-            : 'text-solar-text-body hover:text-solar-text-heading hover:bg-white/40'
+            ? 'bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark shadow-md font-black'
+            : 'text-solar-text-body hover:text-solar-text-heading hover:bg-solar-bg-card/70'
         ]"
       >
         {{ role.label }}

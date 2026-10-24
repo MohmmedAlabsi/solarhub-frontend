@@ -198,7 +198,7 @@ const isMapModalOpen = ref(false)
           type="button"
           @click="activeTab = 'products'"
           class="flex items-center gap-2 py-2 px-1 text-sm font-black border-b-2 transition-all"
-          :class="activeTab === 'products' ? 'border-solar-yellow text-solar-navy-dark' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
+          :class="activeTab === 'products' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
         >
           <Package class="size-4" />
           <span>المنتجات والمخزون المتاح ({{ storeProducts.length }} مختارة)</span>
@@ -208,7 +208,7 @@ const isMapModalOpen = ref(false)
           type="button"
           @click="activeTab = 'reviews'"
           class="flex items-center gap-2 py-2 px-1 text-sm font-bold border-b-2 transition-all"
-          :class="activeTab === 'reviews' ? 'border-solar-yellow text-solar-navy-dark' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
+          :class="activeTab === 'reviews' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
         >
           <Star class="size-4" />
           <span>التقييمات والآراء (145)</span>
@@ -221,7 +221,7 @@ const isMapModalOpen = ref(false)
           type="button"
           @click="selectedFilter = 'all'"
           class="rounded-xl px-4 py-2 text-xs font-bold transition-all whitespace-nowrap"
-          :class="selectedFilter === 'all' ? 'bg-solar-navy-dark text-white font-black shadow-sm' : 'bg-white border border-solar-border-card text-solar-text-heading hover:bg-solar-bg-subtle'"
+          :class="selectedFilter === 'all' ? 'bg-solar-yellow text-solar-navy-dark font-black shadow-sm' : 'bg-solar-bg-card border border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-text-heading'"
         >
           الكل ({{ visitorProducts.length }})
         </button>
@@ -229,7 +229,7 @@ const isMapModalOpen = ref(false)
           type="button"
           @click="selectedFilter = 'panel'"
           class="rounded-xl px-4 py-2 text-xs font-bold transition-all whitespace-nowrap"
-          :class="selectedFilter === 'panel' ? 'bg-solar-navy-dark text-white font-black shadow-sm' : 'bg-white border border-solar-border-card text-solar-text-heading hover:bg-solar-bg-subtle'"
+          :class="selectedFilter === 'panel' ? 'bg-solar-yellow text-solar-navy-dark font-black shadow-sm' : 'bg-solar-bg-card border border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-text-heading'"
         >
           ألواح شمسية
         </button>
@@ -237,7 +237,7 @@ const isMapModalOpen = ref(false)
           type="button"
           @click="selectedFilter = 'inverter'"
           class="rounded-xl px-4 py-2 text-xs font-bold transition-all whitespace-nowrap"
-          :class="selectedFilter === 'inverter' ? 'bg-solar-navy-dark text-white font-black shadow-sm' : 'bg-white border border-solar-border-card text-solar-text-heading hover:bg-solar-bg-subtle'"
+          :class="selectedFilter === 'inverter' ? 'bg-solar-yellow text-solar-navy-dark font-black shadow-sm' : 'bg-solar-bg-card border border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-text-heading'"
         >
           إنفرترات ومحولات
         </button>
@@ -245,7 +245,7 @@ const isMapModalOpen = ref(false)
           type="button"
           @click="selectedFilter = 'battery'"
           class="rounded-xl px-4 py-2 text-xs font-bold transition-all whitespace-nowrap"
-          :class="selectedFilter === 'battery' ? 'bg-solar-navy-dark text-white font-black shadow-sm' : 'bg-white border border-solar-border-card text-solar-text-heading hover:bg-solar-bg-subtle'"
+          :class="selectedFilter === 'battery' ? 'bg-solar-yellow text-solar-navy-dark font-black shadow-sm' : 'bg-solar-bg-card border border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-text-heading'"
         >
           بطاريات تخزين
         </button>
@@ -253,7 +253,7 @@ const isMapModalOpen = ref(false)
           type="button"
           @click="selectedFilter = 'controller'"
           class="rounded-xl px-4 py-2 text-xs font-bold transition-all whitespace-nowrap"
-          :class="selectedFilter === 'controller' ? 'bg-solar-navy-dark text-white font-black shadow-sm' : 'bg-white border border-solar-border-card text-solar-text-heading hover:bg-solar-bg-subtle'"
+          :class="selectedFilter === 'controller' ? 'bg-solar-yellow text-solar-navy-dark font-black shadow-sm' : 'bg-solar-bg-card border border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-text-heading'"
         >
           منظمات MPPT
         </button>
@@ -349,7 +349,7 @@ const isMapModalOpen = ref(false)
     <!-- نافذة استعراض موقع المتجر والمستودع على الخريطة -->
     <CommonMapLocationModal
       :is-open="isMapModalOpen"
-      :current-location="store.address"
+      :current-location="(store as any).locationCoordinates || store.address"
       :title="`موقع متجر ${store.name} على الخريطة`"
       subtitle="الموقع الفعلي للمتجر والمستودعات المعتمدة لاستلام وفحص البضائع وتنسيق الشحن"
       @close="isMapModalOpen = false"
