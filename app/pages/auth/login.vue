@@ -102,7 +102,7 @@ async function handleSubmit() {
     } else if (result.user.role === 'supplier') {
       router.push('/customer/dashboard') // or supplier dashboard
     } else {
-      router.push('/admin/dashboard')
+      router.push('/customer/dashboard')
     }
   } else {
     if (result.status === 403 && (result.error?.includes('verify') || result.error?.includes('التحقق'))) {

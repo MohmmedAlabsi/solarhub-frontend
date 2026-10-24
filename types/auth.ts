@@ -44,6 +44,7 @@ export interface RegisterBasePayload {
   password: string
   password_confirmation: string
   governorate?: string
+  governorate_id?: number
   location?: {
     lat: number
     lng: number
@@ -82,7 +83,15 @@ export interface ForgotPasswordPayload {
   login: string
 }
 
+export interface ResetPasswordPayload {
+  email: string
+  token: string
+  password: string
+  password_confirmation: string
+}
+
 export interface VerifyOtpPayload {
   email: string
   code: string
 }
+

@@ -2,7 +2,9 @@
 import { Eye, EyeOff, ArrowLeft, MapPin, Map as MapIcon, AlertCircle, ChevronDown, Crosshair, Loader2, Check } from 'lucide-vue-next'
 import type { UserRole } from '~~/types/auth'
 import { useAuthStore } from '~/stores/auth'
+import { useGovernorates } from '~/composables/useGovernorates'
 import MapLocationModal from '~/components/common/MapLocationModal.vue'
+import AuthFileUploadInput from '~/components/auth/FileUploadInput.vue'
 
 definePageMeta({
   layout: 'auth',
@@ -44,23 +46,14 @@ const showConfirmPassword = ref(false)
 const errorMessage = ref('')
 const isMapModalOpen = ref(false)
 
-const governorates = [
-  'الرياض',
-  'مكة المكرمة (جدة / الطائف)',
-  'المدينة المنورة',
-  'المنطقة الشرقية (الدمام / الخبر)',
-  'القصيم (بريدة / عنيزة)',
-  'عسير (أبها / خميس مشيط)',
-  'تبوك',
-  'جازان',
-  'نجران',
-  'حائل',
-  'صنعاء',
-  'عدن',
-  'حضرموت (المكلا / سيئون)',
-  'تعز',
-  'الحديدة',
-]
+const { governorates: govList, loadGovernorates, getGovernorateIdByName, getGovernorateCoords } = useGovernorates()
+
+onMounted(() => {
+  loadGovernorates()
+})
+
+// Complete Yemeni Governorates matching requirements
+const governorates = computed(() => govList.value.map(g => g.name_ar))
 
 const subtitleText = computed(() => {
   if (selectedRole.value === 'supplier') {
@@ -75,32 +68,12 @@ const submitButtonText = computed(() => {
   return 'إنشاء الحساب'
 })
 
-const defaultGovernorateCoords: Record<string, { lat: number; lng: number }> = {
-  'صنعاء': { lat: 15.3694, lng: 44.1910 },
-  'عدن': { lat: 12.7855, lng: 45.0187 },
-  'تعز': { lat: 13.5776, lng: 44.0185 },
-  'الحديدة': { lat: 14.7978, lng: 42.9545 },
-  'حضرموت (المكلا / سيئون)': { lat: 14.5425, lng: 49.1242 },
-  'الرياض': { lat: 24.7136, lng: 46.6753 },
-  'مكة المكرمة (جدة / الطائف)': { lat: 21.3891, lng: 39.8579 },
-  'المدينة المنورة': { lat: 24.5247, lng: 39.5692 },
-  'المنطقة الشرقية (الدمام / الخبر)': { lat: 26.4207, lng: 50.0888 },
-  'القصيم (بريدة / عنيزة)': { lat: 26.3260, lng: 43.9750 },
-  'عسير (أبها / خميس مشيط)': { lat: 18.2164, lng: 42.5053 },
-  'تبوك': { lat: 28.3835, lng: 36.5662 },
-  'جازان': { lat: 16.8892, lng: 42.5706 },
-  'نجران': { lat: 17.4924, lng: 44.1277 },
-  'حائل': { lat: 27.5114, lng: 41.7208 },
-}
-
 watch(() => form.governorate, (newGov) => {
   if (newGov) {
     if (!form.locationText || form.locationText.includes('مركز المحافظة') || form.locationText.includes('مركز المدينة') || form.locationText === '') {
       form.locationText = `${newGov} - مركز المحافظة`
     }
-    if (defaultGovernorateCoords[newGov]) {
-      form.locationCoordinates = defaultGovernorateCoords[newGov]
-    }
+    form.locationCoordinates = getGovernorateCoords(newGov)
     if (errorMessage.value.includes('الموقع الجغرافي') || errorMessage.value.includes('المحافظة')) {
       errorMessage.value = ''
     }
@@ -112,11 +85,11 @@ const isQuickLocating = ref(false)
 function findNearestGovFromCoords(lat: number, lng: number): string {
   let nearestGov = form.governorate || 'صنعاء'
   let minDistance = Infinity
-  for (const [gov, coords] of Object.entries(defaultGovernorateCoords)) {
-    const dist = Math.hypot(coords.lat - lat, coords.lng - lng)
+  for (const gov of govList.value) {
+    const dist = Math.hypot(gov.lat - lat, gov.lng - lng)
     if (dist < minDistance) {
       minDistance = dist
-      nearestGov = gov
+      nearestGov = gov.name_ar
     }
   }
   return nearestGov
@@ -141,10 +114,8 @@ async function quickLocateUser() {
         console.warn('GPS notice:', err)
         const targetGov = form.governorate || 'صنعاء'
         form.governorate = targetGov
-        if (defaultGovernorateCoords[targetGov]) {
-          form.locationCoordinates = defaultGovernorateCoords[targetGov]
-          form.locationText = `${targetGov} - مركز المحافظة`
-        }
+        form.locationCoordinates = getGovernorateCoords(targetGov)
+        form.locationText = `${targetGov} - مركز المحافظة`
         isQuickLocating.value = false
       },
       { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
@@ -152,10 +123,8 @@ async function quickLocateUser() {
   } else {
     const targetGov = form.governorate || 'صنعاء'
     form.governorate = targetGov
-    if (defaultGovernorateCoords[targetGov]) {
-      form.locationCoordinates = defaultGovernorateCoords[targetGov]
-      form.locationText = `${targetGov} - مركز المحافظة`
-    }
+    form.locationCoordinates = getGovernorateCoords(targetGov)
+    form.locationText = `${targetGov} - مركز المحافظة`
     isQuickLocating.value = false
   }
 }
@@ -164,7 +133,7 @@ function handleLocationSelected(loc: { address: string; lat: number; lng: number
   form.locationText = loc.address
   form.locationCoordinates = { lat: loc.lat, lng: loc.lng }
   if (loc.governorate) {
-    const match = governorates.find(g => g.includes(loc.governorate!) || loc.governorate!.includes(g))
+    const match = governorates.value.find(g => g.includes(loc.governorate!) || loc.governorate!.includes(g))
     if (match) {
       form.governorate = match
     }
@@ -210,10 +179,8 @@ async function handleSubmit() {
     return
   }
   if (!form.locationText) {
-    form.locationText = `${form.governorate} - مركز المدينة`
-    if (defaultGovernorateCoords[form.governorate]) {
-      form.locationCoordinates = defaultGovernorateCoords[form.governorate]
-    }
+    form.locationText = `${form.governorate} - مركز المحافظة`
+    form.locationCoordinates = getGovernorateCoords(form.governorate)
   }
 
   // Engineer specific
@@ -223,7 +190,7 @@ async function handleSubmit() {
       return
     }
     if (!form.cvFile) {
-      errorMessage.value = 'يرجى إرفاق السيرة الذاتية (ملف PDF)'
+      errorMessage.value = 'يرجى إرفاق شهادة الاعتماد المهني أو السيرة الذاتية (ملف PDF أو صورة)'
       return
     }
   }
@@ -239,7 +206,7 @@ async function handleSubmit() {
       return
     }
     if (!form.commercialRegisterFile) {
-      errorMessage.value = 'يرجى إرفاق السجل التجاري (ملف PDF أو صورة)'
+      errorMessage.value = 'يرجى إرفاق وثيقة السجل التجاري (ملف PDF أو صورة)'
       return
     }
   }
@@ -252,6 +219,7 @@ async function handleSubmit() {
     password: form.password,
     password_confirmation: form.confirmPassword,
     governorate: form.governorate,
+    governorate_id: getGovernorateIdByName(form.governorate) || undefined,
     location: form.locationCoordinates
       ? { ...form.locationCoordinates, address: form.locationText }
       : undefined,
@@ -271,7 +239,13 @@ async function handleSubmit() {
       query: { email: form.email, role: selectedRole.value },
     })
   } else {
-    errorMessage.value = result.error || 'تعذر إتمام التسجيل، يرجى المحاولة لاحقاً'
+    if (result.errors && Object.keys(result.errors).length > 0) {
+      const firstKey = Object.keys(result.errors)[0]
+      const firstMsg = result.errors[firstKey]?.[0]
+      errorMessage.value = firstMsg || result.error || 'تعذر إتمام التسجيل، يرجى التحقق من صحة البيانات'
+    } else {
+      errorMessage.value = result.error || 'تعذر إتمام التسجيل، يرجى المحاولة لاحقاً'
+    }
   }
 }
 </script>
@@ -492,12 +466,13 @@ async function handleSubmit() {
             />
           </div>
 
-          <FileUploadInput
+          <AuthFileUploadInput
             v-model="form.cvFile"
-            label="السيرة الذاتية (CV / ملف PDF)"
-            placeholder="إرفاق السيرة الذاتية (PDF, الحد الأقصى 5MB)"
-            accept=".pdf"
+            label="شهادة الاعتماد المهني أو السيرة الذاتية"
+            placeholder="اضغط لاختيار ملف الشهادة أو السيرة الذاتية (PDF أو صورة)"
+            accept=".pdf,application/pdf,image/*,.png,.jpg,.jpeg,.doc,.docx"
             :max-size-mb="5"
+            hint="الملفات المقبولة: وثائق PDF الرسمية أو صور الشهادات والاعتمادات (JPG, PNG) حتى 5MB"
             required
           />
         </div>
@@ -551,12 +526,13 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <FileUploadInput
+          <AuthFileUploadInput
             v-model="form.commercialRegisterFile"
-            label="السجل التجاري (ملف PDF أو صورة)"
-            placeholder="إرفاق السجل التجاري (PDF أو صورة، الحد الأقصى 10MB)"
-            accept=".pdf,.png,.jpg,.jpeg"
-            :max-size-mb="10"
+            label="وثيقة السجل التجاري أو رخصة المتجر"
+            placeholder="اضغط لاختيار ملف السجل التجاري (PDF أو صورة)"
+            accept=".pdf,application/pdf,image/*,.png,.jpg,.jpeg"
+            :max-size-mb="5"
+            hint="الملفات المقبولة: وثيقة السجل التجاري بصيغة PDF أو صورة واضحة (JPG, PNG) حتى 5MB"
             required
           />
         </div>
@@ -589,7 +565,7 @@ async function handleSubmit() {
     <MapLocationModal
       :is-open="isMapModalOpen"
       :current-location="form.locationText"
-      :initial-coordinates="form.locationCoordinates || (form.governorate ? defaultGovernorateCoords[form.governorate] : undefined) || defaultGovernorateCoords['صنعاء']"
+      :initial-coordinates="form.locationCoordinates || getGovernorateCoords(form.governorate || 'صنعاء')"
       title="تحديد الموقع الجغرافي للمشروع أو المتجر"
       subtitle="اختر موقعك بدقة على الخريطة لتسهيل التوصيل وتحديد النطاق الجغرافي"
       @close="isMapModalOpen = false"

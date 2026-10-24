@@ -34,6 +34,8 @@ const maskedLogin = computed(() => {
   return loginInput.value.slice(0, 3) + '****' + loginInput.value.slice(-3)
 })
 
+const errorMessage = ref('')
+
 function startTimer() {
   countdownSeconds.value = 105
   clearInterval(timerInterval)
@@ -53,10 +55,10 @@ onUnmounted(() => {
 async function handleSend() {
   if (!loginInput.value.trim()) {
     currentState.value = 'error'
+    errorMessage.value = 'يرجى إدخال البريد الإلكتروني أو رقم الجوال المسجل'
     return
   }
 
-  // Simulate verification
   const res = await authStore.forgotPassword(loginInput.value)
 
   if (res.success) {
@@ -64,17 +66,22 @@ async function handleSend() {
     startTimer()
   } else {
     currentState.value = 'error'
+    errorMessage.value = res.error || res.message || 'لم نتمكن من العثور على حساب مرتبط بهذا البريد أو رقم الجوال. يُرجى التحقق وإعادة المحاولة.'
   }
 }
 
-function handleResend() {
-  if (countdownSeconds.value === 0) {
-    startTimer()
+async function handleResend() {
+  if (countdownSeconds.value === 0 && loginInput.value.trim()) {
+    const res = await authStore.forgotPassword(loginInput.value)
+    if (res.success) {
+      startTimer()
+    }
   }
 }
 
 function resetToDefault() {
   currentState.value = 'default'
+  errorMessage.value = ''
 }
 </script>
 
@@ -96,7 +103,7 @@ function resetToDefault() {
         >
           <AlertCircle class="size-5 shrink-0 text-rose-500 mt-0.5" />
           <span class="flex-1">
-            لم نتمكن من العثور على حساب مرتبط بهذا البريد أو رقم الجوال. يُرجى التحقق وإعادة المحاولة.
+            {{ errorMessage || 'لم نتمكن من العثور على حساب مرتبط بهذا البريد أو رقم الجوال. يُرجى التحقق وإعادة المحاولة.' }}
           </span>
         </div>
 
@@ -112,7 +119,7 @@ function resetToDefault() {
               id="recovery-input"
               v-model="loginInput"
               type="text"
-              placeholder="xxxxxxxx gi05example@domain.com"
+              placeholder="example@domain.com"
               dir="ltr"
               @input="resetToDefault"
               class="h-12 w-full rounded-xl border bg-white px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted/70 focus:outline-none focus:ring-2 transition-all text-left"
@@ -126,7 +133,7 @@ function resetToDefault() {
             <!-- رسالة الخطأ تحت الحقل مباشرة المطابقة للتصميم -->
             <div v-if="currentState === 'error'" class="flex items-center gap-1.5 text-[11px] font-bold text-rose-600 mt-1">
               <XCircle class="size-3.5 shrink-0" />
-              <span>البريد الإلكتروني المدخل غير مسجل لدينا في المنصة</span>
+              <span>{{ errorMessage || 'البريد الإلكتروني المدخل غير مسجل لدينا في المنصة' }}</span>
             </div>
           </div>
 

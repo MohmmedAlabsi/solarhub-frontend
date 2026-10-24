@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import { AtSign, Check, Laptop, LockKeyhole, MapPin, MessageSquareText, Shield, ShieldCheck, UserRound } from 'lucide-vue-next'
+import { AtSign, Check, Laptop, LockKeyhole, MapPin, MessageSquareText, Shield, ShieldCheck, UserRound, ChevronDown } from 'lucide-vue-next'
 import FormField from '../../../components/common/FormField.vue'
 import ProfilePasswordField from '../../../components/customer/profile/ProfilePasswordField.vue'
 import ProfileSummaryCard from '../../../components/customer/profile/ProfileSummaryCard.vue'
+import { useGovernorates } from '~/composables/useGovernorates'
 
 definePageMeta({ layout: 'customer' })
 useSeoMeta({ title: 'الملف الشخصي وإعدادات الحساب | SolarHub', description: 'إدارة معلومات حساب العميل وبيانات الاتصال وإعدادات الأمان.' })
 
 const { form, errors, saveState, statusMessage, summary, sessions, terminatingSessions, saveProfile, resetProfile, terminateOtherSessions } = useCustomerProfile()
-const currentSession = computed(() => sessions.find(session => session.isCurrent))
+const { governorates: govList, loadGovernorates } = useGovernorates()
+
+onMounted(() => {
+  loadGovernorates()
+})
+
+const governorates = computed(() => govList.value.map(g => g.name_ar))
+const currentSession = computed(() => (sessions.value || []).find(session => session.isCurrent))
 
 const isMapModalOpen = ref(false)
 
@@ -44,8 +52,21 @@ function handleLocationSelected(loc: { address: string; lat: number; lng: number
         </div>
         <div class="grid gap-5 md:grid-cols-3">
           <FormField label="الاسم الكامل" :error="errors.fullName" required><input v-model.trim="form.fullName" type="text" autocomplete="name" class="solar-input h-11" :class="errors.fullName ? 'border-red-400' : ''" /></FormField>
-          <FormField label="نوع الحساب"><input v-model="form.accountType" type="text" readonly class="solar-input h-11 cursor-not-allowed bg-solar-bg-subtle" /></FormField>
-          <FormField label="المحافظة / المدينة" :error="errors.city" required><input v-model.trim="form.city" type="text" autocomplete="address-level2" class="solar-input h-11" :class="errors.city ? 'border-red-400' : ''" /></FormField>
+          <FormField label="المحافظة / المنطقة" :error="errors.city" required>
+            <div class="relative flex items-center">
+              <select
+                v-model="form.city"
+                class="solar-input h-11 w-full appearance-none pr-3.5 pl-10 cursor-pointer bg-white"
+                :class="errors.city ? 'border-red-400' : ''"
+              >
+                <option value="" disabled>اختر المحافظة</option>
+                <option v-for="gov in governorates" :key="gov" :value="gov">
+                  {{ gov }}
+                </option>
+              </select>
+              <ChevronDown class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-solar-text-muted" />
+            </div>
+          </FormField>
         </div>
       </section>
 
@@ -115,9 +136,12 @@ function handleLocationSelected(loc: { address: string; lat: number; lng: number
 
       <div class="mt-8 flex flex-col-reverse gap-3 border-t border-solar-border-card pt-6 sm:flex-row sm:items-center sm:justify-between">
         <p v-if="statusMessage" class="text-sm font-medium" :class="saveState === 'error' ? 'text-red-600' : 'text-emerald-700'" role="status" aria-live="polite">{{ statusMessage }}</p><span v-else />
-        <div class="flex gap-3"><button type="button" class="btn-outline" :disabled="saveState === 'saving'" @click="resetProfile">إلغاء</button><button type="submit" class="btn-primary min-w-40" :disabled="saveState === 'saving'"><Check class="size-4" aria-hidden="true" />{{ saveState === 'saving' ? 'جارٍ الحفظ...' : 'حفظ التعديلات' }}</button></div>
+        <div class="flex gap-3">
+          <button type="button" class="btn-outline" :disabled="saveState === 'saving'" @click="resetProfile">إلغاء</button>
+          <button type="submit" class="btn-primary min-w-40" :disabled="saveState === 'saving'"><Check class="size-4" aria-hidden="true" />{{ saveState === 'saving' ? 'جارٍ الحفظ...' : 'حفظ التعديلات' }}</button>
+        </div>
       </div>
-      <p class="mt-4 text-[10px] leading-6 text-solar-text-muted">بيانات وإعدادات تجريبية للعرض؛ لا يتم تحديث الحساب أو إعدادات الأمان على الخادم.</p>
+      <p class="mt-4 text-[10px] leading-6 text-solar-text-muted">يتم حفظ وتحديث البيانات مباشرة في خادم سولار هب وقاعدة البيانات بشكل آمن.</p>
     </form>
 
     <!-- نافذة اختيار وتأكيد العنوان الوطني وموقع التوصيل على الخريطة -->

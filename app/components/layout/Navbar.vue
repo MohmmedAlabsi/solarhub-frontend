@@ -1,7 +1,18 @@
 <script setup lang="ts">
-import { LayoutDashboard, LogIn, Menu, ShieldCheck, Sun, UserPlus, X } from 'lucide-vue-next'
+import { LayoutDashboard, LogIn, LogOut, Menu, ShieldCheck, Sun, User, UserPlus, X } from 'lucide-vue-next'
+import { useAuthStore } from '~/stores/auth'
 
 const route = useRoute()
+const authStore = useAuthStore()
+
+const dashboardPath = computed(() => authStore.getDashboardPath())
+const roleLabel = computed(() => {
+  const role = authStore.userRole
+  if (role === 'admin') return 'لوحة الإدارة'
+  if (role === 'supplier') return 'لوحة المتجر'
+  if (role === 'engineer') return 'بوابة المهندس'
+  return 'بوابة العميل'
+})
 
 const navLinks = [
   { label: 'الرئيسية', to: '/' },
@@ -51,41 +62,57 @@ const isMobileOpen = ref(false)
 
       <!-- أزرار تسجيل الدخول وإنشاء الحساب وبوابة العميل -->
       <div class="hidden items-center gap-3 lg:flex">
-        <NuxtLink
-          to="/auth/login"
-          class="text-xs font-bold text-solar-text-heading px-3 py-2 rounded-lg hover:bg-solar-bg-subtle transition-colors flex items-center gap-1.5"
-        >
-          <LogIn class="size-4 text-solar-navy" />
-          <span>تسجيل الدخول</span>
-        </NuxtLink>
+        <template v-if="authStore.isAuthenticated">
+          <!-- زر الانتقال للوحة التحكم الخاصة بالدور -->
+          <NuxtLink
+            :to="dashboardPath"
+            class="btn-primary px-3.5 py-2 text-xs font-black gap-1.5 shadow-sm"
+            :title="`الانتقال إلى ${roleLabel}`"
+          >
+            <LayoutDashboard class="size-4" />
+            <span>{{ roleLabel }}</span>
+          </NuxtLink>
 
-        <NuxtLink
-          to="/auth/register"
-          class="btn-dark px-4 py-2 text-xs font-bold gap-1.5 shadow-sm"
-        >
-          <UserPlus class="size-4" />
-          <span>إنشاء حساب</span>
-        </NuxtLink>
+          <!-- زر لوحة الإدارة إذا كان المستخدم أدمن -->
+          <NuxtLink
+            v-if="authStore.userRole === 'admin'"
+            to="/admin"
+            class="flex items-center gap-1.5 px-3.5 py-2 text-xs font-black rounded-xl bg-solar-navy text-white hover:bg-solar-navy-dark shadow-sm transition-all hover:scale-[1.02] active:scale-95"
+            title="لوحة تحكم الإدارة"
+          >
+            <ShieldCheck class="size-4 text-solar-yellow stroke-[2.5]" />
+            <span>لوحة الأدمن</span>
+          </NuxtLink>
 
-        <!-- زر اختياري سريع لبوابة العميل -->
-        <NuxtLink
-          to="/customer/dashboard"
-          class="btn-primary px-3.5 py-2 text-xs font-black gap-1.5 shadow-sm ml-1"
-          title="الانتقال إلى لوحة تحكم العميل"
-        >
-          <LayoutDashboard class="size-4" />
-          <span>بوابة العميل</span>
-        </NuxtLink>
+          <!-- اسم المستخدم وتسجيل الخروج -->
+          <button
+            type="button"
+            @click="authStore.logout"
+            class="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 px-2.5 py-2 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+            title="تسجيل الخروج"
+          >
+            <LogOut class="size-4" />
+            <span>خروج</span>
+          </button>
+        </template>
 
-        <!-- زر الانتقال إلى لوحة تحكم الأدمن -->
-        <NuxtLink
-          to="/admin"
-          class="flex items-center gap-1.5 px-3.5 py-2 text-xs font-black rounded-xl bg-solar-navy text-white hover:bg-solar-navy-dark shadow-sm transition-all hover:scale-[1.02] active:scale-95 ml-1"
-          title="الانتقال إلى لوحة تحكم الأدمن"
-        >
-          <ShieldCheck class="size-4 text-solar-yellow stroke-[2.5]" />
-          <span>لوحة الأدمن</span>
-        </NuxtLink>
+        <template v-else>
+          <NuxtLink
+            to="/auth/login"
+            class="text-xs font-bold text-solar-text-heading px-3 py-2 rounded-lg hover:bg-solar-bg-subtle transition-colors flex items-center gap-1.5"
+          >
+            <LogIn class="size-4 text-solar-navy" />
+            <span>تسجيل الدخول</span>
+          </NuxtLink>
+
+          <NuxtLink
+            to="/auth/register"
+            class="btn-dark px-4 py-2 text-xs font-bold gap-1.5 shadow-sm"
+          >
+            <UserPlus class="size-4" />
+            <span>إنشاء حساب</span>
+          </NuxtLink>
+        </template>
       </div>
 
       <!-- زر القائمة للأجهزة الذكية واللوحية -->
@@ -117,40 +144,41 @@ const isMobileOpen = ref(false)
         </li>
 
         <li class="mt-4 pt-4 border-t border-solar-border-card flex flex-col gap-2.5">
-          <div class="grid grid-cols-2 gap-2">
+          <template v-if="authStore.isAuthenticated">
             <NuxtLink
-              to="/customer/dashboard"
+              :to="dashboardPath"
               class="btn-primary w-full text-center py-2.5 text-xs font-black flex items-center justify-center gap-1.5"
               @click="isMobileOpen = false"
             >
               <LayoutDashboard class="size-4" />
-              <span>بوابة العميل</span>
+              <span>{{ roleLabel }}</span>
             </NuxtLink>
-            <NuxtLink
-              to="/admin"
-              class="flex items-center justify-center gap-1.5 w-full text-center py-2.5 text-xs font-black rounded-xl bg-solar-navy text-white hover:bg-solar-navy-dark shadow-sm"
-              @click="isMobileOpen = false"
+            <button
+              type="button"
+              @click="() => { isMobileOpen = false; authStore.logout(); }"
+              class="w-full text-center py-2 text-xs font-bold text-rose-600 bg-rose-50 rounded-xl"
             >
-              <ShieldCheck class="size-4 text-solar-yellow stroke-[2.5]" />
-              <span>لوحة الأدمن</span>
-            </NuxtLink>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <NuxtLink
-              to="/auth/login"
-              class="btn-outline text-center py-2 text-xs font-bold"
-              @click="isMobileOpen = false"
-            >
-              تسجيل الدخول
-            </NuxtLink>
-            <NuxtLink
-              to="/auth/register"
-              class="btn-dark text-center py-2 text-xs font-bold"
-              @click="isMobileOpen = false"
-            >
-              إنشاء حساب
-            </NuxtLink>
-          </div>
+              تسجيل الخروج
+            </button>
+          </template>
+          <template v-else>
+            <div class="grid grid-cols-2 gap-2">
+              <NuxtLink
+                to="/auth/login"
+                class="btn-outline text-center py-2 text-xs font-bold"
+                @click="isMobileOpen = false"
+              >
+                تسجيل الدخول
+              </NuxtLink>
+              <NuxtLink
+                to="/auth/register"
+                class="btn-dark text-center py-2 text-xs font-bold"
+                @click="isMobileOpen = false"
+              >
+                إنشاء حساب
+              </NuxtLink>
+            </div>
+          </template>
         </li>
       </ul>
     </div>
