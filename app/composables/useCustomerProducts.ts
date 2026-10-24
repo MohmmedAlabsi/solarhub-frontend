@@ -19,6 +19,7 @@ export interface CustomerProductView {
   rating: number
   reviewsCount: number
   image: string
+  images: string[]
   badge?: string
   specs: Record<string, string>
   stockQuantity: number
@@ -133,9 +134,19 @@ export const useCustomerProducts = () => {
     const catType = resolveCategoryType(catName, mp.category?.slug)
     const brandName = mp.brand?.name || 'SolarHub Tier 1'
 
-    let imageUrl = mp.images?.[0]?.image_url || mp.images?.[0]?.image_path
-    if (!imageUrl) {
-      imageUrl = resolveFallbackImage(catType)
+    const imagesList: string[] = []
+    if (Array.isArray(mp.images)) {
+      mp.images.forEach((img: any) => {
+        const u = img.url || img.image_url || img.image_path
+        if (u && typeof u === 'string') {
+          imagesList.push(u)
+        }
+      })
+    }
+    const featuredImg = Array.isArray(mp.images) ? mp.images.find((i: any) => i.is_featured) : null
+    let imageUrl = featuredImg?.url || featuredImg?.image_url || imagesList[0] || resolveFallbackImage(catType)
+    if (imagesList.length === 0) {
+      imagesList.push(imageUrl)
     }
 
     const price = Number(sp.price) || 0
@@ -170,6 +181,7 @@ export const useCustomerProducts = () => {
       rating: 4.9,
       reviewsCount: 38,
       image: imageUrl,
+      images: imagesList,
       badge: sp.warranty_period ? `ضمان ${sp.warranty_period}` : 'Tier 1 Global',
       specs: specsRecord,
       stockQuantity: stockQty,
@@ -190,9 +202,19 @@ export const useCustomerProducts = () => {
     const catType = resolveCategoryType(catName, mp.category?.slug)
     const brandName = mp.brand?.name || 'علامة معتمدة'
 
-    let imageUrl = mp.images?.[0]?.image_url || mp.images?.[0]?.image_path
-    if (!imageUrl) {
-      imageUrl = resolveFallbackImage(catType)
+    const imagesList: string[] = []
+    if (Array.isArray(mp.images)) {
+      mp.images.forEach((img: any) => {
+        const u = img.url || img.image_url || img.image_path
+        if (u && typeof u === 'string') {
+          imagesList.push(u)
+        }
+      })
+    }
+    const featuredImg = Array.isArray(mp.images) ? mp.images.find((i: any) => i.is_featured) : null
+    let imageUrl = featuredImg?.url || featuredImg?.image_url || imagesList[0] || resolveFallbackImage(catType)
+    if (imagesList.length === 0) {
+      imagesList.push(imageUrl)
     }
 
     const specsRecord: Record<string, string> = {}
@@ -219,6 +241,7 @@ export const useCustomerProducts = () => {
       rating: 4.8,
       reviewsCount: 24,
       image: imageUrl,
+      images: imagesList,
       badge: mp.stores_count ? `${mp.stores_count} عروض متاحة` : 'كتالوج SolarHub',
       specs: specsRecord,
       stockQuantity: 100,
@@ -336,8 +359,8 @@ export const useCustomerProducts = () => {
         masterProduct = storeProduct.master_product || storeProduct.masterProduct
         const masterId = masterProduct?.id || storeProduct.master_product_id
 
-        // جلب تفاصيل المواصفات الفنية الكاملة من master-product إن لم تكن مكتملة
-        if (masterId && (!masterProduct?.specifications || masterProduct.specifications.length === 0)) {
+        // جلب تفاصيل المواصفات الفنية والصور الكاملة من master-product إن لم تكن مكتملة
+        if (masterId && (!masterProduct?.specifications || masterProduct.specifications.length === 0 || !masterProduct?.images || masterProduct.images.length === 0)) {
           try {
             const mpRes: any = await $api(`/master-products/${masterId}`)
             const fullMp = mpRes?.data || mpRes
@@ -354,6 +377,7 @@ export const useCustomerProducts = () => {
             /* ignore */
           }
         }
+        storeProduct.master_product = masterProduct
 
         // تصفية كافة عروض المتاجر التي توفر هذا الموديل / المنتج
         const matchingOffers: StoreOfferItem[] = allStoreProducts

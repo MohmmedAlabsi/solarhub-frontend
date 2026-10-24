@@ -6,6 +6,7 @@ import {
   Droplets,
   Eye,
   EyeOff,
+  FileText,
   Layers,
   Loader2,
   Pencil,
@@ -111,6 +112,14 @@ function getCategoryIcon(catName?: string) {
   if (catName.includes('مضخ') || catName.toLowerCase().includes('pump')) return Droplets
   if (catName.includes('شحن') || catName.toLowerCase().includes('controller')) return Cpu
   return Layers
+}
+
+function getProductThumbnail(item: MasterProduct): string | null {
+  if (item.images && item.images.length > 0) {
+    const featured = item.images.find(img => img.is_featured) || item.images[0]
+    return featured.url || (featured as any).image_url || null
+  }
+  return null
 }
 
 async function handleToggleStatus(item: MasterProduct) {
@@ -244,8 +253,14 @@ function exportList() {
             <!-- اسم المنتج والأيقونة والوصف -->
             <td class="py-3 px-4">
               <div class="flex items-center gap-3">
-                <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-bg-subtle border border-solar-border-card text-solar-navy-dark">
-                  <component :is="getCategoryIcon(item.category?.name_ar)" class="size-5" />
+                <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-solar-bg-subtle border border-solar-border-card text-solar-navy-dark overflow-hidden p-1">
+                  <img
+                    v-if="getProductThumbnail(item)"
+                    :src="getProductThumbnail(item)!"
+                    :alt="item.title"
+                    class="size-full object-contain"
+                  />
+                  <component v-else :is="getCategoryIcon(item.category?.name_ar)" class="size-5" />
                 </div>
                 <div class="flex flex-col">
                   <span class="font-extrabold text-solar-text-heading text-sm">{{ item.title }}</span>
@@ -274,25 +289,26 @@ function exportList() {
             <!-- الإجراءات -->
             <td class="py-3 px-4">
               <div class="flex items-center justify-center gap-1">
+                <!-- استعراض ومعاينة المنتج -->
+                <button
+                  type="button"
+                  @click="openEditModal(item)"
+                  class="flex size-8 items-center justify-center rounded-lg text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-navy transition-colors cursor-pointer"
+                  title="استعراض ومعاينة تفاصيل وصور المنتج"
+                >
+                  <Eye class="size-4" />
+                </button>
+
                 <!-- تحميل المواصفات الفنية Datasheet إذا وجد -->
                 <a
                   v-if="item.datasheet_url"
                   :href="item.datasheet_url"
                   target="_blank"
-                  class="flex size-8 items-center justify-center rounded-lg text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-navy transition-colors cursor-pointer"
-                  title="تحميل المواصفات الفنية PDF"
+                  class="flex size-8 items-center justify-center rounded-lg text-solar-text-body hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
+                  title="تحميل مستند المواصفات الفنية Datasheet PDF"
                 >
-                  <Eye class="size-4" />
+                  <FileText class="size-4" />
                 </a>
-                <button
-                  v-else
-                  type="button"
-                  @click="openEditModal(item)"
-                  class="flex size-8 items-center justify-center rounded-lg text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-navy transition-colors cursor-pointer"
-                  title="معاينة المنتج"
-                >
-                  <Eye class="size-4" />
-                </button>
 
                 <!-- زر التعديل المباشر -->
                 <button

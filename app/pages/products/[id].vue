@@ -31,12 +31,34 @@ useSeoMeta({
 })
 
 const selectedImageIndex = ref(0)
+const isHovered = ref(false)
+const sliderInterval = ref<any>(null)
+
 const gallery = computed(() => {
   return [
     product.value.image,
     '/images/hero-solar.png',
     '/images/product-kit.png',
   ]
+})
+
+function nextSlide() {
+  if (gallery.value.length <= 1) return
+  selectedImageIndex.value = (selectedImageIndex.value + 1) % gallery.value.length
+}
+
+onMounted(() => {
+  sliderInterval.value = setInterval(() => {
+    if (!isHovered.value) {
+      nextSlide()
+    }
+  }, 3500)
+})
+
+onUnmounted(() => {
+  if (sliderInterval.value) {
+    clearInterval(sliderInterval.value)
+  }
 })
 
 function handleQuote() {
@@ -69,7 +91,11 @@ function handleDownloadDatasheet() {
     <div class="grid gap-8 lg:grid-cols-12 items-start">
       <!-- العمود الأيسر (في RTL هو اليسار، يظهر على اليمين بالإنجليزية): معرض صور المنتج -->
       <div class="flex flex-col gap-4 lg:col-span-6">
-        <div class="relative flex aspect-square sm:aspect-[4/3] w-full items-center justify-center rounded-3xl border border-solar-border-card bg-white p-6 shadow-sm overflow-hidden">
+        <div
+          class="relative flex aspect-square sm:aspect-[4/3] w-full items-center justify-center rounded-3xl border border-solar-border-card bg-white p-6 shadow-sm overflow-hidden"
+          @mouseenter="isHovered = true"
+          @mouseleave="isHovered = false"
+        >
           <!-- بادجات الاعتماد والضمان -->
           <div class="absolute top-4 right-4 flex flex-col gap-2 z-10">
             <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-900/90 text-white px-3 py-1 text-xs font-bold shadow-md">

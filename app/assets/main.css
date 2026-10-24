@@ -160,3 +160,26 @@
     @apply w-full rounded-lg border border-solar-border-input bg-solar-bg-card px-3 sm:px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm text-solar-text-heading placeholder-solar-text-muted transition-colors focus:border-solar-yellow focus:outline-none focus:ring-1 focus:ring-solar-yellow;
   }
 }
+
+/* Transitions & Utilities */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.fade-enter-from {
+  opacity: 0;
+  transform: scale(0.98);
+}
+.fade-leave-to {
+  opacity: 0;
+  transform: scale(1.02);
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

@@ -5,6 +5,7 @@ import {
   Check,
   CheckCircle2,
   ChevronLeft,
+  ChevronRight,
   Download,
   FileText,
   Heart,
@@ -83,6 +84,64 @@ async function handleAddToCart() {
   }, 2000)
 }
 
+// إدارة سلايدر الصور التلقائي والتفاعلي
+const activeImageIndex = ref(0)
+const sliderInterval = ref<any>(null)
+const isHovered = ref(false)
+const slideIntervalDuration = 3500 // وقت قصير وانتقال سلس (3.5 ثوانٍ)
+
+const productImages = computed<string[]>(() => {
+  if (!product.value) return []
+  if (product.value.images && product.value.images.length > 0) {
+    return product.value.images
+  }
+  if (product.value.image) {
+    return [product.value.image]
+  }
+  return ['/images/product-panel.png']
+})
+
+function nextSlide() {
+  if (productImages.value.length <= 1) return
+  activeImageIndex.value = (activeImageIndex.value + 1) % productImages.value.length
+}
+
+function prevSlide() {
+  if (productImages.value.length <= 1) return
+  activeImageIndex.value = (activeImageIndex.value - 1 + productImages.value.length) % productImages.value.length
+}
+
+function startAutoplay() {
+  stopAutoplay()
+  if (productImages.value.length > 1) {
+    sliderInterval.value = setInterval(() => {
+      if (!isHovered.value) {
+        nextSlide()
+      }
+    }, slideIntervalDuration)
+  }
+}
+
+function stopAutoplay() {
+  if (sliderInterval.value) {
+    clearInterval(sliderInterval.value)
+    sliderInterval.value = null
+  }
+}
+
+watch(productImages, (imgs) => {
+  activeImageIndex.value = 0
+  if (imgs.length > 1) {
+    startAutoplay()
+  } else {
+    stopAutoplay()
+  }
+})
+
+onUnmounted(() => {
+  stopAutoplay()
+})
+
 onMounted(async () => {
   if (routeProductId) {
     const data = await fetchProductDetails(routeProductId)
@@ -96,6 +155,9 @@ onMounted(async () => {
         }
       } else {
         quantity.value = data.product.minOrderQty || 1
+      }
+      if (productImages.value.length > 1) {
+        startAutoplay()
       }
     }
   }
@@ -142,20 +204,93 @@ onMounted(async () => {
     <div v-else class="grid gap-8 lg:grid-cols-12">
       <!-- العمود الأيمن: معرض الصور ومعلومات المتجر المعتمد (5 أعمدة) -->
       <div class="lg:col-span-5 flex flex-col gap-4">
-        <!-- بطاقة الصورة الرئيسية -->
-        <div class="relative flex h-96 w-full items-center justify-center rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm overflow-hidden">
+        <!-- سلايدر احترافي لصور المنتج مع تنقل تلقائي وتحكم يدوي -->
+        <div
+          class="relative flex h-96 w-full items-center justify-center rounded-2xl border border-solar-border-card bg-white dark:bg-solar-bg-card p-6 shadow-sm overflow-hidden group select-none"
+          @mouseenter="isHovered = true"
+          @mouseleave="isHovered = false"
+        >
+          <!-- شارة الاعتماد / الضمان -->
           <span
             v-if="product.badge"
-            class="absolute top-4 right-4 rounded-md bg-solar-yellow/20 px-3 py-1 text-xs font-bold text-solar-navy-dark"
+            class="absolute top-4 right-4 z-10 rounded-md bg-solar-yellow/20 px-3 py-1 text-xs font-bold text-solar-navy-dark dark:text-solar-yellow backdrop-blur-xs"
           >
             {{ product.badge }}
           </span>
 
-          <img
-            :src="product.image || '/images/product-panel.png'"
-            :alt="product.name"
-            class="h-full w-full object-contain transition-transform duration-300 hover:scale-105"
-          />
+          <!-- عداد الصور عند وجود أكثر من صورة -->
+          <span
+            v-if="productImages.length > 1"
+            class="absolute top-4 left-4 z-10 rounded-full bg-slate-900/70 text-white px-2.5 py-1 text-[11px] font-mono font-bold backdrop-blur-xs"
+          >
+            {{ activeImageIndex + 1 }} / {{ productImages.length }}
+          </span>
+
+          <!-- الصورة المعروضة مع حركة انسيابية -->
+          <transition name="fade" mode="out-in">
+            <img
+              :key="productImages[activeImageIndex]"
+              :src="productImages[activeImageIndex]"
+              :alt="`${product.name} - صورة ${activeImageIndex + 1}`"
+              class="h-full w-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
+            />
+          </transition>
+
+          <!-- أسهم التنقل يميناً ويساراً تظهر عند التحويم -->
+          <div
+            v-if="productImages.length > 1"
+            class="absolute inset-x-3 top-1/2 -translate-y-1/2 flex items-center justify-between pointer-events-none z-10"
+          >
+            <button
+              type="button"
+              @click.stop="prevSlide"
+              class="pointer-events-auto flex size-9 items-center justify-center rounded-full bg-white/90 dark:bg-slate-800/90 border border-solar-border-card text-solar-navy-dark dark:text-white shadow-md hover:bg-solar-yellow hover:text-solar-navy-dark transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+              title="الصورة السابقة"
+            >
+              <ChevronRight class="size-5" />
+            </button>
+            <button
+              type="button"
+              @click.stop="nextSlide"
+              class="pointer-events-auto flex size-9 items-center justify-center rounded-full bg-white/90 dark:bg-slate-800/90 border border-solar-border-card text-solar-navy-dark dark:text-white shadow-md hover:bg-solar-yellow hover:text-solar-navy-dark transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+              title="الصورة التالية"
+            >
+              <ChevronLeft class="size-5" />
+            </button>
+          </div>
+
+          <!-- مؤشرات النقاط التفاعلية في الأسفل -->
+          <div
+            v-if="productImages.length > 1"
+            class="absolute bottom-3 inset-x-0 flex items-center justify-center gap-1.5 z-10"
+          >
+            <button
+              v-for="(_, idx) in productImages"
+              :key="idx"
+              type="button"
+              @click.stop="activeImageIndex = idx"
+              class="h-1.5 rounded-full transition-all cursor-pointer"
+              :class="activeImageIndex === idx ? 'w-6 bg-solar-yellow shadow-sm' : 'w-2 bg-slate-300 dark:bg-slate-600 hover:bg-slate-400'"
+              :aria-label="`الانتقال للصورة ${idx + 1}`"
+            />
+          </div>
+        </div>
+
+        <!-- شريط الصور المصغرة (Thumbnails) -->
+        <div
+          v-if="productImages.length > 1"
+          class="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none"
+        >
+          <button
+            v-for="(thumb, idx) in productImages"
+            :key="idx"
+            type="button"
+            @click="activeImageIndex = idx"
+            class="flex size-16 shrink-0 items-center justify-center rounded-xl border-2 bg-white dark:bg-solar-bg-card p-1.5 transition-all overflow-hidden cursor-pointer"
+            :class="activeImageIndex === idx ? 'border-solar-yellow ring-2 ring-solar-yellow/20 shadow-xs' : 'border-solar-border-card hover:border-slate-300 opacity-70 hover:opacity-100'"
+          >
+            <img :src="thumb" :alt="`صورة مصغرة ${idx + 1}`" class="size-full object-contain" />
+          </button>
         </div>
 
         <!-- بطاقة المتجر والمورد المعتمد المحدد -->

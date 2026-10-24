@@ -81,9 +81,10 @@ export interface ProductSpecification {
 
 export interface ProductImage {
   id: number;
-  product_id: number;
+  product_id?: number;
   image_path?: string;
-  image_url: string;
+  image_url?: string;
+  url?: string;
   is_featured: boolean;
 }
 
