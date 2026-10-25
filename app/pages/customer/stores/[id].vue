@@ -120,8 +120,18 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div v-if="store.phone" class="flex items-center gap-2">
-              <a :href="`tel:${store.phone}`" class="btn-primary h-10 px-4 text-xs gap-1.5">
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                @click="isMapModalOpen = true"
+                class="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-solar-border-card bg-solar-bg-subtle px-3.5 text-xs font-bold text-solar-text-heading hover:border-solar-yellow hover:text-solar-yellow active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+                title="عرض موقع المتجر المعتمد على الخريطة"
+              >
+                <MapPin class="size-4 text-solar-yellow" />
+                <span>موقع المتجر على الخريطة</span>
+              </button>
+
+              <a v-if="store.phone" :href="`tel:${store.phone}`" class="btn-primary h-10 px-4 text-xs gap-1.5">
                 <Phone class="size-4" />
                 <span>اتصال بالمبيعات</span>
               </a>
@@ -194,15 +204,15 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- نافذة استعراض موقع المتجر والمستودع على الخريطة التفاعلية -->
+      <!-- نافذة استعراض موقع المتجر والمستودع على الخريطة التفاعلية (للعرض فقط) -->
       <CommonMapLocationModal
         :is-open="isMapModalOpen"
         :initial-coordinates="store.coordinates"
         :current-location="store.address"
         :title="`موقع متجر ${store.name} على الخريطة`"
         subtitle="الموقع الفعلي للمتجر والمستودعات المعتمدة لاستلام وفحص البضائع وتنسيق الشحن"
+        :readonly="true"
         @close="isMapModalOpen = false"
-        @select="isMapModalOpen = false"
       />
     </template>
 

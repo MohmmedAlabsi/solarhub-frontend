@@ -10,7 +10,9 @@ import {
   Loader2,
   Navigation,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  ExternalLink,
+  ShieldCheck,
 } from 'lucide-vue-next'
 
 export interface LocationData {
@@ -26,6 +28,7 @@ interface Props {
   initialCoordinates?: { lat: number; lng: number }
   title?: string
   subtitle?: string
+  readonly?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,7 +36,8 @@ const props = withDefaults(defineProps<Props>(), {
   currentLocation: '',
   initialCoordinates: () => ({ lat: 15.3694, lng: 44.1910 }), // Default Sana'a
   title: 'تحديد الموقع الجغرافي',
-  subtitle: 'ابحث عن منطقتك ليعكس موقعها مباشرة على الخريطة التفاعلية، ثم اضغط حفظ'
+  subtitle: 'ابحث عن منطقتك ليعكس موقعها مباشرة على الخريطة التفاعلية، ثم اضغط حفظ',
+  readonly: false,
 })
 
 const emit = defineEmits<{
@@ -41,121 +45,15 @@ const emit = defineEmits<{
   select: [location: LocationData]
 }>()
 
-// Comprehensive Offline-first Location Database for Yemen & Saudi Arabia
-// Designed for instant 0ms response without relying on blocked or slow external APIs
-const popularLocations = [
-  // Yemen - Sana'a & Districts
-  { name: 'صنعاء - مركز المحافظة', governorate: 'صنعاء', lat: 15.3694, lng: 44.1910, aliases: ['صنعاء', 'امانه العاصمة', 'أمانة العاصمة'] },
-  { name: 'صنعاء - حدة', governorate: 'صنعاء', lat: 15.3120, lng: 44.1960, aliases: ['حدة', 'شارع حدة', 'حي حدة'] },
-  { name: 'صنعاء - السبعين', governorate: 'صنعاء', lat: 15.3280, lng: 44.2050, aliases: ['السبعين', 'ميدان السبعين', 'حديقة السبعين'] },
-  { name: 'صنعاء - التحرير', governorate: 'صنعاء', lat: 15.3550, lng: 44.2070, aliases: ['التحرير', 'ميدان التحرير'] },
-  { name: 'صنعاء - الصافية', governorate: 'صنعاء', lat: 15.3420, lng: 44.2180, aliases: ['الصافية', 'حي الصافية'] },
-  { name: 'صنعاء - شملان', governorate: 'صنعاء', lat: 15.4050, lng: 44.1480, aliases: ['شملان', 'شارع شملan'] },
-  { name: 'صنعاء - الروضة', governorate: 'صنعاء', lat: 15.4350, lng: 44.2250, aliases: ['الروضة', 'حي الروضة'] },
-  { name: 'صنعاء - الحصبة', governorate: 'صنعاء', lat: 15.3780, lng: 44.2000, aliases: ['الحصبة', 'جولة الحصبة'] },
-  { name: 'صنعاء - شعوب', governorate: 'صنعاء', lat: 15.3750, lng: 44.2250, aliases: ['شعوب', 'باب شعوب'] },
-  { name: 'صنعاء - دار سلم', governorate: 'صنعاء', lat: 15.2750, lng: 44.2250, aliases: ['دار سلم', 'جولة دار سلم'] },
-  { name: 'صنعاء - مذبح', governorate: 'صنعاء', lat: 15.3720, lng: 44.1620, aliases: ['مذبح', 'شارع الثلاثين'] },
-  { name: 'صنعاء - عصر', governorate: 'صنعاء', lat: 15.3390, lng: 44.1700, aliases: ['عصر', 'جبل عصر'] },
-  { name: 'صنعاء - معين', governorate: 'صنعاء', lat: 15.3600, lng: 44.1750, aliases: ['معين', 'حي معين', 'شارع هايل'] },
-  { name: 'صنعاء - سعوان', governorate: 'صنعاء', lat: 15.3700, lng: 44.2500, aliases: ['سعوان', 'مدينة سعوان'] },
-
-  // Yemen - Aden & Districts
-  { name: 'عدن - مركز المدينة', governorate: 'عدن', lat: 12.7855, lng: 45.0187, aliases: ['عدن'] },
-  { name: 'عدن - المعلا', governorate: 'عدن', lat: 12.7850, lng: 45.0080, aliases: ['المعلا', 'شارع مدرم'] },
-  { name: 'عدن - كريتر', governorate: 'عدن', lat: 12.7750, lng: 45.0350, aliases: ['كريتر', 'صيرة'] },
-  { name: 'عدن - التواهي', governorate: 'عدن', lat: 12.7830, lng: 44.9850, aliases: ['التواهي', 'القلوعة'] },
-  { name: 'عدن - خور مكسر', governorate: 'عدن', lat: 12.8050, lng: 45.0380, aliases: ['خور مكسر', 'ساحل أبين'] },
-  { name: 'عدن - المنصورة', governorate: 'عدن', lat: 12.8550, lng: 44.9920, aliases: ['المنصورة', 'كابوتا'] },
-  { name: 'عدن - الشيخ عثمان', governorate: 'عدن', lat: 12.8680, lng: 45.0020, aliases: ['الشيخ عثمان', 'الممدارة'] },
-  { name: 'عدن - البريقة', governorate: 'عدن', lat: 12.7350, lng: 44.8750, aliases: ['البريقة', 'صلاح الدين', 'إنماء'] },
-  { name: 'عدن - دار سعد', governorate: 'عدن', lat: 12.8880, lng: 45.0150, aliases: ['دار سعد', 'بئر فضل'] },
-
-  // Yemen - Taiz
-  { name: 'تعز - مركز المحافظة', governorate: 'تعز', lat: 13.5776, lng: 44.0185, aliases: ['تعز'] },
-  { name: 'تعز - شارع جمال', governorate: 'تعز', lat: 13.5790, lng: 44.0150, aliases: ['شارع جمال', 'وسط تعز'] },
-  { name: 'تعز - الحوبان', governorate: 'تعز', lat: 13.6200, lng: 44.0800, aliases: ['الحوبان', 'مفرق ماوية'] },
-  { name: 'تعز - المظفر', governorate: 'تعز', lat: 13.5750, lng: 44.0100, aliases: ['المظفر', 'حي المظفر'] },
-  { name: 'تعز - القاهرة', governorate: 'تعز', lat: 13.5850, lng: 44.0250, aliases: ['القاهرة', 'قلعة القاهرة'] },
-  { name: 'تعز - بير باشا', governorate: 'تعز', lat: 13.5720, lng: 43.9850, aliases: ['بير باشا', 'جامعة تعز'] },
-  { name: 'تعز - التربة', governorate: 'تعز', lat: 13.2180, lng: 44.1350, aliases: ['التربة', 'الشمايتين'] },
-
-  // Yemen - Hadhramaut
-  { name: 'حضرموت - المكلا', governorate: 'حضرموت', lat: 14.5425, lng: 49.1242, aliases: ['المكلا', 'حضرموت'] },
-  { name: 'حضرموت - فوة', governorate: 'حضرموت', lat: 14.5200, lng: 49.0600, aliases: ['فوة', 'المساكن', 'ابن سيناء'] },
-  { name: 'حضرموت - الديس', governorate: 'حضرموت', lat: 14.5550, lng: 49.1450, aliases: ['الديس', 'حي الديس'] },
-  { name: 'حضرموت - الشرج', governorate: 'حضرموت', lat: 14.5380, lng: 49.1180, aliases: ['الشرج', 'سوق الشرج'] },
-  { name: 'حضرموت - سيئون', governorate: 'حضرموت', lat: 15.9432, lng: 48.7871, aliases: ['سيئون', 'وادي حضرموت'] },
-  { name: 'حضرموت - تريم', governorate: 'حضرموت', lat: 16.0550, lng: 48.9950, aliases: ['تريم', 'الغناء'] },
-  { name: 'حضرموت - الشحر', governorate: 'حضرموت', lat: 14.7600, lng: 49.6050, aliases: ['الشحر', 'سعاد'] },
-
-  // Yemen - Al Hudaydah
-  { name: 'الحديدة - مركز المحافظة', governorate: 'الحديدة', lat: 14.7978, lng: 42.9545, aliases: ['الحديدة'] },
-  { name: 'الحديدة - الميناء', governorate: 'الحديدة', lat: 14.8050, lng: 42.9450, aliases: ['الميناء', 'ميناء الحديدة'] },
-  { name: 'الحديدة - الحوك', governorate: 'الحديدة', lat: 14.7750, lng: 42.9600, aliases: ['الحوك', 'حي الحوك'] },
-  { name: 'الحديدة - الحالي', governorate: 'الحديدة', lat: 14.8150, lng: 42.9750, aliases: ['الحالي', 'حي الحالي'] },
-  { name: 'الحديدة - باجل', governorate: 'الحديدة', lat: 15.0580, lng: 43.2850, aliases: ['باجل'] },
-  { name: 'الحديدة - زبيد', governorate: 'الحديدة', lat: 14.1950, lng: 43.3150, aliases: ['زبيد'] },
-
-  // Yemen - Other Governorates
-  { name: 'إب - مركز المحافظة', governorate: 'إب', lat: 13.9667, lng: 44.1833, aliases: ['إب', 'اب'] },
-  { name: 'إب - جبلة', governorate: 'إب', lat: 13.9220, lng: 44.1480, aliases: ['جبلة'] },
-  { name: 'إب - يريم', governorate: 'إب', lat: 14.2980, lng: 44.3800, aliases: ['يريم', 'كتاب'] },
-  { name: 'ذمار - مركز المحافظة', governorate: 'ذمار', lat: 14.5427, lng: 44.4051, aliases: ['ذمار'] },
-  { name: 'ذمار - معبر', governorate: 'ذمار', lat: 14.7950, lng: 44.2950, aliases: ['معبر', 'جهران'] },
-  { name: 'مأرب - مركز المحافظة', governorate: 'مأرب', lat: 15.4608, lng: 45.3258, aliases: ['مأرب', 'مارب'] },
-  { name: 'صعدة - مركز المحافظة', governorate: 'صعدة', lat: 16.9402, lng: 43.7640, aliases: ['صعدة', 'صعده'] },
-  { name: 'حجة - مركز المحافظة', governorate: 'حجة', lat: 15.6943, lng: 43.6025, aliases: ['حجة', 'حجه', 'عبس'] },
-  { name: 'البيضاء - مركز المحافظة', governorate: 'البيضاء', lat: 13.9852, lng: 45.5727, aliases: ['البيضاء', 'رداع'] },
-  { name: 'لحج - الحوطة', governorate: 'لحج', lat: 13.0583, lng: 44.8828, aliases: ['لحج', 'الحوطة', 'صبر'] },
-  { name: 'أبين - زنجبار', governorate: 'أبين', lat: 13.1287, lng: 45.3800, aliases: ['أبين', 'ابين', 'زنجبار', 'جعار'] },
-  { name: 'المهرة - الغيضة', governorate: 'المهرة', lat: 16.2079, lng: 52.1760, aliases: ['المهرة', 'المهره', 'الغيضة'] },
-  { name: 'شبوة - عتق', governorate: 'شبوة', lat: 14.5377, lng: 46.8319, aliases: ['شبوة', 'شبوه', 'عتق'] },
-  { name: 'الضالع - مركز المحافظة', governorate: 'الضالع', lat: 13.6957, lng: 44.7314, aliases: ['الضالع', 'دمت', 'قعطبة'] },
-  { name: 'عمران - مركز المحافظة', governorate: 'عمران', lat: 15.6594, lng: 43.9442, aliases: ['عمران', 'خمر', 'ريدة'] },
-  { name: 'سقطرى - حديبو', governorate: 'سقطرى', lat: 12.6500, lng: 54.0167, aliases: ['سقطرى', 'حديبو', 'قلنسية'] },
-
-  // Saudi Arabia - Riyadh & Districts
-  { name: 'الرياض - مركز المدينة', governorate: 'الرياض', lat: 24.7136, lng: 46.6753, aliases: ['الرياض'] },
-  { name: 'الرياض - العليا', governorate: 'الرياض', lat: 24.7050, lng: 46.6800, aliases: ['العليا', 'طريق الملك فهد'] },
-  { name: 'الرياض - الملز', governorate: 'الرياض', lat: 24.6650, lng: 46.7250, aliases: ['الملز', 'شارع الستين'] },
-  { name: 'الرياض - النسيم', governorate: 'الرياض', lat: 24.7300, lng: 46.8200, aliases: ['النسيم'] },
-  { name: 'الرياض - الملقا', governorate: 'الرياض', lat: 24.8050, lng: 46.6150, aliases: ['الملقا', 'شمال الرياض'] },
-  { name: 'الرياض - النرجس', governorate: 'الرياض', lat: 24.8450, lng: 46.6600, aliases: ['النرجس'] },
-  { name: 'الرياض - الياسمين', governorate: 'الرياض', lat: 24.8250, lng: 46.6450, aliases: ['الياسمين'] },
-
-  // Saudi Arabia - Makkah & Jeddah & Taif
-  { name: 'مكة المكرمة - الحرم', governorate: 'مكة المكرمة', lat: 21.3891, lng: 39.8579, aliases: ['مكة', 'مكه', 'مكة المكرمة'] },
-  { name: 'مكة المكرمة - العزيزية', governorate: 'مكة المكرمة', lat: 21.4050, lng: 39.8700, aliases: ['العزيزية بمكة'] },
-  { name: 'جدة - مركز المدينة', governorate: 'مكة المكرمة', lat: 21.5433, lng: 39.1728, aliases: ['جدة', 'جده'] },
-  { name: 'جدة - البلد', governorate: 'مكة المكرمة', lat: 21.4850, lng: 39.1850, aliases: ['البلد بجدة', 'المنطقة التاريخية'] },
-  { name: 'جدة - الحمراء', governorate: 'مكة المكرمة', lat: 21.5150, lng: 39.1550, aliases: ['الحمراء', 'كورنيش جدة'] },
-  { name: 'جدة - الروضة', governorate: 'مكة المكرمة', lat: 21.5600, lng: 39.1500, aliases: ['الروضة بجدة'] },
-  { name: 'جدة - الصفا', governorate: 'مكة المكرمة', lat: 21.5850, lng: 39.2000, aliases: ['الصفا بجدة'] },
-  { name: 'الطائف - مركز المدينة', governorate: 'مكة المكرمة', lat: 21.2854, lng: 40.4244, aliases: ['الطائف', 'الهدا', 'الشفا الطائف'] },
-
-  // Saudi Arabia - Madinah & Eastern & Others
-  { name: 'المدينة المنورة - الحرم النبوي', governorate: 'المدينة المنورة', lat: 24.5247, lng: 39.5692, aliases: ['المدينة', 'المدينه', 'المدينة المنورة'] },
-  { name: 'الدمام - مركز المدينة', governorate: 'المنطقة الشرقية', lat: 26.4207, lng: 50.0888, aliases: ['الدمام', 'الشرقية'] },
-  { name: 'الخبر - كورنيش الخبر', governorate: 'المنطقة الشرقية', lat: 26.2818, lng: 50.2084, aliases: ['الخبر', 'العقربية'] },
-  { name: 'الهفوف - الأحساء', governorate: 'المنطقة الشرقية', lat: 25.3646, lng: 49.5883, aliases: ['الأحساء', 'الاحساء', 'الهفوف', 'المبرز'] },
-  { name: 'الجبيل - الجبيل الصناعية', governorate: 'المنطقة الشرقية', lat: 27.0174, lng: 49.6582, aliases: ['الجبيل'] },
-  { name: 'القصيم - بريدة', governorate: 'القصيم', lat: 26.3260, lng: 43.9750, aliases: ['القصيم', 'بريدة', 'بريده'] },
-  { name: 'القصيم - عنيزة', governorate: 'القصيم', lat: 26.0843, lng: 43.9936, aliases: ['عنيزة', 'عنيزه'] },
-  { name: 'عسير - أبها', governorate: 'عسير', lat: 18.2164, lng: 42.5053, aliases: ['عسير', 'أبها', 'ابها'] },
-  { name: 'عسير - خميس مشيط', governorate: 'عسير', lat: 18.3000, lng: 42.7333, aliases: ['خميس مشيط'] },
-  { name: 'تبوك - مركز المدينة', governorate: 'تبوك', lat: 28.3835, lng: 36.5662, aliases: ['تبوك'] },
-  { name: 'حائل - مركز المدينة', governorate: 'حائل', lat: 27.5114, lng: 41.7208, aliases: ['حائل', 'حايل'] },
-  { name: 'جازان - مركز المدينة', governorate: 'جازان', lat: 16.8892, lng: 42.5706, aliases: ['جازان', 'جيزان'] },
-  { name: 'نجران - مركز المدينة', governorate: 'نجران', lat: 17.4924, lng: 44.1277, aliases: ['نجران'] },
-  { name: 'ينبع - ينبع الصناعية', governorate: 'المدينة المنورة', lat: 24.0924, lng: 38.0618, aliases: ['ينبع', 'ينبع البحر'] },
-]
+import { popularLocations, findNearestLocation, reverseGeocode } from '~/utils/geocoding'
 
 // State
 const searchQuery = ref('')
 const searchResults = ref<Array<{ display_name: string; lat: number; lng: number; governorate: string }>>([])
 const isSearching = ref(false)
 const isLocatingUser = ref(false)
+const isTranslatingAddress = ref(false)
+let geocodeAbortController: AbortController | null = null
 const locationError = ref('')
 const successNotice = ref('')
 const addressInput = ref(props.currentLocation || '')
@@ -220,27 +118,38 @@ function parseCoordinateString(str?: string): { lat: number; lng: number } | nul
 
 // Match best initial coordinates based on location name or initial prop
 function syncInitialLocation() {
-  if (props.initialCoordinates && props.initialCoordinates.lat && props.initialCoordinates.lng) {
+  let hasExplicitCoords = false
+
+  if (props.initialCoordinates && !isNaN(props.initialCoordinates.lat) && !isNaN(props.initialCoordinates.lng) && (props.initialCoordinates.lat !== 0 || props.initialCoordinates.lng !== 0)) {
     selectedCoords.value = {
       lat: props.initialCoordinates.lat,
       lng: props.initialCoordinates.lng,
     }
+    hasExplicitCoords = true
   }
 
   if (props.currentLocation) {
     addressInput.value = props.currentLocation
     const parsedCoords = parseCoordinateString(props.currentLocation)
     if (parsedCoords) {
-      selectedCoords.value = parsedCoords
+      if (!hasExplicitCoords) {
+        selectedCoords.value = parsedCoords
+        hasExplicitCoords = true
+      }
       const nearest = findNearestPopular(parsedCoords.lat, parsedCoords.lng)
       if (nearest) selectedGovernorate.value = nearest.governorate
-    } else {
+    } else if (!hasExplicitCoords) {
       const match = findLocalMatch(props.currentLocation)
       if (match) {
         selectedCoords.value = { lat: match.lat, lng: match.lng }
         selectedGovernorate.value = match.governorate
       }
     }
+  }
+
+  if (hasExplicitCoords) {
+    const nearest = findNearestPopular(selectedCoords.value.lat, selectedCoords.value.lng)
+    if (nearest) selectedGovernorate.value = nearest.governorate
   }
 }
 
@@ -347,7 +256,7 @@ async function initMap() {
     const customIcon = L.divIcon({
       className: 'solar-custom-marker',
       html: `
-        <div style="position: relative; width: 44px; height: 54px; transform: translate(-50%, -100%); cursor: grab;">
+        <div style="position: relative; width: 44px; height: 54px; transform: translate(-50%, -100%); cursor: ${props.readonly ? 'pointer' : 'grab'};">
           <svg viewBox="0 0 38 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 6px 12px rgba(36,59,83,0.45));">
             <path d="M19 0C8.50659 0 0 8.50659 0 19C0 32.25 19 48 19 48C19 48 38 32.25 38 19C38 8.50659 29.4934 0 19 0Z" fill="#243B53"/>
             <circle cx="19" cy="18" r="9.5" fill="#F2B705"/>
@@ -360,25 +269,35 @@ async function initMap() {
       iconAnchor: [22, 54],
     })
 
+    const isInteractive = !props.readonly
+
     mapMarker = L.marker([lat, lng], {
       icon: customIcon,
-      draggable: true,
-      autoPan: true,
+      draggable: isInteractive,
+      autoPan: isInteractive,
     }).addTo(leafletMap)
 
-    // Marker drag end
-    mapMarker.on('dragend', () => {
-      const pos = mapMarker.getLatLng()
-      updatePosition(pos.lat, pos.lng)
-    })
+    if (isInteractive) {
+      // Marker drag end
+      mapMarker.on('dragend', () => {
+        const pos = mapMarker.getLatLng()
+        updatePosition(pos.lat, pos.lng)
+      })
 
-
-    // Map click
-    leafletMap.on('click', (e: any) => {
-      const { lat, lng } = e.latlng
-      mapMarker.setLatLng([lat, lng])
-      updatePosition(lat, lng)
-    })
+      // Map click
+      leafletMap.on('click', (e: any) => {
+        const { lat, lng } = e.latlng
+        mapMarker.setLatLng([lat, lng])
+        updatePosition(lat, lng)
+      })
+    } else {
+      mapMarker.bindPopup(`
+        <div style="text-align: right; font-family: inherit; direction: rtl; font-size: 12px; line-height: 1.5; padding: 4px;">
+          <b style="color: #243B53; display: block; margin-bottom: 2px;">${props.title || 'موقع المتجر المعتمد'}</b>
+          <span style="color: #64748b; font-size: 11px;">${addressInput.value || props.currentLocation}</span>
+        </div>
+      `).openPopup()
+    }
 
     // Invalidate size to ensure proper layout rendering
     setTimeout(() => {
@@ -392,19 +311,40 @@ async function initMap() {
   }
 }
 
-// Update position safely and calculate address
-function updatePosition(lat: number, lng: number) {
+// Update position safely and calculate address with real-time Reverse Geocoding
+async function updatePosition(lat: number, lng: number) {
   selectedCoords.value = { lat, lng }
   locationError.value = ''
 
-  const nearest = findNearestPopular(lat, lng)
-  if (nearest) {
-    selectedGovernorate.value = nearest.governorate
-    addressInput.value = `${nearest.governorate} - ${nearest.name} (${lat.toFixed(4)}, ${lng.toFixed(4)})`
-  } else {
-    addressInput.value = `موقع محدد على الخريطة (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+  // 1. Immediate offline preview (0ms) so user sees instant feedback
+  const nearest = findNearestLocation(lat, lng)
+  selectedGovernorate.value = nearest.governorate
+  addressInput.value = nearest.formattedAddress
+
+  // 2. Abort prior in-flight reverse geocode request if user is still moving
+  if (geocodeAbortController) {
+    geocodeAbortController.abort()
+    geocodeAbortController = null
   }
-  showNotice(`تم تثبيت الموقع عند الإحداثيات: ${lat.toFixed(4)}, ${lng.toFixed(4)}`)
+
+  geocodeAbortController = new AbortController()
+  isTranslatingAddress.value = true
+
+  try {
+    const geo = await reverseGeocode(lat, lng, { signal: geocodeAbortController.signal })
+    if (geo && geo.formattedAddress) {
+      addressInput.value = geo.formattedAddress
+      selectedGovernorate.value = geo.governorate
+      showNotice(`تم تحديد العنوان: ${geo.shortAddress || geo.formattedAddress}`)
+    }
+  } catch (err: any) {
+    if (err.name !== 'AbortError') {
+      console.warn('Reverse geocoding notice:', err)
+    }
+  } finally {
+    isTranslatingAddress.value = false
+    geocodeAbortController = null
+  }
 }
 
 function showNotice(msg: string) {
@@ -653,8 +593,8 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <!-- فورم مربع نص للبحث وعكس الموقع على الخريطة التفاعلية -->
-        <form @submit.prevent="executeSearch()" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 relative">
+        <!-- فورم مربع نص للبحث وعكس الموقع على الخريطة التفاعلية (يظهر فقط في وضع التحديد وليس العرض) -->
+        <form v-if="!readonly" @submit.prevent="executeSearch()" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 relative">
           <!-- مربع نص للبحث -->
           <div class="relative flex-1">
             <input
@@ -715,7 +655,7 @@ onUnmounted(() => {
 
         <!-- تنبيه في حال وجود إشعار نجاح أو خطأ -->
         <div
-          v-if="successNotice"
+          v-if="successNotice && !readonly"
           class="flex items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 animate-in fade-in duration-150"
         >
           <CheckCircle2 class="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -723,15 +663,15 @@ onUnmounted(() => {
         </div>
 
         <div
-          v-if="locationError"
+          v-if="locationError && !readonly"
           class="flex items-center gap-2 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/40 p-2.5 text-xs font-semibold text-amber-800 dark:text-amber-300 animate-in fade-in duration-150"
         >
           <AlertCircle class="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
           <span>{{ locationError }}</span>
         </div>
 
-        <!-- شريط المحافظات والمدن الأكثر شيوعاً للانتقال السريع بنقرة واحدة -->
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        <!-- شريط المحافظات والمدن الأكثر شيوعاً للانتقال السريع بنقرة واحدة (يظهر فقط في وضع التحديد) -->
+        <div v-if="!readonly" class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           <span class="text-[11px] font-bold text-solar-text-muted shrink-0 ml-1">انتقال سريع:</span>
           <button
             v-for="loc in [
@@ -761,10 +701,14 @@ onUnmounted(() => {
         <div class="relative w-full h-[290px] sm:h-[330px] rounded-2xl overflow-hidden border border-solar-border-card shadow-inner bg-slate-100">
           <div ref="mapContainer" class="w-full h-full z-0" />
 
-          <!-- شارة إرشادية لتحريك الدبوس -->
-          <div class="absolute top-3 right-3 z-10 pointer-events-none rounded-xl bg-solar-navy-dark/90 backdrop-blur-xs px-3 py-1.5 text-[11px] font-bold text-white shadow-md flex items-center gap-1.5">
+          <!-- شارة إرشادية -->
+          <div v-if="!readonly" class="absolute top-3 right-3 z-10 pointer-events-none rounded-xl bg-solar-navy-dark/90 backdrop-blur-xs px-3 py-1.5 text-[11px] font-bold text-white shadow-md flex items-center gap-1.5">
             <Navigation class="size-3.5 text-solar-yellow" />
             <span>اسحب الدبوس أو انقر على أي نقطة لتثبيت موقعك</span>
+          </div>
+          <div v-else class="absolute top-3 right-3 z-10 pointer-events-none rounded-xl bg-solar-navy-dark/90 backdrop-blur-xs px-3 py-1.5 text-[11px] font-bold text-white shadow-md flex items-center gap-1.5">
+            <ShieldCheck class="size-3.5 text-emerald-400" />
+            <span>الموقع الجغرافي المعتمد للمتجر</span>
           </div>
 
           <!-- مبدل نمط الخريطة (شوارع / قمر صناعي) -->
@@ -793,28 +737,72 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- حقل معاينة وتعديل العنوان المختار -->
-        <div class="flex flex-col gap-1.5 bg-solar-bg-subtle p-3 rounded-2xl border border-solar-border-card/70">
+        <!-- حقل معاينة وتعديل العنوان المختار (يظهر في وضع التحديد) -->
+        <div v-if="!readonly" class="flex flex-col gap-1.5 bg-solar-bg-subtle p-3 rounded-2xl border border-solar-border-card/70">
           <label for="modal-address-input" class="text-xs font-bold text-solar-text-heading flex items-center justify-between">
             <span class="flex items-center gap-1.5">
               <MapPin class="size-3.5 text-solar-yellow" />
               <span>الموقع المحدد الذي سيتم حفظه:</span>
+              <span v-if="isTranslatingAddress" class="text-[10px] text-solar-yellow dark:text-solar-yellow font-bold flex items-center gap-1 animate-pulse mr-2">
+                <Loader2 class="size-3 animate-spin" />
+                <span>جاري ترجمة الإحداثيات إلى نص دقيق...</span>
+              </span>
             </span>
             <span class="text-[10px] font-bold text-solar-navy-dark bg-solar-yellow/25 px-2 py-0.5 rounded-full">
               {{ selectedGovernorate }}
             </span>
           </label>
-          <input
-            id="modal-address-input"
-            v-model="addressInput"
-            type="text"
-            placeholder="مثال: صنعاء - حدة - جولة الرويشان"
-            class="h-10 w-full rounded-xl border border-solar-border-card bg-solar-bg-card px-3 text-xs font-semibold text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-right"
-          />
+          <div class="relative">
+            <input
+              id="modal-address-input"
+              v-model="addressInput"
+              type="text"
+              placeholder="مثال: صنعاء - حدة - جولة الرويشان"
+              class="h-10 w-full rounded-xl border border-solar-border-card bg-solar-bg-card px-3 pr-3 pl-9 text-xs font-semibold text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-right"
+            />
+            <span v-if="isTranslatingAddress" class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+              <Loader2 class="size-3.5 text-solar-yellow animate-spin" />
+            </span>
+          </div>
         </div>
 
-        <!-- أزرار الإجراءات: زر حفظ الموقع وزر إلغاء -->
-        <div class="flex items-center gap-3 pt-1 border-t border-solar-border-card/70">
+        <!-- بطاقة استعراض الموقع المعتمد الثابت (تظهر في وضع العرض فقط Read-only) -->
+        <div v-else class="flex flex-col gap-2.5 bg-solar-bg-subtle p-3.5 sm:p-4 rounded-2xl border border-solar-border-card/70">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-solar-text-heading flex items-center gap-1.5">
+              <MapPin class="size-4 text-solar-yellow shrink-0" />
+              <span>العنوان الجغرافي المعتمد للمتجر:</span>
+            </span>
+            <span class="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+              <ShieldCheck class="size-3 text-emerald-600 dark:text-emerald-400" />
+              <span>{{ selectedGovernorate }}</span>
+            </span>
+          </div>
+
+          <p class="text-xs font-medium text-solar-text-body bg-solar-bg-card p-2.5 rounded-xl border border-solar-border-card/50 leading-relaxed text-right">
+            {{ addressInput || currentLocation || 'الموقع محدد ومعتمد على الخريطة' }}
+          </p>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-solar-text-muted">
+            <div class="flex items-center gap-1.5">
+              <span class="font-bold">الإحداثيات الجغرافية:</span>
+              <span class="font-mono font-bold text-solar-text-heading dir-ltr">{{ formattedCoordinates }}</span>
+            </div>
+
+            <a
+              :href="`https://www.google.com/maps/search/?api=1&query=${selectedCoords.lat},${selectedCoords.lng}`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-1 text-[11px] font-bold text-solar-navy-dark dark:text-solar-yellow hover:underline"
+            >
+              <span>فتح الموقع في خرائط Google</span>
+              <ExternalLink class="size-3.5" />
+            </a>
+          </div>
+        </div>
+
+        <!-- أزرار الإجراءات: في وضع التعديل (حفظ وإلغاء)، وفي وضع العرض (إغلاق فقط) -->
+        <div v-if="!readonly" class="flex items-center gap-3 pt-1 border-t border-solar-border-card/70">
           <button
             type="button"
             @click="saveLocation"
@@ -830,6 +818,16 @@ onUnmounted(() => {
             class="h-12 px-6 rounded-xl border border-solar-border-card bg-solar-bg-subtle text-xs font-bold text-solar-text-body hover:bg-solar-bg-card transition-colors cursor-pointer"
           >
             إلغاء
+          </button>
+        </div>
+
+        <div v-else class="flex items-center justify-end pt-1 border-t border-solar-border-card/70">
+          <button
+            type="button"
+            @click="emit('close')"
+            class="w-full sm:w-auto h-11 px-8 rounded-xl bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark text-xs sm:text-sm font-black hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+          >
+            <span>إغلاق النافذة</span>
           </button>
         </div>
       </div>

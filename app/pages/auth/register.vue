@@ -5,6 +5,7 @@ import { useAuthStore } from '~/stores/auth'
 import { useGovernorates } from '~/composables/useGovernorates'
 import MapLocationModal from '~/components/common/MapLocationModal.vue'
 import AuthFileUploadInput from '~/components/auth/FileUploadInput.vue'
+import { reverseGeocode } from '~/utils/geocoding'
 
 definePageMeta({
   layout: 'auth',
@@ -101,14 +102,27 @@ async function quickLocateUser() {
 
   if (typeof window !== 'undefined' && 'geolocation' in navigator) {
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const lat = pos.coords.latitude
         const lng = pos.coords.longitude
         form.locationCoordinates = { lat, lng }
-        const matchedGov = findNearestGovFromCoords(lat, lng)
-        form.governorate = matchedGov
-        form.locationText = `${matchedGov} - موقع محدد عبر الـ GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`
-        isQuickLocating.value = false
+
+        try {
+          const geo = await reverseGeocode(lat, lng)
+          if (geo && geo.governorate) {
+            const match = governorates.value.find(g => g.includes(geo.governorate) || geo.governorate.includes(g))
+            form.governorate = match || geo.governorate
+          } else {
+            form.governorate = findNearestGovFromCoords(lat, lng)
+          }
+          form.locationText = geo.formattedAddress
+        } catch {
+          const matchedGov = findNearestGovFromCoords(lat, lng)
+          form.governorate = matchedGov
+          form.locationText = `${matchedGov} - موقع محدد عبر الـ GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+        } finally {
+          isQuickLocating.value = false
+        }
       },
       (err) => {
         console.warn('GPS notice:', err)
