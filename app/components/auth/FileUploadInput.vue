@@ -9,20 +9,26 @@ interface Props {
   maxSizeMb?: number
   modelValue?: File | null
   hint?: string
+  pdfOnly?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   placeholder: 'اضغط هنا لاختيار ملف PDF أو صورة، أو اسحب الملف إلى هنا',
-  accept: '.pdf,application/pdf,image/*,.png,.jpg,.jpeg',
+  accept: '.pdf,application/pdf,image/*,.png,.jpg,.jpeg,.webp',
   required: false,
-  maxSizeMb: 5,
+  maxSizeMb: 10,
   modelValue: null,
-  hint: 'الملفات المقبولة: وثائق PDF أو صور (JPG, PNG) بحد أقصى 5 ميجابايت',
+  hint: 'الملفات المقبولة: وثائق PDF أو صور (JPG, PNG) بحد أقصى 10 ميجابايت',
+  pdfOnly: false,
 })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', file: File | null): void
 }>()
+
+const isStrictlyPdf = computed(() => {
+  return props.pdfOnly || (!props.accept.includes('image') && props.accept.includes('pdf'))
+})
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const fileName = ref('')
@@ -84,10 +90,14 @@ function validateAndSetFile(file: File | null) {
   const nameLower = file.name.toLowerCase()
   const isPdf = file.type === 'application/pdf' || nameLower.endsWith('.pdf')
   const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(nameLower)
-  const isDoc = /\.(doc|docx)$/i.test(nameLower)
 
-  if (!isPdf && !isImage && !isDoc) {
-    errorMsg.value = 'نوع الملف غير مدعوم. يرجى رفع ملف بصيغة PDF أو صورة واضحة (PNG, JPG).'
+  if (isStrictlyPdf.value) {
+    if (!isPdf) {
+      errorMsg.value = 'عذراً، يجب أن يكون الملف بصيغة PDF فقط (لا يُسمح بالصور أو الصيغ الأخرى).'
+      return
+    }
+  } else if (!isPdf && !isImage) {
+    errorMsg.value = 'نوع الملف غير مدعوم. يرجى رفع ملف بصيغة PDF أو صورة واضحة (PNG, JPG, WEBP).'
     return
   }
 
@@ -143,13 +153,13 @@ function onDrop(e: DragEvent) {
         <span v-if="required" class="text-rose-500">*</span>
       </label>
 
-      <!-- شارات الصيغ المقبولة بوضوح تام -->
+      <!-- شارات الصيغ المقبولة بوضوح تام حسب النوع -->
       <div class="flex items-center gap-1.5 text-[10px] font-bold">
-        <span class="rounded bg-rose-500/15 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 border border-rose-500/30">
-          مستند PDF
+        <span class="rounded bg-rose-500/15 text-rose-600 dark:text-rose-400 px-2 py-0.5 border border-rose-500/30">
+          {{ isStrictlyPdf ? 'ملف PDF فقط' : 'مستند PDF' }}
         </span>
-        <span class="rounded bg-sky-500/15 text-sky-600 dark:text-sky-400 px-1.5 py-0.5 border border-sky-500/30">
-          صورة JPG / PNG
+        <span v-if="!isStrictlyPdf" class="rounded bg-sky-500/15 text-sky-600 dark:text-sky-400 px-2 py-0.5 border border-sky-500/30">
+          صورة JPG / PNG / WEBP
         </span>
       </div>
     </div>

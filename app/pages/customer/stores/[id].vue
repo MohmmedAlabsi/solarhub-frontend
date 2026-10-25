@@ -43,7 +43,7 @@ onMounted(async () => {
     ])
 
     const rawStore = storeRes?.data || storeRes
-    if (rawStore) {
+    if (rawStore && rawStore.approval_status === 'approved') {
       const governorate = rawStore.governorate_name || rawStore.governorate || rawStore.user?.governorate?.name_ar || rawStore.city || 'اليمن'
       const coords = parseCoordinates(rawStore.location_coordinates || rawStore.coordinates, governorate)
 
@@ -58,11 +58,13 @@ onMounted(async () => {
         workingHours: 'السبت - الخميس: 8:00 ص - 6:00 م',
         rating: Number(rawStore.average_rating) || 4.9,
         reviewsCount: Number(rawStore.ratings_count) || 0,
-        verified: rawStore.approval_status === 'approved',
+        verified: true,
         tierBadge: rawStore.store_type === 'wholesaler' ? 'وكيل ومورد رئيسي' : 'متجر معتمد',
         description: rawStore.bio || 'مورد معتمد لمعدات ومنظومات الطاقة الشمسية في منصة SolarHub.',
         logo: rawStore.company_logo_url,
       }
+    } else {
+      store.value = null
     }
 
     storeProducts.value = Array.isArray(productsRes) ? productsRes : ((productsRes as any)?.data || [])

@@ -42,15 +42,30 @@ export function parseCoordinates(raw: any, governorateName?: string): { lat: num
 
   if (typeof raw === 'string') {
     const trimmed = raw.trim()
+
+    // format "POINT(lng lat)" or "POINT (lng lat)"
+    const pointMatch = trimmed.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i)
+    if (pointMatch && pointMatch[1] && pointMatch[2]) {
+      const p1 = parseFloat(pointMatch[1])
+      const p2 = parseFloat(pointMatch[2])
+      if (!isNaN(p1) && !isNaN(p2)) {
+        const isP1Lng = (p1 > 35 && p1 < 65) || (p2 > 10 && p2 < 35)
+        const lng = isP1Lng ? p1 : p2
+        const lat = isP1Lng ? p2 : p1
+        return { lat, lng }
+      }
+    }
+
     // format "lat,lng"
     if (trimmed.includes(',')) {
       const parts = trimmed.split(',')
-      const lat = parseFloat(parts[0]?.trim())
-      const lng = parseFloat(parts[1]?.trim())
+      const lat = parseFloat(parts[0]?.trim() || '')
+      const lng = parseFloat(parts[1]?.trim() || '')
       if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
         return { lat, lng }
       }
     }
+
     // format JSON
     try {
       const parsed = JSON.parse(trimmed)

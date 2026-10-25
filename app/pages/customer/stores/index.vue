@@ -53,9 +53,10 @@ onMounted(async () => {
       fetchGovernorates(),
     ])
 
-    const rawList = Array.isArray(storesRes)
+    const rawList = (Array.isArray(storesRes)
       ? storesRes
-      : (Array.isArray(storesRes?.data) ? storesRes.data : (Array.isArray(storesRes?.data?.data) ? storesRes.data.data : []))
+      : (Array.isArray(storesRes?.data) ? storesRes.data : (Array.isArray(storesRes?.data?.data) ? storesRes.data.data : [])))
+      .filter((s: any) => s.approval_status === 'approved')
 
     stores.value = rawList.map((s: any) => ({
       id: s.id,

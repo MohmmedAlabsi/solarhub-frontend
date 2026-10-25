@@ -693,10 +693,10 @@ onUnmounted(() => {
           <button
             type="submit"
             :disabled="isSearching || !searchQuery.trim()"
-            class="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 rounded-xl bg-[#1b2d42] dark:bg-solar-yellow text-white dark:text-solar-navy-dark text-xs font-bold hover:bg-solar-navy-dark dark:hover:bg-solar-yellow-hover transition-all shrink-0 cursor-pointer disabled:opacity-50 shadow-xs active:scale-[0.99]"
+            class="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 rounded-xl bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark text-xs font-bold hover:opacity-90 active:scale-[0.99] transition-all shrink-0 cursor-pointer disabled:opacity-50 shadow-xs"
           >
             <Search class="size-3.5 text-solar-yellow dark:text-solar-navy-dark" />
-            <span>بحث وعكس على الخريطة</span>
+            <span>بحث في الخريطة</span>
           </button>
 
           <!-- زر تحديد موقعي الحالي عبر الـ GPS -->
@@ -708,7 +708,7 @@ onUnmounted(() => {
             title="تحديد موقعي الحالي من الجهاز"
           >
             <Loader2 v-if="isLocatingUser" class="size-4 animate-spin text-solar-yellow" />
-            <Crosshair v-else class="size-4 text-solar-navy-dark dark:text-solar-yellow" />
+            <Crosshair v-else class="size-4 text-solar-navy dark:text-solar-yellow" />
             <span class="hidden sm:inline">{{ isLocatingUser ? 'جاري التحديد...' : 'موقعي الآن' }}</span>
           </button>
         </form>
@@ -716,17 +716,17 @@ onUnmounted(() => {
         <!-- تنبيه في حال وجود إشعار نجاح أو خطأ -->
         <div
           v-if="successNotice"
-          class="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-xs font-semibold text-emerald-800 animate-in fade-in duration-150"
+          class="flex items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 animate-in fade-in duration-150"
         >
-          <CheckCircle2 class="size-4 shrink-0 text-emerald-600" />
+          <CheckCircle2 class="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
           <span>{{ successNotice }}</span>
         </div>
 
         <div
           v-if="locationError"
-          class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs font-semibold text-amber-800 animate-in fade-in duration-150"
+          class="flex items-center gap-2 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/40 p-2.5 text-xs font-semibold text-amber-800 dark:text-amber-300 animate-in fade-in duration-150"
         >
-          <AlertCircle class="size-4 shrink-0 text-amber-600" />
+          <AlertCircle class="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
           <span>{{ locationError }}</span>
         </div>
 
@@ -762,7 +762,7 @@ onUnmounted(() => {
           <div ref="mapContainer" class="w-full h-full z-0" />
 
           <!-- شارة إرشادية لتحريك الدبوس -->
-          <div class="absolute top-3 right-3 z-10 pointer-events-none rounded-xl bg-[#1b2d42]/90 backdrop-blur-xs px-3 py-1.5 text-[11px] font-bold text-white shadow-md flex items-center gap-1.5">
+          <div class="absolute top-3 right-3 z-10 pointer-events-none rounded-xl bg-solar-navy-dark/90 backdrop-blur-xs px-3 py-1.5 text-[11px] font-bold text-white shadow-md flex items-center gap-1.5">
             <Navigation class="size-3.5 text-solar-yellow" />
             <span>اسحب الدبوس أو انقر على أي نقطة لتثبيت موقعك</span>
           </div>
@@ -772,7 +772,7 @@ onUnmounted(() => {
             <button
               type="button"
               @click="setTileLayer('streets')"
-              :class="currentMapType === 'streets' ? 'bg-[#1b2d42] dark:bg-solar-yellow text-white dark:text-solar-navy-dark shadow-xs' : 'text-solar-text-muted hover:text-solar-navy-dark dark:hover:text-solar-yellow'"
+              :class="currentMapType === 'streets' ? 'bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark shadow-xs' : 'text-solar-text-muted hover:text-solar-navy-dark dark:hover:text-solar-yellow'"
               class="px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
             >
               خريطة الشوارع
@@ -780,7 +780,7 @@ onUnmounted(() => {
             <button
               type="button"
               @click="setTileLayer('satellite')"
-              :class="currentMapType === 'satellite' ? 'bg-[#1b2d42] dark:bg-solar-yellow text-white dark:text-solar-navy-dark shadow-xs' : 'text-solar-text-muted hover:text-solar-navy-dark dark:hover:text-solar-yellow'"
+              :class="currentMapType === 'satellite' ? 'bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark shadow-xs' : 'text-solar-text-muted hover:text-solar-navy-dark dark:hover:text-solar-yellow'"
               class="px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
             >
               قمر صناعي
