@@ -492,7 +492,7 @@ onMounted(() => {
                   class="break-words text-base font-bold leading-7 text-solar-text-heading"
                 >
                   <NuxtLink
-                    :to="`/customer/products/${item.product.id}`"
+                    :to="`/customer/products/${item.product.storeProductId}?kind=store`"
                     class="hover:underline"
                   >
                     {{ item.product.name }}

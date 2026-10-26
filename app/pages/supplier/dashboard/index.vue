@@ -25,9 +25,7 @@ import { useAuthStore } from '~/stores/auth'
 import { useTheme } from '~/composables/useTheme'
 import ThemeToggle from '~/components/common/ThemeToggle.vue'
 
-definePageMeta({
-  middleware: 'auth',
-})
+// auth.global.ts protects supplier routes and checks the account role.
 
 useSeoMeta({
   title: 'لوحة تحكم المتجر والمورد | SolarHub',

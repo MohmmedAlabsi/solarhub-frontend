@@ -11,6 +11,13 @@ export default defineNuxtConfig({
 
   spaLoadingTemplate: false,
 
+  // Keep the Nuxt plugin and application stores on one Pinia module in SSR.
+  nitro: {
+    externals: {
+      inline: ['pinia'],
+    },
+  },
+
   typescript: {
     typeCheck: false,
     strict: false,

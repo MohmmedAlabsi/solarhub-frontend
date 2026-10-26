@@ -202,6 +202,7 @@ export interface AdminServiceRequest {
 }
 export interface AdminReview {
   id: string; orderId: string; client: string; targetId: string; score: number
+  targetName?: string
   comment: string; approved: boolean
 }
 export interface AdminBroadcast {
