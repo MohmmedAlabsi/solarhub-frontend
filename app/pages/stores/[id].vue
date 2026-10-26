@@ -21,6 +21,7 @@ import {
 } from 'lucide-vue-next'
 import { visitorStores, visitorProducts } from '~~/app/data/visitor-mock'
 import { useAuthModal } from '~~/app/composables/useAuthModal'
+import { parseCoordinates } from '~/utils/geo'
 
 const route = useRoute()
 const storeId = route.params.id as string
@@ -346,14 +347,15 @@ const isMapModalOpen = ref(false)
         </div>
       </div>
     </div>
-    <!-- نافذة استعراض موقع المتجر والمستودع على الخريطة -->
+    <!-- نافذة استعراض موقع المتجر والمستودع على الخريطة (للعرض فقط) -->
     <CommonMapLocationModal
       :is-open="isMapModalOpen"
+      :initial-coordinates="parseCoordinates((store as any).locationCoordinates || (store as any).coordinates, store.address)"
       :current-location="(store as any).locationCoordinates || store.address"
       :title="`موقع متجر ${store.name} على الخريطة`"
       subtitle="الموقع الفعلي للمتجر والمستودعات المعتمدة لاستلام وفحص البضائع وتنسيق الشحن"
+      :readonly="true"
       @close="isMapModalOpen = false"
-      @select="isMapModalOpen = false"
     />
   </div>
 </template>

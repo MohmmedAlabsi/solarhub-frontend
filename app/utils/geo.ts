@@ -42,16 +42,65 @@ export function parseCoordinates(raw: any, governorateName?: string): { lat: num
 
   if (typeof raw === 'string') {
     const trimmed = raw.trim()
-    // format "lat,lng"
+
+    // 1. PostGIS EWKB Hex format (e.g. 0101000020E6100000...)
+    if (/^0101000020[0-9a-fA-F]{40}$/i.test(trimmed)) {
+      try {
+        const match = trimmed.match(/^0101000020[0-9a-fA-F]{8}([0-9a-fA-F]{16})([0-9a-fA-F]{16})$/i)
+        if (match && match[1] && match[2]) {
+          const hexToDouble = (hex: string) => {
+            const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)))
+            const view = new DataView(bytes.buffer)
+            return view.getFloat64(0, true) // little endian
+          }
+          const lng = hexToDouble(match[1])
+          const lat = hexToDouble(match[2])
+          if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+            return { lat, lng }
+          }
+        }
+      } catch {
+        // continue
+      }
+    }
+
+    // 2. format "POINT(lng lat)" or "POINT (lng lat)"
+    const pointMatch = trimmed.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i)
+    if (pointMatch && pointMatch[1] && pointMatch[2]) {
+      const p1 = parseFloat(pointMatch[1])
+      const p2 = parseFloat(pointMatch[2])
+      if (!isNaN(p1) && !isNaN(p2)) {
+        const isP1Lng = (p1 > 35 && p1 < 65) || (p2 > 10 && p2 < 35)
+        const lng = isP1Lng ? p1 : p2
+        const lat = isP1Lng ? p2 : p1
+        return { lat, lng }
+      }
+    }
+
+    // 3. format "lat,lng"
     if (trimmed.includes(',')) {
       const parts = trimmed.split(',')
-      const lat = parseFloat(parts[0]?.trim())
-      const lng = parseFloat(parts[1]?.trim())
+      const lat = parseFloat(parts[0]?.trim() || '')
+      const lng = parseFloat(parts[1]?.trim() || '')
       if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
         return { lat, lng }
       }
     }
-    // format JSON
+
+    // 4. Embedded coordinates in text, e.g. "(15.3897, 44.1888)"
+    const embeddedMatch = trimmed.match(/\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/)
+    if (embeddedMatch && embeddedMatch[1] && embeddedMatch[2]) {
+      const p1 = parseFloat(embeddedMatch[1])
+      const p2 = parseFloat(embeddedMatch[2])
+      if (!isNaN(p1) && !isNaN(p2)) {
+        const isP1Lat = p1 >= -90 && p1 <= 90 && (p2 > 30 && p2 < 60)
+        const lat = isP1Lat ? p1 : p2
+        const lng = isP1Lat ? p2 : p1
+        return { lat, lng }
+      }
+    }
+
+    // 5. format JSON
     try {
       const parsed = JSON.parse(trimmed)
       if (parsed && typeof parsed === 'object') {

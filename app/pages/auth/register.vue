@@ -5,6 +5,7 @@ import { useAuthStore } from '~/stores/auth'
 import { useGovernorates } from '~/composables/useGovernorates'
 import MapLocationModal from '~/components/common/MapLocationModal.vue'
 import AuthFileUploadInput from '~/components/auth/FileUploadInput.vue'
+import { reverseGeocode } from '~/utils/geocoding'
 
 definePageMeta({
   layout: 'auth',
@@ -101,14 +102,27 @@ async function quickLocateUser() {
 
   if (typeof window !== 'undefined' && 'geolocation' in navigator) {
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const lat = pos.coords.latitude
         const lng = pos.coords.longitude
         form.locationCoordinates = { lat, lng }
-        const matchedGov = findNearestGovFromCoords(lat, lng)
-        form.governorate = matchedGov
-        form.locationText = `${matchedGov} - موقع محدد عبر الـ GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`
-        isQuickLocating.value = false
+
+        try {
+          const geo = await reverseGeocode(lat, lng)
+          if (geo && geo.governorate) {
+            const match = governorates.value.find(g => g.includes(geo.governorate) || geo.governorate.includes(g))
+            form.governorate = match || geo.governorate
+          } else {
+            form.governorate = findNearestGovFromCoords(lat, lng)
+          }
+          form.locationText = geo.formattedAddress
+        } catch {
+          const matchedGov = findNearestGovFromCoords(lat, lng)
+          form.governorate = matchedGov
+          form.locationText = `${matchedGov} - موقع محدد عبر الـ GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+        } finally {
+          isQuickLocating.value = false
+        }
       },
       (err) => {
         console.warn('GPS notice:', err)
@@ -192,7 +206,12 @@ async function handleSubmit() {
       return
     }
     if (!form.cvFile) {
-      errorMessage.value = 'يرجى إرفاق شهادة الاعتماد المهني أو وثيقة السيرة الذاتية (PDF أو صورة)'
+      errorMessage.value = 'يرجى إرفاق ملف السيرة الذاتية بصيغة PDF فقط'
+      return
+    }
+    const isPdf = form.cvFile.type === 'application/pdf' || form.cvFile.name.toLowerCase().endsWith('.pdf')
+    if (!isPdf) {
+      errorMessage.value = 'يجب أن يكون ملف السيرة الذاتية للمهندس بصيغة PDF فقط (لا يُسمح بالصور أو الصيغ الأخرى)'
       return
     }
   }
@@ -225,7 +244,7 @@ async function handleSubmit() {
 
   const selectedGovId = getGovernorateIdByName(form.governorate)
 
-  const result = await authStore.register({
+  const payload: any = {
     name: form.name.trim(),
     email: form.email.trim(),
     phone: form.phone.trim(),
@@ -241,10 +260,13 @@ async function handleSubmit() {
     license_number: form.licenseNumber.trim() || undefined,
     commercial_registry: form.commercialRegistry.trim() || undefined,
     store_type: selectedRole.value === 'supplier' ? form.storeType : undefined,
+    address_details: `${form.governorate} - ${form.locationText}`,
     addressDetails: `${form.governorate} - ${form.locationText}`,
     cvFile: form.cvFile,
     commercialRegisterFile: form.commercialRegisterFile,
-  } as any)
+  }
+
+  const result = await authStore.register(payload)
 
   if (result.success) {
     // Navigate to email OTP verification
@@ -464,7 +486,7 @@ async function handleSubmit() {
           </div>
         </div>
 
-        <!-- حقول إضافية للمهندس: رقم الترخيص والسيرة الذاتية -->
+        <!-- حقول إضافية للمهندس: رقم الترخيص والسيرة الذاتية (PDF فقط) -->
         <div v-if="selectedRole === 'engineer'" class="flex flex-col gap-4.5 animate-in fade-in duration-200">
           <div class="flex flex-col gap-1.5">
             <label for="licenseNumber" class="text-xs font-bold text-solar-text-heading flex items-center gap-1">
@@ -482,11 +504,12 @@ async function handleSubmit() {
 
           <AuthFileUploadInput
             v-model="form.cvFile"
-            label="شهادة الاعتماد المهني أو السيرة الذاتية"
-            placeholder="اضغط لاختيار ملف الشهادة أو السيرة الذاتية (PDF أو صورة)"
-            accept=".pdf,application/pdf,image/*,.png,.jpg,.jpeg,.doc,.docx"
-            :max-size-mb="5"
-            hint="الملفات المقبولة: وثائق PDF الرسمية أو صور الشهادات والاعتمادات (JPG, PNG) حتى 5MB"
+            label="ملف السيرة الذاتية وشهادة الاعتماد المهني (PDF فقط)"
+            placeholder="اضغط لاختيار ملف السيرة الذاتية (PDF فقط)"
+            accept=".pdf,application/pdf"
+            :pdf-only="true"
+            :max-size-mb="10"
+            hint="الملفات المقبولة: وثائق PDF الرسمية فقط حتى 10MB"
             required
           />
         </div>
@@ -544,9 +567,10 @@ async function handleSubmit() {
             v-model="form.commercialRegisterFile"
             label="وثيقة السجل التجاري أو رخصة المتجر"
             placeholder="اضغط لاختيار ملف السجل التجاري (PDF أو صورة)"
-            accept=".pdf,application/pdf,image/*,.png,.jpg,.jpeg"
-            :max-size-mb="5"
-            hint="الملفات المقبولة: وثيقة السجل التجاري بصيغة PDF أو صورة واضحة (JPG, PNG) حتى 5MB"
+            accept=".pdf,application/pdf,image/*,.png,.jpg,.jpeg,.webp"
+            :pdf-only="false"
+            :max-size-mb="10"
+            hint="الملفات المقبولة: وثيقة السجل التجاري بصيغة PDF أو صورة واضحة (JPG, PNG, WEBP) حتى 10MB"
             required
           />
         </div>

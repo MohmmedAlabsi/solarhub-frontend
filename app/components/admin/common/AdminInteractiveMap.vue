@@ -162,8 +162,8 @@ onUnmounted(() => {
       :current-location="address || governorate"
       :title="`موقع: ${title}`"
       :subtitle="`المحافظة: ${governorate} — الإحداثيات: ${lat.toFixed(5)}, ${lng.toFixed(5)}`"
+      :readonly="true"
       @close="isModalOpen = false"
-      @select="isModalOpen = false"
     />
   </div>
 </template>

@@ -354,9 +354,11 @@ function setUser(newUser: any | null) {
 
         if (payload.governorate) body.governorate = payload.governorate
         if (payload.governorate_id) body.governorate_id = payload.governorate_id
-        if (payload.location) {
-          body.location = payload.location
-          body.default_coordinates = `POINT(${payload.location.lng} ${payload.location.lat})`
+
+        const custCoords = (payload as any).default_coordinates || (payload as any).location_coordinates || (payload.location?.lat && payload.location?.lng ? `POINT(${payload.location.lng} ${payload.location.lat})` : null)
+        if (custCoords) {
+          body.default_coordinates = custCoords
+          body.location_coordinates = custCoords
         }
 
         const res = await apiRequest<any>('/auth/customer/register', {
@@ -388,7 +390,7 @@ function setUser(newUser: any | null) {
         formData.append('phone', engPayload.phone.trim())
         formData.append('password', engPayload.password)
         formData.append('password_confirmation', engPayload.password_confirmation)
-        
+
         // License number (required by backend)
         const license = engPayload.licenseNumber || engPayload.license_number || `SCE-${Math.floor(100000 + Math.random() * 900000)}`
         formData.append('license_number', license)
@@ -397,13 +399,15 @@ function setUser(newUser: any | null) {
         if (engPayload.governorate) formData.append('governorate', engPayload.governorate)
         if (engPayload.governorate_id) formData.append('governorate_id', String(engPayload.governorate_id))
         if (engPayload.location?.address) formData.append('address_details', engPayload.location.address)
-        if (engPayload.location?.lat && engPayload.location?.lng) {
-          const coordsStr = `POINT(${engPayload.location.lng} ${engPayload.location.lat})`
-          formData.append('location_coordinates', coordsStr)
-          formData.append('default_coordinates', coordsStr)
+        if (engPayload.address_details || engPayload.addressDetails) formData.append('address_details', engPayload.address_details || engPayload.addressDetails)
+
+        const engCoords = engPayload.default_coordinates || engPayload.location_coordinates || (engPayload.location?.lat && engPayload.location?.lng ? `POINT(${engPayload.location.lng} ${engPayload.location.lat})` : null)
+        if (engCoords) {
+          formData.append('location_coordinates', engCoords)
+          formData.append('default_coordinates', engCoords)
         }
 
-        // CV File
+        // CV File (strictly PDF)
         if (engPayload.cvFile) {
           formData.append('cv', engPayload.cvFile)
         }
@@ -453,10 +457,11 @@ function setUser(newUser: any | null) {
         formData.append('address_details', address)
         if (supPayload.governorate) formData.append('governorate', supPayload.governorate)
         if (supPayload.governorate_id) formData.append('governorate_id', String(supPayload.governorate_id))
-        if (supPayload.location?.lat && supPayload.location?.lng) {
-          const coordsStr = `POINT(${supPayload.location.lng} ${supPayload.location.lat})`
-          formData.append('location_coordinates', coordsStr)
-          formData.append('default_coordinates', coordsStr)
+
+        const supCoords = supPayload.default_coordinates || supPayload.location_coordinates || (supPayload.location?.lat && supPayload.location?.lng ? `POINT(${supPayload.location.lng} ${supPayload.location.lat})` : null)
+        if (supCoords) {
+          formData.append('location_coordinates', supCoords)
+          formData.append('default_coordinates', supCoords)
         }
 
         // Commercial register file
