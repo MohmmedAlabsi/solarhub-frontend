@@ -62,34 +62,112 @@ export const useAuthStore = defineStore('auth', () => {
     setUser(newUser)
     isInitialized.value = true
   }
-
-  function setUser(newUser: any | null) {
-    if (!newUser) {
-      user.value = null
-      authUserCookie.value = null
-      authPermissionsCookie.value = []
-    } else {
-      const normalizedUser: User = {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        role: newUser.role,
-        status: newUser.status,
-        governorate: typeof newUser.governorate === 'object' ? newUser.governorate?.name_ar : newUser.governorate,
-        isVerified: !!(newUser.email_verified || newUser.isVerified || newUser.email_verified_at),
-        default_coordinates: newUser.default_coordinates || null,
-        store: newUser.store || null,
-        has_store: newUser.has_store,
-        has_engineer_profile: newUser.has_engineer_profile,
-        createdAt: newUser.created_at || newUser.createdAt || new Date().toISOString(),
-        permissions: Array.isArray(newUser.permissions) ? newUser.permissions : (authPermissionsCookie.value || []),
-      }
-      user.value = normalizedUser
-      authUserCookie.value = normalizedUser
-    }
+function setUser(newUser: any | null) {
+  if (!newUser) {
+    user.value = null
+    authUserCookie.value = null
+    authPermissionsCookie.value = []
     isInitialized.value = true
+    return
   }
+
+  type StoredUser = User & {
+    onboarding_status?: string
+  }
+
+  // نحافظ على البيانات السابقة للحساب نفسه فقط.
+  const previous: StoredUser | null =
+    user.value
+    && String(user.value.id) === String(newUser.id)
+      ? user.value
+      : null
+
+  const hasField = (field: string): boolean =>
+    Object.prototype.hasOwnProperty.call(newUser, field)
+
+  const governorate = hasField('governorate')
+    ? newUser.governorate
+    : previous?.governorate
+
+  let verified = previous?.isVerified ?? false
+
+  if (typeof newUser.email_verified === 'boolean') {
+    verified = newUser.email_verified
+  } else if (hasField('email_verified_at')) {
+    verified = Boolean(newUser.email_verified_at)
+  } else if (typeof newUser.isVerified === 'boolean') {
+    verified = newUser.isVerified
+  }
+
+  const permissions = Array.isArray(newUser.permissions)
+    ? newUser.permissions
+    : previous?.permissions ?? []
+
+  const normalizedUser: StoredUser = {
+    id: newUser.id,
+
+    name: newUser.name ?? previous?.name ?? '',
+    email: newUser.email ?? previous?.email ?? '',
+    phone: newUser.phone ?? previous?.phone ?? '',
+
+    // مسار تحديث الملف الشخصي لا يعيد role.
+    role: hasField('role')
+      ? newUser.role
+      : previous?.role,
+
+    status: hasField('status')
+      ? newUser.status
+      : previous?.status,
+
+    governorate:
+      governorate && typeof governorate === 'object'
+        ? governorate.name_ar
+          ?? governorate.name
+          ?? governorate.name_en
+          ?? null
+        : governorate ?? null,
+
+    isVerified: verified,
+
+    // غياب الحقل يختلف عن إعادته بقيمة null.
+    default_coordinates: hasField('default_coordinates')
+      ? newUser.default_coordinates ?? null
+      : previous?.default_coordinates ?? null,
+
+    store: hasField('store')
+      ? newUser.store
+      : newUser.has_store === false
+        ? null
+        : previous?.store ?? null,
+
+    has_store: typeof newUser.has_store === 'boolean'
+      ? newUser.has_store
+      : previous?.has_store,
+
+    has_engineer_profile:
+      typeof newUser.has_engineer_profile === 'boolean'
+        ? newUser.has_engineer_profile
+        : previous?.has_engineer_profile,
+
+    onboarding_status: hasField('onboarding_status')
+      ? newUser.onboarding_status
+      : previous?.onboarding_status,
+
+    createdAt:
+      newUser.created_at
+      || newUser.createdAt
+      || previous?.createdAt
+      || '',
+
+    permissions,
+  }
+
+  user.value = normalizedUser
+  authUserCookie.value = normalizedUser
+  authPermissionsCookie.value = permissions
+
+  isInitialized.value = true
+}
 
   function setToken(newToken: string | null) {
     token.value = newToken

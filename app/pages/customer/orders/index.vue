@@ -1,27 +1,15 @@
 <script setup lang="ts">
 import {
-  AlertCircle,
-  ArrowLeft,
-  Check,
-  CheckCircle2,
-  Clock,
-  ExternalLink,
-  Eye,
-  FileText,
-  Loader2,
-  Package,
-  Search,
-  ShoppingBag,
-  Store,
-  Truck,
-  X,
-  XCircle,
-} from 'lucide-vue-next'
-import {
-  useCustomerOrders,
-  type ApiOrder,
-  type ApiQuoteRequest,
-} from '~~/app/composables/useCustomerOrders'
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+} from 'vue'
+import { FileText, Loader2, Package } from 'lucide-vue-next'
+import { useAuthStore } from '../../../stores/auth'
+import { fetchAllApiRows } from '../../../utils/apiCollection'
 
 definePageMeta({
   layout: 'customer',
@@ -29,396 +17,1154 @@ definePageMeta({
 
 useSeoMeta({
   title: 'طلباتي وعروض الأسعار | SolarHub',
-  description: 'متابعة أوامر الشراء وحالات الشحن والتوصيل وطلبات عروض الأسعار الهندسية.',
 })
+
+type Tab = 'orders' | 'quotes'
+type QuoteDecision = 'accept' | 'reject'
+
+interface ApiResponse<T> {
+  status: string
+  message?: string
+  data: T
+}
+
+interface OrderRow {
+  id: number
+  order_number: string
+  status: string
+  total_amount: number | string | null
+  delivery_address?: string | null
+  created_at?: string | null
+
+  governorate?: {
+    id?: number | null
+    name?: string | null
+    name_ar?: string | null
+  } | null
+}
+
+interface OrderCollectionResponse {
+  status: string
+  message?: string
+
+  data:
+    | OrderRow[]
+    | {
+        data: OrderRow[]
+        last_page?: number
+        meta?: { last_page?: number }
+      }
+
+  meta?: { last_page?: number }
+}
+
+interface QuoteRow {
+  id: number
+  quantity: number
+  status: string
+
+  customer?: {
+    id: number | string
+    name?: string | null
+  } | null
+
+  store_product?: {
+    id: number
+    title?: string | null
+    listed_price?: number | string | null
+
+    store?: {
+      id?: number | null
+      company_name?: string | null
+    } | null
+  } | null
+
+  customer_target_price?: number | string | null
+  offered_unit_price?: number | string | null
+  total_price?: number | string | null
+
+  customer_notes?: string | null
+  store_notes?: string | null
+
+  created_at?: string | null
+  responded_at?: string | null
+  accepted_at?: string | null
+}
+
+interface RequestContext {
+  token: string
+  owner: string
+  version: number
+}
 
 const route = useRoute()
-const router = useRouter()
+const authStore = useAuthStore()
+const { $api } = useNuxtApp()
 
-const activeTab = ref<'orders' | 'quotes'>((route.query.tab as string) === 'quotes' ? 'quotes' : 'orders')
-const searchQuery = ref('')
+const orders = ref<OrderRow[]>([])
+const quotes = ref<QuoteRow[]>([])
 
-const {
-  orders,
-  quoteRequests,
-  fetchMyOrders,
-  fetchMyQuoteRequests,
-  cancelOrder,
-  acceptQuoteRequest,
-  rejectQuoteRequest,
-  isLoading,
-  isActionLoading,
-  error,
-} = useCustomerOrders()
+const loading = reactive<Record<Tab, boolean>>({
+  orders: false,
+  quotes: false,
+})
 
-const actionNotice = ref<string | null>(null)
+const loaded = reactive<Record<Tab, boolean>>({
+  orders: false,
+  quotes: false,
+})
 
-function setTab(tab: 'orders' | 'quotes') {
-  activeTab.value = tab
-  router.push({ query: { ...route.query, tab: tab === 'quotes' ? 'quotes' : undefined } })
+const errors = reactive<Record<Tab, string>>({
+  orders: '',
+  quotes: '',
+})
+
+const search = ref('')
+const selectedStatus = ref('all')
+const currentPage = ref(1)
+
+const noticeMessage = ref('')
+const actionError = ref('')
+const quotesNeedRefresh = ref(true)
+
+const quoteAction = ref<{
+  id: number
+  decision: QuoteDecision
+} | null>(null)
+
+const pageSize = 12
+
+const sequences: Record<Tab, number> = {
+  orders: 0,
+  quotes: 0,
 }
 
-watch(
-  () => route.query.tab,
-  (newTab) => {
-    if (newTab === 'quotes') {
-      activeTab.value = 'quotes'
-    } else {
-      activeTab.value = 'orders'
-    }
-  }
+let contextVersion = 0
+let mounted = false
+let disposed = false
+
+const orderStatuses: Record<string, string> = {
+  pending: 'قيد الانتظار',
+  processing: 'قيد التجهيز',
+  shipped: 'تم الشحن',
+  delivered: 'تم تسجيل التسليم',
+  completed: 'مكتمل',
+  cancelled: 'ملغى',
+}
+
+const quoteStatuses: Record<string, string> = {
+  pending: 'بانتظار رد المتجر',
+  responded: 'وصل عرض المتجر',
+  accepted: 'تمت الموافقة على العرض',
+  rejected: 'مرفوض / ملغى',
+}
+
+const activeTab = computed<Tab>(() => {
+  const value = Array.isArray(route.query.tab)
+    ? route.query.tab[0]
+    : route.query.tab
+
+  return value === 'quotes' ? 'quotes' : 'orders'
+})
+
+const actionBusy = computed(() =>
+  quoteAction.value !== null,
 )
 
-// تصفية أوامر الشراء
-const filteredOrders = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return orders.value
-  return orders.value.filter((o) => {
-    return (
-      o.order_number.toLowerCase().includes(q) ||
-      o.delivery_address.toLowerCase().includes(q) ||
-      (o.governorate?.name_ar && o.governorate.name_ar.toLowerCase().includes(q))
-    )
-  })
-})
+const statusOptions = computed(() =>
+  Object.entries(
+    activeTab.value === 'orders'
+      ? orderStatuses
+      : quoteStatuses,
+  ).map(([value, label]) => ({ value, label })),
+)
 
-// تصفية طلبات عروض الأسعار
-const filteredQuotes = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return quoteRequests.value
-  return quoteRequests.value.filter((qr) => {
-    const title = qr.store_product?.master_product?.title || ''
-    const store = qr.store_product?.store?.company_name || ''
-    return (
-      String(qr.id).includes(q) ||
-      title.toLowerCase().includes(q) ||
-      store.toLowerCase().includes(q)
-    )
-  })
-})
+const ordersCount = computed(() =>
+  loaded.orders && !loading.orders && !errors.orders
+    ? orders.value.length
+    : null,
+)
 
-function getStatusBadge(status: string) {
+const quotesCount = computed(() =>
+  loaded.quotes && !loading.quotes && !errors.quotes
+    ? quotes.value.length
+    : null,
+)
+
+function captureContext(): RequestContext | null {
+  const token = authStore.token
+  const owner = String(authStore.user?.id ?? '')
+
+  if (!token || !owner) return null
+
+  return {
+    token,
+    owner,
+    version: contextVersion,
+  }
+}
+
+function isCurrent(context: RequestContext): boolean {
+  return !disposed
+    && context.version === contextVersion
+    && authStore.token === context.token
+    && String(authStore.user?.id ?? '') === context.owner
+}
+
+function validId(value: unknown): boolean {
+  const id = Number(value)
+
+  return Number.isSafeInteger(id) && id > 0
+}
+
+function amountValue(value: unknown): number | null {
+  if (
+    value === null
+    || value === undefined
+    || String(value).trim() === ''
+  ) {
+    return null
+  }
+
+  const amount = Number(value)
+
+  return Number.isFinite(amount) && amount >= 0
+    ? amount
+    : null
+}
+
+function formatAmount(value: unknown): string {
+  const amount = amountValue(value)
+
+  return amount === null
+    ? 'غير متاح'
+    : new Intl.NumberFormat('ar', {
+        maximumFractionDigits: 2,
+      }).format(amount)
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return 'غير متاح'
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) return 'غير متاح'
+
+  return new Intl.DateTimeFormat('ar', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(date)
+}
+
+function statusLabel(status: string, tab: Tab): string {
+  const labels = tab === 'orders'
+    ? orderStatuses
+    : quoteStatuses
+
+  return labels[status] || 'حالة غير معروفة'
+}
+
+function statusClasses(status: string): string {
   switch (status) {
-    case 'pending':
-      return { text: 'قيد الانتظار', class: 'bg-amber-100 text-amber-800 border-amber-200' }
-    case 'processing':
     case 'accepted':
-      return { text: 'قيد التجهيز', class: 'bg-blue-100 text-blue-800 border-blue-200' }
-    case 'shipped':
-      return { text: 'في طريقها إليك', class: 'bg-indigo-100 text-indigo-800 border-indigo-200 animate-pulse' }
-    case 'delivered':
-      return { text: 'تم التسليم بالموقع', class: 'bg-emerald-100 text-emerald-800 border-emerald-200' }
     case 'completed':
-      return { text: 'مكتمل ومعتمد', class: 'bg-emerald-100 text-emerald-800 border-emerald-200' }
+    case 'delivered':
+      return 'bg-emerald-50 text-emerald-800'
+
     case 'cancelled':
     case 'rejected':
-      return { text: 'ملغي / مرفوض', class: 'bg-red-100 text-red-800 border-red-200' }
+      return 'bg-red-50 text-red-800'
+
     case 'responded':
-      return { text: 'تم استلام عرض السعر', class: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-bold' }
+    case 'processing':
+    case 'shipped':
+      return 'bg-blue-50 text-blue-800'
+
     default:
-      return { text: status, class: 'bg-gray-100 text-gray-800 border-gray-200' }
+      return 'bg-amber-50 text-amber-800'
   }
 }
 
-// إلغاء طلب شراء
-async function handleCancelOrder(orderId: number) {
-  if (!confirm('هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟')) return
+function matchesSearch(values: unknown[]): boolean {
+  const query = search.value.trim().toLocaleLowerCase('ar')
+
+  if (!query) return true
+
+  return values
+    .filter(value => value !== null && value !== undefined)
+    .join(' ')
+    .toLocaleLowerCase('ar')
+    .includes(query)
+}
+
+const filteredOrders = computed(() =>
+  orders.value.filter(order => {
+    if (
+      selectedStatus.value !== 'all'
+      && order.status !== selectedStatus.value
+    ) {
+      return false
+    }
+
+    return matchesSearch([
+      order.id,
+      order.order_number,
+      order.delivery_address,
+      order.governorate?.name,
+      order.governorate?.name_ar,
+    ])
+  }),
+)
+
+const filteredQuotes = computed(() =>
+  quotes.value.filter(quote => {
+    if (
+      selectedStatus.value !== 'all'
+      && quote.status !== selectedStatus.value
+    ) {
+      return false
+    }
+
+    return matchesSearch([
+      quote.id,
+      quote.store_product?.title,
+      quote.store_product?.store?.company_name,
+      quote.customer_notes,
+      quote.store_notes,
+    ])
+  }),
+)
+
+const resultCount = computed(() =>
+  activeTab.value === 'orders'
+    ? filteredOrders.value.length
+    : filteredQuotes.value.length,
+)
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(resultCount.value / pageSize)),
+)
+
+const displayedOrders = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+
+  return filteredOrders.value.slice(start, start + pageSize)
+})
+
+const displayedQuotes = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+
+  return filteredQuotes.value.slice(start, start + pageSize)
+})
+
+const hasFilters = computed(() =>
+  Boolean(search.value.trim()) || selectedStatus.value !== 'all',
+)
+
+function selectTab(tab: Tab) {
+  const query = { ...route.query }
+
+  if (tab === 'orders') {
+    delete query.tab
+  } else {
+    query.tab = 'quotes'
+  }
+
+  return navigateTo({
+    path: route.path,
+    query,
+    hash: route.hash,
+  })
+}
+
+function resetFilters() {
+  search.value = ''
+  selectedStatus.value = 'all'
+  currentPage.value = 1
+}
+
+async function loadTab(tab: Tab): Promise<boolean> {
+  const sequence = ++sequences[tab]
+  const context = captureContext()
+
+  loading[tab] = true
+  loaded[tab] = false
+  errors[tab] = ''
+
+  if (tab === 'quotes') {
+    quotesNeedRefresh.value = true
+  }
+
+  if (!context) {
+    errors[tab] = 'سجّل الدخول لعرض سجلات حسابك.'
+    loading[tab] = false
+    return false
+  }
+
   try {
-    await cancelOrder(orderId)
-    actionNotice.value = 'تم إلغاء الطلب بنجاح.'
-    setTimeout(() => { actionNotice.value = null }, 3500)
-  } catch (err: any) {
-    alert(err?.userMessage || 'تعذر إلغاء الطلب.')
+    if (tab === 'orders') {
+      const rows = await fetchAllApiRows<OrderRow>(
+        query => $api<OrderCollectionResponse>(
+          '/my/orders',
+          { query },
+        ),
+        100,
+      )
+
+      if (
+        !isCurrent(context)
+        || sequence !== sequences[tab]
+      ) {
+        return false
+      }
+
+      if (rows.some(row => !validId(row.id))) {
+        throw new Error('Invalid order records')
+      }
+
+      orders.value = rows
+    } else {
+      // هذا المسار يعيد القائمة كاملة دون تقسيم صفحات.
+      const response = await $api<ApiResponse<QuoteRow[]>>(
+        '/my/quote-requests',
+      )
+
+      if (
+        !isCurrent(context)
+        || sequence !== sequences[tab]
+      ) {
+        return false
+      }
+
+      if (
+        response.status !== 'success'
+        || !Array.isArray(response.data)
+      ) {
+        throw new Error('Invalid quotes response')
+      }
+
+      const seen = new Set<number>()
+
+      for (const quote of response.data) {
+        const id = Number(quote.id)
+
+        if (
+          !validId(id)
+          || !validId(quote.quantity)
+          || !quote.customer
+          || String(quote.customer.id) !== context.owner
+          || seen.has(id)
+        ) {
+          throw new Error('Invalid quote record')
+        }
+
+        seen.add(id)
+      }
+
+      quotes.value = response.data
+      quotesNeedRefresh.value = false
+    }
+
+    loaded[tab] = true
+    return true
+  } catch {
+    if (
+      !isCurrent(context)
+      || sequence !== sequences[tab]
+    ) {
+      return false
+    }
+
+    errors[tab] = tab === 'orders'
+      ? 'تعذر تحميل سجل الطلبات. أعد المحاولة.'
+      : 'تعذر تحميل عروض الأسعار. أعد المحاولة.'
+
+    return false
+  } finally {
+    if (
+      isCurrent(context)
+      && sequence === sequences[tab]
+    ) {
+      loading[tab] = false
+    }
   }
 }
 
-// قبول عرض سعر
-async function handleAcceptQuote(quoteId: number) {
-  if (!confirm('هل توافق على عرض السعر والمواصفات المقدمة من المورد؟')) return
+async function refreshActiveTab() {
+  if (actionBusy.value || loading[activeTab.value]) return
+
+  if (activeTab.value === 'quotes') {
+    actionError.value = ''
+  }
+
+  await loadTab(activeTab.value)
+}
+
+async function refreshQuotes() {
+  if (actionBusy.value || loading.quotes) return
+
+  actionError.value = ''
+  await loadTab('quotes')
+}
+
+function quoteActionsAvailable(): boolean {
+  return loaded.quotes
+    && !loading.quotes
+    && !errors.quotes
+    && !quotesNeedRefresh.value
+    && !actionBusy.value
+}
+
+function canAcceptQuote(quote: QuoteRow): boolean {
+  const unitPrice = amountValue(quote.offered_unit_price)
+  const total = amountValue(quote.total_price)
+
+  return quoteActionsAvailable()
+    && quote.status === 'responded'
+    && validId(quote.store_product?.id)
+    && unitPrice !== null
+    && unitPrice > 0
+    && total !== null
+    && total > 0
+}
+
+function canRejectQuote(quote: QuoteRow): boolean {
+  return quoteActionsAvailable()
+    && ['pending', 'responded'].includes(quote.status)
+}
+
+async function decideQuote(
+  quote: QuoteRow,
+  decision: QuoteDecision,
+) {
+  if (
+    decision === 'accept'
+      ? !canAcceptQuote(quote)
+      : !canRejectQuote(quote)
+  ) {
+    return
+  }
+
+  const confirmed = window.confirm(
+    decision === 'accept'
+      ? 'هل تؤكد الموافقة على عرض السعر؟ هذه الموافقة لا تنشئ طلب شراء.'
+      : 'هل تريد إغلاق طلب عرض السعر بالرفض أو الإلغاء؟',
+  )
+
+  if (!confirmed) return
+
+  const context = captureContext()
+
+  if (!context) return
+
+  quoteAction.value = {
+    id: quote.id,
+    decision,
+  }
+
+  quotesNeedRefresh.value = true
+  actionError.value = ''
+  noticeMessage.value = ''
+
   try {
-    await acceptQuoteRequest(quoteId)
-    actionNotice.value = 'تم قبول عرض السعر بنجاح، سيقوم المورد بالتواصل لإتمام التجهيز.'
-    setTimeout(() => { actionNotice.value = null }, 4000)
-  } catch (err: any) {
-    alert(err?.userMessage || 'تعذر قبول عرض السعر.')
+    const response = await $api<ApiResponse<QuoteRow>>(
+      `/quote-requests/${quote.id}/${decision}`,
+      {
+        method: 'PATCH',
+        retry: 0,
+      },
+    )
+
+    if (!isCurrent(context)) return
+
+    const updated = response.data
+    const expectedStatus = decision === 'accept'
+      ? 'accepted'
+      : 'rejected'
+
+    if (
+      response.status !== 'success'
+      || !updated
+      || Number(updated.id) !== Number(quote.id)
+      || updated.status !== expectedStatus
+      || !updated.customer
+      || String(updated.customer.id) !== context.owner
+    ) {
+      throw new Error('Quote decision was not confirmed')
+    }
+
+    quotes.value = quotes.value.map(item =>
+      Number(item.id) === Number(quote.id)
+        ? { ...item, ...updated }
+        : item,
+    )
+
+    noticeMessage.value = decision === 'accept'
+      ? `تم حفظ الموافقة على عرض السعر #${quote.id}.`
+      : `تم إغلاق طلب عرض السعر #${quote.id}.`
+
+    await loadTab('quotes')
+  } catch {
+    if (!isCurrent(context)) return
+
+    quotesNeedRefresh.value = true
+
+    actionError.value =
+      'تعذر تأكيد نتيجة القرار. حدّث عروض الأسعار للتحقق قبل المحاولة مجددًا.'
+  } finally {
+    if (isCurrent(context)) {
+      quoteAction.value = null
+    }
   }
 }
 
-// رفض عرض سعر
-async function handleRejectQuote(quoteId: number) {
-  if (!confirm('هل أنت متأكد من رفض أو إلغاء طلب عرض السعر هذا؟')) return
-  try {
-    await rejectQuoteRequest(quoteId)
-    actionNotice.value = 'تم تحديث حالة طلب عرض السعر.'
-    setTimeout(() => { actionNotice.value = null }, 3500)
-  } catch (err: any) {
-    alert(err?.userMessage || 'تعذر رفض عرض السعر.')
-  }
-}
+watch(activeTab, () => {
+  resetFilters()
+  noticeMessage.value = ''
+})
 
-onMounted(async () => {
-  await Promise.allSettled([
-    fetchMyOrders(),
-    fetchMyQuoteRequests(),
-  ])
+watch([search, selectedStatus], () => {
+  currentPage.value = 1
+})
+
+watch(totalPages, value => {
+  currentPage.value = Math.min(currentPage.value, value)
+})
+
+watch(
+  [
+    () => authStore.token,
+    () => String(authStore.user?.id ?? ''),
+  ],
+  () => {
+    contextVersion++
+    sequences.orders++
+    sequences.quotes++
+
+    orders.value = []
+    quotes.value = []
+
+    loading.orders = false
+    loading.quotes = false
+    loaded.orders = false
+    loaded.quotes = false
+    errors.orders = ''
+    errors.quotes = ''
+
+    quoteAction.value = null
+    quotesNeedRefresh.value = true
+    actionError.value = ''
+    noticeMessage.value = ''
+
+    resetFilters()
+
+    if (mounted) {
+      void loadTab('orders')
+      void loadTab('quotes')
+    }
+  },
+)
+
+onMounted(() => {
+  mounted = true
+
+  void loadTab('orders')
+  void loadTab('quotes')
+})
+
+onBeforeUnmount(() => {
+  disposed = true
+  mounted = false
+  contextVersion++
+  sequences.orders++
+  sequences.quotes++
 })
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <!-- Breadcrumbs -->
-    <nav class="flex items-center gap-2 text-xs text-solar-text-muted">
-      <NuxtLink to="/customer/dashboard" class="hover:text-solar-text-heading">الرئيسية</NuxtLink>
-      <span>/</span>
-      <span class="font-bold text-solar-text-heading">طلباتي وعروض الأسعار</span>
+  <div dir="rtl" class="flex min-w-0 flex-col gap-6">
+    <nav
+      class="flex flex-wrap items-center gap-2 text-xs text-solar-text-muted"
+      aria-label="مسار التنقل"
+    >
+      <NuxtLink to="/customer/dashboard">
+        الرئيسية
+      </NuxtLink>
+
+      <span aria-hidden="true">‹</span>
+
+      <span>طلباتي وعروض الأسعار</span>
     </nav>
 
-    <!-- شريط العنوان والتبويبات -->
-    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-black text-solar-text-heading">طلباتي وعروض الأسعار</h1>
-        <p class="text-xs text-solar-text-muted">متابعة شحنات المعدات وأوامر الشراء وعروض الأسعار الفنية للمشاريع</p>
-      </div>
+    <header>
+      <h1 class="text-2xl font-bold text-solar-text-heading">
+        طلباتي وعروض الأسعار
+      </h1>
 
-      <!-- تبديل التبويبات -->
-      <div class="flex items-center rounded-xl bg-solar-bg-subtle p-1 border border-solar-border-card text-xs font-bold w-full sm:w-auto">
-        <button
-          type="button"
-          @click="setTab('orders')"
-          class="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg px-4 py-2 transition-all cursor-pointer"
-          :class="activeTab === 'orders' ? 'bg-solar-yellow text-solar-navy-dark shadow-sm' : 'text-solar-text-secondary hover:text-solar-text-heading'"
-        >
-          <ShoppingBag class="size-4" />
-          <span>أوامر الشراء ({{ orders.length }})</span>
-        </button>
+      <p class="mt-2 text-sm leading-7 text-solar-text-muted">
+        راجع طلبات الشراء وردود المتاجر على طلبات التسعير.
+      </p>
+    </header>
 
-        <button
-          type="button"
-          @click="setTab('quotes')"
-          class="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg px-4 py-2 transition-all cursor-pointer"
-          :class="activeTab === 'quotes' ? 'bg-solar-navy text-white shadow-sm' : 'text-solar-text-secondary hover:text-solar-text-heading'"
+    <nav
+      class="flex flex-wrap gap-3"
+      aria-label="نوع السجلات"
+    >
+      <button
+        type="button"
+        :aria-current="activeTab === 'orders' ? 'page' : undefined"
+        class="rounded-lg border px-5 py-3 text-sm font-bold"
+        :class="
+          activeTab === 'orders'
+            ? 'border-solar-yellow bg-solar-yellow text-solar-navy-dark'
+            : 'border-solar-border-card bg-white text-solar-text-heading'
+        "
+        @click="selectTab('orders')"
+      >
+        طلبات الشراء ({{ ordersCount ?? '—' }})
+      </button>
+
+      <button
+        type="button"
+        :aria-current="activeTab === 'quotes' ? 'page' : undefined"
+        class="rounded-lg border px-5 py-3 text-sm font-bold"
+        :class="
+          activeTab === 'quotes'
+            ? 'border-solar-yellow bg-solar-yellow text-solar-navy-dark'
+            : 'border-solar-border-card bg-white text-solar-text-heading'
+        "
+        @click="selectTab('quotes')"
+      >
+        عروض الأسعار ({{ quotesCount ?? '—' }})
+      </button>
+    </nav>
+
+    <p
+      v-if="noticeMessage"
+      role="status"
+      aria-live="polite"
+      class="rounded-xl bg-emerald-50 p-4 text-sm leading-7 text-emerald-800"
+    >
+      {{ noticeMessage }}
+    </p>
+
+    <section
+      v-if="actionError"
+      role="alert"
+      class="rounded-xl border border-red-200 bg-red-50 p-5"
+    >
+      <p class="text-sm leading-7 text-red-800">
+        {{ actionError }}
+      </p>
+
+      <button
+        type="button"
+        :disabled="actionBusy || loading.quotes"
+        class="mt-3 rounded-lg bg-white px-4 py-2 text-sm font-bold text-red-800 disabled:opacity-50"
+        @click="refreshQuotes"
+      >
+        تحديث عروض الأسعار
+      </button>
+    </section>
+
+    <p
+      v-if="activeTab === 'quotes'"
+      class="rounded-xl bg-solar-status-info-bg p-4 text-sm leading-7 text-solar-text-body"
+    >
+      قبول العرض يسجل موافقتك على التسعير.
+      إنشاء طلب شراء بالسعر المتفاوض عليه غير متاح حاليًا.
+    </p>
+
+    <section
+      class="grid gap-4 rounded-xl border border-solar-border-card bg-white p-5 sm:grid-cols-2"
+      aria-label="البحث والتصفية"
+    >
+      <label class="flex flex-col gap-2">
+        <span class="text-sm font-bold text-solar-text-heading">
+          البحث
+        </span>
+
+        <input
+          v-model="search"
+          type="search"
+          :placeholder="
+            activeTab === 'orders'
+              ? 'رقم الطلب أو عنوان التوصيل'
+              : 'رقم العرض أو المنتج أو المتجر'
+          "
+          class="solar-input h-11"
         >
-          <FileText class="size-4" />
-          <span>عروض الأسعار RFQ ({{ quoteRequests.length }})</span>
-        </button>
-      </div>
+      </label>
+
+      <label class="flex flex-col gap-2">
+        <span class="text-sm font-bold text-solar-text-heading">
+          الحالة
+        </span>
+
+        <select
+          v-model="selectedStatus"
+          class="solar-input h-11"
+        >
+          <option value="all">جميع الحالات</option>
+
+          <option
+            v-for="option in statusOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+    </section>
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p class="text-xs text-solar-text-muted">
+        العملة غير محددة في البيانات المتاحة.
+      </p>
+
+      <button
+        type="button"
+        :disabled="loading[activeTab] || actionBusy"
+        class="rounded-lg border border-solar-border-card bg-white px-4 py-2 text-xs font-bold text-solar-text-heading disabled:opacity-50"
+        @click="refreshActiveTab"
+      >
+        تحديث السجلات
+      </button>
     </div>
 
-    <!-- إشعار النجاح -->
-    <div v-if="actionNotice" class="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-xs text-emerald-800 border border-emerald-200">
-      <CheckCircle2 class="size-5 shrink-0" />
-      <span>{{ actionNotice }}</span>
-    </div>
-
-    <!-- شريط البحث السريع -->
-    <div class="flex items-center gap-3 rounded-2xl border border-solar-border-card bg-white p-3 shadow-sm">
-      <Search class="size-4 text-solar-text-muted mr-2" />
-      <input
-        v-model="searchQuery"
-        type="search"
-        :placeholder="activeTab === 'orders' ? 'ابحث برقم الطلب، المحافظة، العنوان...' : 'ابحث برقم الطلب، اسم المنتج، اسم المورد...'"
-        class="solar-input border-0 bg-transparent py-1 text-xs focus:ring-0"
+    <section
+      v-if="
+        loading[activeTab]
+        || (!loaded[activeTab] && !errors[activeTab])
+      "
+      role="status"
+      aria-live="polite"
+      class="rounded-xl border border-solar-border-card bg-white p-12 text-center"
+    >
+      <Loader2
+        class="mx-auto size-8 animate-spin text-amber-600"
+        aria-hidden="true"
       />
-    </div>
 
-    <!-- مؤشر التحميل الأولي -->
-    <div v-if="isLoading" class="flex flex-col items-center justify-center py-20">
-      <Loader2 class="size-10 animate-spin text-solar-yellow mb-4" />
-      <p class="text-sm font-semibold text-solar-text-muted">جاري تحميل السجلات من خادم المنصة...</p>
-    </div>
+      <p class="mt-4 text-sm text-solar-text-muted">
+        جارٍ تحميل السجلات…
+      </p>
+    </section>
 
-    <!-- 1. تبويب أوامر الشراء (Orders) -->
-    <div v-else-if="activeTab === 'orders'" class="flex flex-col gap-4">
-      <div v-if="filteredOrders.length > 0" class="flex flex-col gap-3">
-        <div
-          v-for="order in filteredOrders"
+    <section
+      v-else-if="errors[activeTab]"
+      role="alert"
+      class="rounded-xl border border-red-200 bg-red-50 p-5"
+    >
+      <p class="text-sm leading-7 text-red-800">
+        {{ errors[activeTab] }}
+      </p>
+
+      <button
+        type="button"
+        :disabled="actionBusy"
+        class="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-bold text-red-800 disabled:opacity-50"
+        @click="refreshActiveTab"
+      >
+        إعادة المحاولة
+      </button>
+    </section>
+
+    <template v-else>
+      <p
+        role="status"
+        aria-live="polite"
+        class="text-sm text-solar-text-muted"
+      >
+        عدد النتائج: {{ resultCount }}
+      </p>
+
+      <section
+        v-if="!resultCount"
+        class="rounded-xl border border-dashed border-solar-border-card bg-white p-12 text-center"
+      >
+        <h2 class="text-lg font-bold text-solar-text-heading">
+          {{
+            hasFilters
+              ? 'لا توجد نتائج تطابق البحث'
+              : activeTab === 'orders'
+                ? 'لا توجد طلبات شراء مسجلة'
+                : 'لا توجد طلبات عروض أسعار مسجلة'
+          }}
+        </h2>
+
+        <button
+          v-if="hasFilters"
+          type="button"
+          class="mt-5 rounded-lg bg-solar-yellow px-5 py-3 text-sm font-bold text-solar-navy-dark"
+          @click="resetFilters"
+        >
+          إلغاء التصفية
+        </button>
+
+        <NuxtLink
+          v-else
+          to="/customer/products"
+          class="mt-5 inline-flex rounded-lg bg-solar-yellow px-5 py-3 text-sm font-bold text-solar-navy-dark"
+        >
+          تصفح المنتجات
+        </NuxtLink>
+      </section>
+
+      <div
+        v-else-if="activeTab === 'orders'"
+        class="flex flex-col gap-4"
+      >
+        <article
+          v-for="order in displayedOrders"
           :key="order.id"
-          class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-solar-border-card bg-white p-5 shadow-sm transition-all hover:border-solar-yellow/50"
+          class="solar-card p-5"
         >
-          <!-- تفاصيل الطلب -->
-          <div class="flex items-start gap-4 flex-1">
-            <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-solar-status-info-bg text-solar-status-info-text">
-              <Package class="size-6" />
-            </div>
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="min-w-0">
+              <h2
+                class="flex items-center gap-2 text-base font-bold text-solar-text-heading"
+              >
+                <Package class="size-5 shrink-0" aria-hidden="true" />
+                {{ order.order_number || `الطلب #${order.id}` }}
+              </h2>
 
-            <div class="flex flex-col gap-1 text-right flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-sm font-black text-solar-navy-dark">#{{ order.order_number }}</span>
-                <span
-                  class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border"
-                  :class="getStatusBadge(order.status).class"
-                >
-                  {{ getStatusBadge(order.status).text }}
-                </span>
-                <span class="text-xs text-solar-text-muted">
-                  {{ new Date(order.created_at).toLocaleDateString('ar-SA') }}
-                </span>
-              </div>
-
-              <p class="text-xs text-solar-text-body truncate">
-                موقع التوصيل: {{ order.governorate?.name_ar || 'اليمن' }} • {{ order.delivery_address }}
+              <p class="mt-3 text-xs text-solar-text-muted">
+                تاريخ الإنشاء: {{ formatDate(order.created_at) }}
               </p>
-
-              <div class="flex items-center gap-3 text-xs text-solar-text-muted mt-0.5">
-                <span class="font-bold text-solar-navy-dark text-sm">
-                  {{ Number(order.total_amount).toLocaleString() }} ر.س
-                </span>
-                <span>•</span>
-                <span>{{ order.order_stores?.length || 1 }} فروع متاجر معتمدة</span>
-              </div>
             </div>
+
+            <span
+              class="rounded-full px-3 py-1 text-xs font-bold"
+              :class="statusClasses(order.status)"
+            >
+              {{ statusLabel(order.status, 'orders') }}
+            </span>
           </div>
 
-          <!-- الأزرار والإجراءات -->
-          <div class="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0">
-            <button
-              v-if="order.status === 'pending'"
-              type="button"
-              @click="handleCancelOrder(order.id)"
-              :disabled="isActionLoading"
-              class="btn-outline text-xs px-3 py-2 text-red-600 hover:bg-red-50 hover:border-red-300"
-            >
-              إلغاء الطلب
-            </button>
+          <dl class="mt-5 grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt class="text-xs text-solar-text-muted">
+                إجمالي الطلب المسجل
+              </dt>
 
-            <NuxtLink
-              :to="`/customer/orders/${order.id}/track`"
-              class="btn-primary text-xs px-4 py-2 gap-1.5"
-            >
-              <Truck class="size-3.5" />
-              <span>تتبع الشحنة</span>
-            </NuxtLink>
-          </div>
-        </div>
+              <dd class="mt-2 font-bold text-solar-text-heading">
+                {{ formatAmount(order.total_amount) }}
+              </dd>
+            </div>
+
+            <div>
+              <dt class="text-xs text-solar-text-muted">
+                المحافظة
+              </dt>
+
+              <dd class="mt-2 text-sm text-solar-text-heading">
+                {{
+                  order.governorate?.name
+                    || order.governorate?.name_ar
+                    || 'غير محددة'
+                }}
+              </dd>
+            </div>
+
+            <div class="sm:col-span-2">
+              <dt class="text-xs text-solar-text-muted">
+                عنوان التوصيل
+              </dt>
+
+              <dd
+                class="mt-2 whitespace-pre-line break-words text-sm leading-7 text-solar-text-heading"
+              >
+                {{ order.delivery_address || 'غير متاح' }}
+              </dd>
+            </div>
+          </dl>
+
+          <NuxtLink
+            :to="`/customer/orders/${order.id}/track`"
+            class="mt-5 inline-flex rounded-lg bg-solar-yellow px-5 py-3 text-xs font-bold text-solar-navy-dark"
+          >
+            التفاصيل والإجراءات
+          </NuxtLink>
+        </article>
       </div>
 
-      <!-- الحالة الفارغة لأوامر الشراء -->
-      <div
-        v-else
-        class="flex flex-col items-center justify-center rounded-2xl border border-solar-border-card bg-white p-12 text-center shadow-sm"
-      >
-        <div class="flex size-20 items-center justify-center rounded-full bg-solar-bg-subtle text-solar-text-muted mb-4">
-          <ShoppingBag class="size-10 stroke-[1.5]" />
-        </div>
-        <h3 class="text-lg font-bold text-solar-text-heading mb-1">لا توجد أوامر شراء مسجلة حالياً</h3>
-        <p class="text-xs text-solar-text-muted max-w-sm mb-6">
-          لم تقم بتأكيد أي طلبات شراء بعد. استكشف كتالوج المنتجات واحصل على أفضل عروض الطاقة الشمسية.
-        </p>
-        <NuxtLink to="/customer/products" class="btn-primary text-xs px-6 py-2.5 gap-2">
-          <span>تصفح كتالوج المنتجات</span>
-          <ArrowLeft class="size-4" />
-        </NuxtLink>
-      </div>
-    </div>
-
-    <!-- 2. تبويب طلبات عروض الأسعار (RFQ) -->
-    <div v-else-if="activeTab === 'quotes'" class="flex flex-col gap-4">
-      <div v-if="filteredQuotes.length > 0" class="flex flex-col gap-3">
-        <div
-          v-for="quote in filteredQuotes"
+      <div v-else class="flex flex-col gap-4">
+        <article
+          v-for="quote in displayedQuotes"
           :key="quote.id"
-          class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-solar-border-card bg-white p-5 shadow-sm transition-all hover:border-solar-yellow/50"
+          class="solar-card p-5"
+          :aria-busy="quoteAction?.id === quote.id"
         >
-          <!-- تفاصيل العرض -->
-          <div class="flex items-start gap-4 flex-1">
-            <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-text-heading">
-              <FileText class="size-6 text-amber-600" />
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2
+                class="flex items-center gap-2 text-base font-bold text-solar-text-heading"
+              >
+                <FileText class="size-5 shrink-0" aria-hidden="true" />
+                طلب عرض سعر #{{ quote.id }}
+              </h2>
+
+              <p class="mt-3 text-xs text-solar-text-muted">
+                تاريخ الطلب: {{ formatDate(quote.created_at) }}
+              </p>
             </div>
 
-            <div class="flex flex-col gap-1 text-right flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-sm font-black text-solar-navy-dark">طلب عرض سعر #RFQ-{{ quote.id }}</span>
-                <span
-                  class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border"
-                  :class="getStatusBadge(quote.status).class"
-                >
-                  {{ getStatusBadge(quote.status).text }}
-                </span>
-                <span class="text-xs text-solar-text-muted">
-                  {{ new Date(quote.created_at).toLocaleDateString('ar-SA') }}
-                </span>
-              </div>
-
-              <h4 class="text-xs font-bold text-solar-text-heading truncate">
-                {{ quote.store_product?.master_product?.title || 'معدة طاقة شمسية' }}
-              </h4>
-
-              <div class="flex items-center gap-3 text-xs text-solar-text-muted flex-wrap">
-                <span>المورد: <strong class="text-solar-text-heading">{{ quote.store_product?.store?.company_name || 'وكيل معتمد' }}</strong></span>
-                <span>•</span>
-                <span>الكمية: <strong>{{ quote.quantity }} وحدة</strong></span>
-                <span v-if="quote.customer_target_price">•</span>
-                <span v-if="quote.customer_target_price">السعر المستهدف: {{ quote.customer_target_price }} ر.س</span>
-              </div>
-
-              <!-- عرض السعر المقدم من المورد إن وجد -->
-              <div v-if="quote.store_offered_price" class="mt-2 rounded-xl bg-amber-50 p-2.5 border border-amber-200 text-xs">
-                <div class="flex items-center justify-between font-bold text-amber-900">
-                  <span>السعر المقدم من المورد:</span>
-                  <span class="text-sm font-black text-solar-navy-dark">{{ Number(quote.store_offered_price).toLocaleString() }} ر.س</span>
-                </div>
-                <p v-if="quote.store_notes" class="text-[11px] text-amber-800 mt-1">
-                  ملاحظات المورد: {{ quote.store_notes }}
-                </p>
-              </div>
-            </div>
+            <span
+              class="rounded-full px-3 py-1 text-xs font-bold"
+              :class="statusClasses(quote.status)"
+            >
+              {{ statusLabel(quote.status, 'quotes') }}
+            </span>
           </div>
 
-          <!-- أزرار الإجراءات للعميل -->
-          <div class="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0">
-            <!-- إذا كان المورد قد رد بعرض سعر -->
-            <template v-if="quote.status === 'responded'">
-              <button
-                type="button"
-                @click="handleAcceptQuote(quote.id)"
-                :disabled="isActionLoading"
-                class="btn-primary text-xs px-3.5 py-2 gap-1"
-              >
-                <Check class="size-3.5" />
-                <span>قبول العرض</span>
-              </button>
+          <h3
+            class="mt-5 break-words text-sm font-bold text-solar-text-heading"
+          >
+            {{ quote.store_product?.title || 'اسم المنتج غير متاح' }}
+          </h3>
 
-              <button
-                type="button"
-                @click="handleRejectQuote(quote.id)"
-                :disabled="isActionLoading"
-                class="btn-outline text-xs px-3 py-2 text-red-600 hover:bg-red-50"
-              >
-                رفض
-              </button>
-            </template>
+          <p class="mt-2 text-xs text-solar-text-muted">
+            المتجر:
+            {{ quote.store_product?.store?.company_name || 'غير متاح' }}
+          </p>
 
-            <!-- إذا كان بانتظار الرد -->
-            <button
-              v-else-if="quote.status === 'pending'"
-              type="button"
-              @click="handleRejectQuote(quote.id)"
-              :disabled="isActionLoading"
-              class="btn-outline text-xs px-3 py-2 text-red-600 hover:bg-red-50"
+          <p class="mt-2 text-xs text-solar-text-muted">
+            الكمية: {{ quote.quantity }}
+          </p>
+
+          <p
+            v-if="
+              quote.customer_target_price !== null
+              && quote.customer_target_price !== undefined
+            "
+            class="mt-2 text-xs text-solar-text-muted"
+          >
+            السعر المستهدف:
+            {{ formatAmount(quote.customer_target_price) }}
+          </p>
+
+          <p
+            v-if="quote.customer_notes"
+            class="mt-4 whitespace-pre-line break-words text-sm leading-7 text-solar-text-body"
+          >
+            ملاحظاتك: {{ quote.customer_notes }}
+          </p>
+
+          <section
+            v-if="quote.status !== 'pending'"
+            class="mt-5 rounded-xl bg-solar-bg-subtle p-4"
+            aria-label="رد المتجر"
+          >
+            <dl class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt class="text-xs text-solar-text-muted">
+                  سعر الوحدة المقدم
+                </dt>
+
+                <dd class="mt-2 font-bold text-solar-text-heading">
+                  {{ formatAmount(quote.offered_unit_price) }}
+                </dd>
+              </div>
+
+              <div>
+                <dt class="text-xs text-solar-text-muted">
+                  إجمالي العرض
+                </dt>
+
+                <dd class="mt-2 font-bold text-solar-text-heading">
+                  {{ formatAmount(quote.total_price) }}
+                </dd>
+              </div>
+            </dl>
+
+            <p
+              v-if="quote.store_notes"
+              class="mt-4 whitespace-pre-line break-words text-sm leading-7 text-solar-text-body"
             >
-              إلغاء الطلب
+              ملاحظات المتجر: {{ quote.store_notes }}
+            </p>
+
+            <p
+              v-if="quote.responded_at"
+              class="mt-3 text-xs text-solar-text-muted"
+            >
+              تاريخ الرد: {{ formatDate(quote.responded_at) }}
+            </p>
+
+            <p
+              v-if="quote.accepted_at"
+              class="mt-3 text-xs text-solar-text-muted"
+            >
+              تاريخ الموافقة: {{ formatDate(quote.accepted_at) }}
+            </p>
+          </section>
+
+          <div class="mt-5 flex flex-wrap gap-3">
+            <button
+              v-if="quote.status === 'responded'"
+              type="button"
+              :disabled="!canAcceptQuote(quote)"
+              class="rounded-lg bg-solar-yellow px-5 py-3 text-xs font-bold text-solar-navy-dark disabled:opacity-50"
+              @click="decideQuote(quote, 'accept')"
+            >
+              {{
+                quoteAction?.id === quote.id
+                && quoteAction.decision === 'accept'
+                  ? 'جارٍ الحفظ…'
+                  : 'الموافقة على العرض'
+              }}
+            </button>
+
+            <button
+              v-if="['pending', 'responded'].includes(quote.status)"
+              type="button"
+              :disabled="!canRejectQuote(quote)"
+              class="rounded-lg border border-red-200 px-5 py-3 text-xs font-bold text-red-700 disabled:opacity-50"
+              @click="decideQuote(quote, 'reject')"
+            >
+              {{
+                quoteAction?.id === quote.id
+                && quoteAction.decision === 'reject'
+                  ? 'جارٍ الحفظ…'
+                  : quote.status === 'pending'
+                    ? 'إلغاء طلب التسعير'
+                    : 'رفض العرض'
+              }}
             </button>
           </div>
-        </div>
+        </article>
       </div>
 
-      <!-- الحالة الفارغة لعروض الأسعار -->
-      <div
-        v-else
-        class="flex flex-col items-center justify-center rounded-2xl border border-solar-border-card bg-white p-12 text-center shadow-sm"
+      <nav
+        v-if="totalPages > 1"
+        class="flex flex-wrap items-center justify-center gap-4"
+        aria-label="صفحات السجلات"
       >
-        <div class="flex size-20 items-center justify-center rounded-full bg-solar-bg-subtle text-solar-text-muted mb-4">
-          <FileText class="size-10 stroke-[1.5]" />
-        </div>
-        <h3 class="text-lg font-bold text-solar-text-heading mb-1">لا توجد طلبات عروض أسعار مسجلة</h3>
-        <p class="text-xs text-solar-text-muted max-w-sm mb-6">
-          يمكنك طلب عروض أسعار مباشرة ومخصصة لمشاريعك عبر كتالوج المنتجات.
-        </p>
-        <NuxtLink to="/customer/products" class="btn-primary text-xs px-6 py-2.5 gap-2">
-          <span>طلب تسعير من الكتالوج</span>
-          <ArrowLeft class="size-4" />
-        </NuxtLink>
-      </div>
-    </div>
+        <button
+          type="button"
+          :disabled="currentPage === 1"
+          class="rounded-lg border border-solar-border-card bg-white px-4 py-2 text-sm disabled:opacity-40"
+          @click="currentPage--"
+        >
+          السابق
+        </button>
+
+        <span class="text-sm text-solar-text-muted">
+          الصفحة {{ currentPage }} من {{ totalPages }}
+        </span>
+
+        <button
+          type="button"
+          :disabled="currentPage === totalPages"
+          class="rounded-lg border border-solar-border-card bg-white px-4 py-2 text-sm disabled:opacity-40"
+          @click="currentPage++"
+        >
+          التالي
+        </button>
+      </nav>
+    </template>
   </div>
 </template>

@@ -1,3 +1,5 @@
+export type EngineerSpecialty = string
+
 export interface Engineer {
   id: number
   name: string
@@ -5,14 +7,12 @@ export interface Engineer {
   specialty: string
   specialtyKey: EngineerSpecialty
   city: string
-  rating: number
-  completedProjects: number
+  rating: number | null
+  completedProjects: number | null
   serviceTitle: string
   bio: string
   isVerified: boolean
 }
-
-export type EngineerSpecialty = 'photovoltaic' | 'agricultural' | 'storage' | 'maintenance'
 
 export interface EngineerFilters {
   query: string
@@ -46,19 +46,14 @@ export interface EngineerProject {
   statusLabel: string
   capacityLabel: string
   location: string
-  completionYear: number
-  category: 'commercial' | 'agricultural' | 'storage' | 'industrial'
-}
-export interface EngineerProfile extends Engineer {
-  reviews: EngineerReviews
-  licenseNumber: string
-  experienceYears: number
-  verifiedReviews: number
-  responseTime: string
-  professionalBio: string
-  expertise: EngineerExpertise[]
-  certificates: EngineerCertificate[]
-  projects: EngineerProject[]
+  completionYear: number | null
+
+  category:
+    | 'commercial'
+    | 'agricultural'
+    | 'storage'
+    | 'industrial'
+    | null
 }
 
 export type EngineerReviewScore = 1 | 2 | 3 | 4 | 5
@@ -73,9 +68,24 @@ export interface EngineerReview {
 }
 
 export interface EngineerReviews {
-  /** Aggregate across all reviews, independent of the displayed comment sample. */
   distribution: Record<EngineerReviewScore, number>
   comments: EngineerReview[]
 }
 
-export type EngineerProfileTab = 'overview' | 'projects' | 'certificates' | 'reviews'
+export interface EngineerProfile extends Engineer {
+  reviews: EngineerReviews
+  licenseNumber: string
+  experienceYears: number | null
+  verifiedReviews: number | null
+  responseTime: string
+  professionalBio: string
+  expertise: EngineerExpertise[]
+  certificates: EngineerCertificate[]
+  projects: EngineerProject[]
+}
+
+export type EngineerProfileTab =
+  | 'overview'
+  | 'projects'
+  | 'certificates'
+  | 'reviews'
