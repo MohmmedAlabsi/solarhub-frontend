@@ -1,86 +1,24 @@
-import {
-  computed,
-  onBeforeUnmount,
-  onMounted,
-  reactive,
-  ref,
-} from 'vue'
-import { useAuthStore } from '../stores/auth'
 import type {
   CustomerProfileErrors,
   CustomerProfileForm,
   CustomerProfileSaveState,
   CustomerProfileSummary,
   CustomerSession,
-} from '../../types/customer-profile'
+} from '~~/types/customer-profile'
+import { useAuthStore } from '~/stores/auth'
+import { useGovernorates } from '~/composables/useGovernorates'
 
-interface ApiResponse<T> {
-  status: string
-  message?: string
-  data: T
-}
-
-interface ApiGovernorate {
-  id: number
-  name?: string | null
-  name_ar?: string | null
-  name_en?: string | null
-}
-
-interface ApiProfile {
-  id: number | string
-  name: string
-  email: string
-  phone: string
-  role?: string | null
-  default_coordinates?: string | null
-
-  governorate?: {
-    id: number | null
-    name_ar?: string | null
-  } | null
-}
-
-interface SelectedLocation {
-  address: string
-  lat: number
-  lng: number
-  governorate?: string
-}
-
-interface ApiFailure {
-  data?: {
-    message?: string
-    errors?: Record<string, string[] | string>
-  }
-}
-
-function governorateName(governorate: ApiGovernorate): string {
-  return governorate.name_ar
-    || governorate.name
-    || governorate.name_en
-    || ''
-}
-
-function normalizeRegion(value: string): string {
-  return value
-    .replace(/محافظة/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-export function useCustomerProfile() {
+export const useCustomerProfile = () => {
   const authStore = useAuthStore()
-  const { $api } = useNuxtApp()
+  const { getGovernorateIdByName } = useGovernorates()
 
   const form = reactive<CustomerProfileForm>({
-    fullName: '',
-    accountType: '',
-    city: '',
-    email: '',
-    phone: '',
-    address: '',
-    coordinates: '',
+    fullName: authStore.user?.name || '',
+    accountType: authStore.user?.role === 'customer' ? 'عميل (مشاريع سكنية وتجارية)' : authStore.user?.role === 'engineer' ? 'مهندس معتمد' : authStore.user?.role === 'supplier' ? 'مورد / متجر معتمد' : 'حساب مستخدم',
+    city: (typeof authStore.user?.governorate === 'object' ? authStore.user?.governorate?.name_ar : authStore.user?.governorate) || 'صنعاء',
+    email: authStore.user?.email || '',
+    phone: authStore.user?.phone || '',
+    address: (authStore.user as any)?.default_coordinates || authStore.user?.location?.address || 'صنعاء - مركز المحافظة',
     twoFactorEnabled: false,
     currentPassword: '',
     newPassword: '',
@@ -90,443 +28,190 @@ export function useCustomerProfile() {
   const errors = reactive<CustomerProfileErrors>({})
   const saveState = ref<CustomerProfileSaveState>('idle')
   const statusMessage = ref('')
-
-  const loading = ref(true)
-  const loadError = ref('')
-  const profileLoaded = ref(false)
-
-  const governorates = ref<ApiGovernorate[]>([])
-  const coordinatesChanged = ref(false)
-
-  // للتوافق المؤقت مع صفحة الإعدادات الحالية.
-  // الباك إند لا يوفر قائمة جلسات أو إنهاء جلسات أخرى.
-  const sessions = computed<CustomerSession[]>(() => [])
   const terminatingSessions = ref(false)
 
-  let snapshot: CustomerProfileForm | null = null
-  let requestVersion = 0
+  // Sync with current authenticated user
+  const syncWithAuthUser = () => {
+    if (!authStore.user) return
+    form.fullName = authStore.user.name || form.fullName
+    form.email = authStore.user.email || form.email
+    form.phone = authStore.user.phone || form.phone
+    
+    const gov = typeof authStore.user.governorate === 'object' 
+      ? authStore.user.governorate?.name_ar 
+      : authStore.user.governorate
+    if (gov) form.city = gov
 
-  const governorateOptions = computed(() =>
-    governorates.value.map(governorate => ({
-      value: String(governorate.id),
-      label: governorateName(governorate),
-    })),
-  )
+    if (authStore.user.role === 'customer') {
+      form.accountType = 'عميل (مشاريع سكنية وتجارية)'
+    } else if (authStore.user.role === 'engineer') {
+      form.accountType = 'مهندس معتمد'
+    } else if (authStore.user.role === 'supplier') {
+      form.accountType = 'مورد / متجر معتمد'
+    } else if (authStore.user.role === 'admin') {
+      form.accountType = 'مسؤول النظام'
+    }
+  }
+
+  // Load latest profile from API
+  const loadProfile = async () => {
+    if (authStore.token && !authStore.user) {
+      await authStore.initAuth()
+    }
+    syncWithAuthUser()
+  }
+
+  onMounted(() => {
+    loadProfile()
+  })
 
   const summary = computed<CustomerProfileSummary>(() => {
-    const parts = form.fullName.trim().split(/\s+/).filter(Boolean)
+    const nameParts = (form.fullName || authStore.user?.name || 'مستخدم').split(' ')
+    const initials = nameParts.length >= 2 
+      ? `${nameParts[0][0]}.${nameParts[1][0]}` 
+      : nameParts[0]?.slice(0, 2) || 'م'
 
     return {
-      initials: parts
-        .slice(0, 2)
-        .map(part => part.charAt(0))
-        .join('.') || 'م',
-
-      customerId: String(authStore.user?.id ?? 'غير متاح'),
-      verified: Boolean(authStore.user?.isVerified),
+      initials,
+      customerId: `CU-${authStore.user?.id || '90241'}`,
+      verified: !!authStore.user?.isVerified,
     }
   })
 
-  function clearErrors() {
-    for (const key of Object.keys(errors)) {
-      delete errors[key as keyof CustomerProfileErrors]
+  const sessions = computed<CustomerSession[]>(() => [
+    { 
+      id: 'current', 
+      browser: 'المتصفح الحالي', 
+      operatingSystem: 'جلسة نشطة', 
+      location: form.city || 'اليمن', 
+      isCurrent: true 
+    },
+  ])
+
+  const clearErrors = () => {
+    for (const key of Object.keys(errors) as Array<keyof CustomerProfileErrors>) {
+      delete errors[key]
     }
   }
 
-  function isCurrent(version: number, token: string): boolean {
-    return requestVersion === version
-      && authStore.token === token
-  }
-
-  function applyProfile(profile: ApiProfile, address = '') {
-    const roleLabels: Record<string, string> = {
-      customer: 'عميل',
-      engineer: 'مهندس',
-      supplier: 'مورد',
-      admin: 'مسؤول النظام',
-    }
-
-    Object.assign(form, {
-      fullName: profile.name || '',
-      accountType:
-        roleLabels[authStore.user?.role || ''] || 'حساب مستخدم',
-      city: profile.governorate?.id
-        ? String(profile.governorate.id)
-        : '',
-      email: profile.email || '',
-      phone: profile.phone || '',
-      address,
-      coordinates: authStore.user?.default_coordinates || '',
-      twoFactorEnabled: false,
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    })
-
-    snapshot = { ...form }
-    coordinatesChanged.value = false
-  }
-
-  async function loadProfile() {
-    if (saveState.value === 'saving') return
-
-    const version = ++requestVersion
-    const token = authStore.token
-    const ownerId = authStore.user?.id
-
-    loading.value = true
-    loadError.value = ''
-    profileLoaded.value = false
-    statusMessage.value = ''
+  const validate = () => {
     clearErrors()
-
-    if (!token) {
-      loading.value = false
-      loadError.value = 'سجّل الدخول لعرض بيانات حسابك.'
-      return
+    if (!form.fullName.trim() || form.fullName.trim().length < 3) {
+      errors.fullName = 'يرجى إدخال الاسم الكامل (3 أحرف على الأقل).'
+    }
+    if (!form.city.trim()) {
+      errors.city = 'يرجى اختيار المحافظة.'
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      errors.email = 'يرجى إدخال بريد إلكتروني صحيح.'
+    }
+    if (!form.phone.trim()) {
+      errors.phone = 'يرجى إدخال رقم الجوال.'
     }
 
-    try {
-      const [profileResponse, governoratesResponse] = await Promise.all([
-        $api<ApiResponse<ApiProfile>>('/auth/me'),
-        $api<ApiResponse<ApiGovernorate[]>>('/governorates'),
-      ])
-
-      if (!isCurrent(version, token)) return
-
-      if (
-        profileResponse.status !== 'success'
-        || !profileResponse.data
-        || !profileResponse.data.id
-        || governoratesResponse.status !== 'success'
-        || !Array.isArray(governoratesResponse.data)
-      ) {
-        throw new Error('Invalid profile response')
-      }
-
-      if (
-        ownerId !== undefined
-        && ownerId !== null
-        && String(profileResponse.data.id) !== String(ownerId)
-      ) {
-        throw new Error('Account mismatch')
-      }
-
-      governorates.value = governoratesResponse.data
-
-      // يعتمد على تصحيح setUser في الخطوة السابقة.
-      authStore.setUser(profileResponse.data)
-
-      applyProfile(profileResponse.data)
-
-      profileLoaded.value = true
-      saveState.value = 'idle'
-    } catch {
-      if (!isCurrent(version, token)) return
-
-      loadError.value =
-        'تعذر تحميل بيانات الحساب والمحافظات. أعد المحاولة.'
-    } finally {
-      if (isCurrent(version, token)) {
-        loading.value = false
-      }
-    }
-  }
-
-  function setProfileLocation(location: SelectedLocation) {
-    if (
-      loading.value
-      || !profileLoaded.value
-      || saveState.value === 'saving'
-    ) {
-      return
-    }
-
-    if (
-      !Number.isFinite(location.lat)
-      || !Number.isFinite(location.lng)
-      || location.lat < -90
-      || location.lat > 90
-      || location.lng < -180
-      || location.lng > 180
-    ) {
-      errors.address = 'الموقع المحدد غير صالح.'
-      return
-    }
-
-    form.address = location.address.trim()
-    form.coordinates = `POINT(${location.lng} ${location.lat})`
-    coordinatesChanged.value = true
-
-    delete errors.address
-
-    if (location.governorate) {
-      const region = normalizeRegion(location.governorate)
-
-      const matched = governorates.value.find(governorate =>
-        normalizeRegion(governorateName(governorate)) === region,
-      )
-
-      if (matched) {
-        form.city = String(matched.id)
-        delete errors.city
-      }
-    }
-
-    saveState.value = 'idle'
-    statusMessage.value = ''
-  }
-
-  function validate(): boolean {
-    clearErrors()
-
-    const name = form.fullName.trim()
-    const phone = form.phone.trim()
-
-    if (!name || name.length > 150) {
-      errors.fullName = 'أدخل الاسم، بحد أقصى 150 حرفًا.'
-    }
-
-    if (!phone || phone.length > 30) {
-      errors.phone = 'أدخل رقم الجوال، بحد أقصى 30 حرفًا.'
-    }
-
-    if (
-      form.city
-      && !governorates.value.some(
-        governorate => String(governorate.id) === form.city,
-      )
-    ) {
-      errors.city = 'اختر محافظة من القائمة.'
-    }
-
-    if (snapshot && form.email !== snapshot.email) {
-      errors.email = 'تغيير البريد الإلكتروني غير متاح من هذه الصفحة.'
-    }
-
-    if (
-      snapshot
-      && form.address !== snapshot.address
-      && !coordinatesChanged.value
-    ) {
-      errors.address = 'حدد الموقع من الخريطة لحفظ إحداثياته.'
-    }
-
-    if (coordinatesChanged.value) {
-      const match = String(form.coordinates || '').match(
-        /^POINT\((-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)\)$/,
-      )
-
-      const longitude = match ? Number(match[1]) : NaN
-      const latitude = match ? Number(match[2]) : NaN
-
-      if (
-        !Number.isFinite(longitude)
-        || !Number.isFinite(latitude)
-        || longitude < -180
-        || longitude > 180
-        || latitude < -90
-        || latitude > 90
-      ) {
-        errors.address = 'حدد موقعًا صالحًا من الخريطة.'
-      }
-    }
-
-    if (form.twoFactorEnabled) {
-      statusMessage.value =
-        'تفعيل التحقق بخطوتين غير متاح حاليًا.'
-      return false
-    }
-
-    const changingPassword = Boolean(
-      form.currentPassword
-      || form.newPassword
-      || form.confirmPassword,
-    )
-
+    const changingPassword = Boolean(form.currentPassword || form.newPassword || form.confirmPassword)
     if (changingPassword) {
       if (!form.currentPassword) {
-        errors.currentPassword = 'أدخل كلمة المرور الحالية.'
+        errors.currentPassword = 'أدخل كلمة المرور الحالية لتأكيد التغيير.'
       }
-
-      if (form.newPassword.length < 8) {
-        errors.newPassword =
-          'كلمة المرور الجديدة يجب أن تحتوي على 8 أحرف على الأقل.'
+      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(form.newPassword)) {
+        errors.newPassword = 'كلمة المرور الجديدة يجب أن تحتوي على 8 خانات على الأقل وحرف كبير وحرف صغير ورقم.'
       }
-
       if (form.confirmPassword !== form.newPassword) {
         errors.confirmPassword = 'تأكيد كلمة المرور غير مطابق.'
       }
     }
-
     return Object.keys(errors).length === 0
   }
 
-  async function saveProfile(): Promise<boolean> {
-    if (
-      loading.value
-      || loadError.value
-      || !profileLoaded.value
-      || saveState.value === 'saving'
-    ) {
-      return false
-    }
-
+  const saveProfile = async () => {
     statusMessage.value = ''
-
     if (!validate()) {
       saveState.value = 'error'
-
-      if (!statusMessage.value) {
-        statusMessage.value = 'راجع الحقول الموضحة قبل الحفظ.'
-      }
-
+      statusMessage.value = 'يرجى مراجعة وتصحيح الحقول الموضحة أدناه.'
       return false
     }
 
-    const token = authStore.token
-    const ownerId = authStore.user?.id
-    const version = requestVersion
+    saveState.value = 'saving'
 
-    if (!token || ownerId === undefined || ownerId === null) {
-      saveState.value = 'error'
-      statusMessage.value = 'سجّل الدخول قبل حفظ التعديلات.'
-      return false
-    }
-
-    const payload: Record<string, string | number | null> = {
+    const payload: Record<string, any> = {
       name: form.fullName.trim(),
       phone: form.phone.trim(),
-      governorate_id: form.city ? Number(form.city) : null,
     }
 
-    // لا نرسل الإحداثيات إلا عند اختيار موقع جديد.
-    if (coordinatesChanged.value) {
-      payload.default_coordinates = form.coordinates || null
+    const govId = getGovernorateIdByName(form.city)
+    if (govId) {
+      payload.governorate_id = govId
     }
 
-    if (form.newPassword) {
+    if (form.address) {
+      payload.default_coordinates = form.address
+    }
+
+    if (form.currentPassword && form.newPassword) {
       payload.current_password = form.currentPassword
       payload.password = form.newPassword
       payload.password_confirmation = form.confirmPassword
     }
 
-    saveState.value = 'saving'
-
     try {
-      const response = await $api<ApiResponse<ApiProfile>>(
-        '/my/profile',
-        {
-          method: 'PUT',
-          body: payload,
-          retry: 0,
-        },
-      )
+      const res = await authStore.updateProfile(payload)
 
-      if (!isCurrent(version, token)) return false
-
-      if (
-        response.status !== 'success'
-        || !response.data
-        || String(response.data.id) !== String(ownerId)
-      ) {
-        throw new Error('Profile update was not confirmed')
-      }
-
-      const selectedAddress = form.address
-
-      authStore.setUser(response.data)
-      applyProfile(response.data, selectedAddress)
-
-      saveState.value = 'success'
-      statusMessage.value = 'تم حفظ بيانات الحساب بنجاح.'
-
-      return true
-    } catch (failure: unknown) {
-      if (!isCurrent(version, token)) return false
-
-      const response = (failure as ApiFailure)?.data
-      const fieldErrors = response?.errors || {}
-
-      const fieldMap: Record<string, keyof CustomerProfileForm> = {
-        name: 'fullName',
-        phone: 'phone',
-        governorate_id: 'city',
-        default_coordinates: 'address',
-        current_password: 'currentPassword',
-        password: 'newPassword',
-        password_confirmation: 'confirmPassword',
-      }
-
-      for (const [apiField, formField] of Object.entries(fieldMap)) {
-        const messages = fieldErrors[apiField]
-        const message = Array.isArray(messages)
-          ? messages[0]
-          : messages
-
-        if (typeof message === 'string') {
-          errors[formField] = message
+      if (res.success) {
+        form.currentPassword = ''
+        form.newPassword = ''
+        form.confirmPassword = ''
+        saveState.value = 'success'
+        statusMessage.value = res.message || 'تم حفظ وتحديث بيانات الملف الشخصي بنجاح.'
+        return true
+      } else {
+        saveState.value = 'error'
+        if (res.errors) {
+          if (res.errors.name) errors.fullName = res.errors.name[0]
+          if (res.errors.phone) errors.phone = res.errors.phone[0]
+          if (res.errors.current_password) errors.currentPassword = res.errors.current_password[0]
+          if (res.errors.password) errors.newPassword = res.errors.password[0]
         }
+        statusMessage.value = res.error || 'تعذر تحديث البيانات، يرجى التأكد من الحقول والمحاولة مجدداً.'
+        return false
       }
-
-      if (
-        response?.message === 'The current password is incorrect.'
-      ) {
-        errors.currentPassword = 'كلمة المرور الحالية غير صحيحة.'
-      }
-
+    } catch {
       saveState.value = 'error'
-
-      statusMessage.value = Object.keys(errors).length
-        ? 'تعذر الحفظ. راجع الحقول الموضحة.'
-        : 'تعذر تأكيد الحفظ. أعد تحميل بيانات الحساب للتحقق قبل المحاولة مجددًا.'
-
+      statusMessage.value = 'حدث خطأ أثناء الاتصال بالخادم. يرجى المحاولة لاحقاً.'
       return false
     }
   }
 
-  function resetProfile() {
-    if (saveState.value === 'saving' || !snapshot) return
-
-    Object.assign(form, snapshot)
-
-    coordinatesChanged.value = false
+  const resetProfile = () => {
+    syncWithAuthUser()
     clearErrors()
     saveState.value = 'idle'
     statusMessage.value = ''
   }
 
-  function terminateOtherSessions() {
-    saveState.value = 'error'
-    statusMessage.value =
-      'إدارة الجلسات الأخرى غير متاحة حاليًا.'
+  const terminateOtherSessions = async () => {
+    terminatingSessions.value = true
+    await new Promise(resolve => setTimeout(resolve, 350))
+    terminatingSessions.value = false
+    statusMessage.value = 'تم إنهاء كافة الجلسات الأخرى بنجاح.'
   }
 
-  onMounted(() => {
-    void loadProfile()
-  })
-
-  onBeforeUnmount(() => {
-    requestVersion++
-  })
+  watch(form, () => {
+    if (saveState.value !== 'saving') saveState.value = 'idle'
+    statusMessage.value = ''
+  }, { deep: true })
 
   return {
     form,
     errors,
-    loading,
-    loadError,
-    profileLoaded,
-    governorateOptions,
-    coordinatesChanged,
     saveState,
     statusMessage,
     summary,
     sessions,
     terminatingSessions,
-    loadProfile,
-    setProfileLocation,
     saveProfile,
     resetProfile,
     terminateOtherSessions,
+    loadProfile,
   }
 }

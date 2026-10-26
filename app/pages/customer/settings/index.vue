@@ -1,573 +1,157 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import {
-  AtSign,
-  Check,
-  Eye,
-  EyeOff,
-  Laptop,
-  MapPin,
-  Shield,
-  UserRound,
-} from 'lucide-vue-next'
+import { AtSign, Check, Laptop, LockKeyhole, MapPin, MessageSquareText, Shield, ShieldCheck, UserRound, ChevronDown } from 'lucide-vue-next'
 import FormField from '../../../components/common/FormField.vue'
-import MapLocationModal, {
-  type LocationData,
-} from '../../../components/common/MapLocationModal.vue'
-import { useCustomerProfile } from '../../../composables/useCustomerProfile'
+import ProfilePasswordField from '../../../components/customer/profile/ProfilePasswordField.vue'
+import ProfileSummaryCard from '../../../components/customer/profile/ProfileSummaryCard.vue'
+import { useGovernorates } from '~/composables/useGovernorates'
 
-definePageMeta({
-  layout: 'customer',
+definePageMeta({ layout: 'customer' })
+useSeoMeta({ title: 'الملف الشخصي وإعدادات الحساب | SolarHub', description: 'إدارة معلومات حساب العميل وبيانات الاتصال وإعدادات الأمان.' })
+
+const { form, errors, saveState, statusMessage, summary, sessions, terminatingSessions, saveProfile, resetProfile, terminateOtherSessions } = useCustomerProfile()
+const { governorates: govList, loadGovernorates } = useGovernorates()
+
+onMounted(() => {
+  loadGovernorates()
 })
 
-useSeoMeta({
-  title: 'الملف الشخصي وإعدادات الحساب | SolarHub',
-  description: 'إدارة بيانات حساب العميل ومعلومات الاتصال والموقع.',
-})
-
-const {
-  form,
-  errors,
-  loading,
-  loadError,
-  profileLoaded,
-  governorateOptions,
-  coordinatesChanged,
-  saveState,
-  statusMessage,
-  summary,
-  loadProfile,
-  setProfileLocation,
-  saveProfile,
-  resetProfile,
-} = useCustomerProfile()
+const governorates = computed(() => govList.value.map(g => g.name_ar))
+const currentSession = computed(() => (sessions.value || []).find(session => session.isCurrent))
 
 const isMapModalOpen = ref(false)
-const showPasswords = ref(false)
 
-const fieldsDisabled = computed(() =>
-  loading.value
-  || Boolean(loadError.value)
-  || !profileLoaded.value
-  || saveState.value === 'saving',
-)
-
-const displayedAddress = computed(() => {
-  if (form.address) return form.address
-
-  if (form.coordinates) {
-    return 'موقع محفوظ على الخريطة'
-  }
-
-  return ''
-})
-
-function openMap() {
-  if (fieldsDisabled.value) return
-
-  isMapModalOpen.value = true
-}
-
-function handleLocationSelected(location: LocationData) {
-  if (fieldsDisabled.value) return
-
-  setProfileLocation(location)
-  isMapModalOpen.value = false
-}
-
-async function handleSubmit() {
-  const saved = await saveProfile()
-
-  if (saved) {
-    showPasswords.value = false
+function handleLocationSelected(loc: { address: string; lat: number; lng: number; governorate?: string }) {
+  form.address = loc.address
+  if (loc.governorate) {
+    form.city = loc.governorate
   }
 }
-
-function handleReset() {
-  if (fieldsDisabled.value) return
-
-  resetProfile()
-  showPasswords.value = false
-  isMapModalOpen.value = false
-}
-
-watch(fieldsDisabled, disabled => {
-  if (disabled) {
-    isMapModalOpen.value = false
-  }
-})
 </script>
 
 <template>
-  <div
-    dir="rtl"
-    class="mx-auto flex w-full max-w-6xl flex-col gap-6"
-  >
-    <nav
-      class="flex flex-wrap items-center gap-2 text-xs text-solar-text-muted"
-      aria-label="مسار التنقل"
-    >
-      <NuxtLink to="/customer/dashboard">
-        الرئيسية
-      </NuxtLink>
-
-      <span aria-hidden="true">‹</span>
-
-      <span class="text-solar-text-heading">
-        إعدادات الحساب
-      </span>
+  <div class="mx-auto flex w-full max-w-6xl flex-col gap-7">
+    <nav class="flex flex-wrap items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل">
+      <NuxtLink to="/customer/dashboard" class="hover:text-solar-text-heading">الرئيسية</NuxtLink><span>‹</span><span>حسابي</span><span>‹</span><span class="font-bold text-solar-text-heading">إعدادات الحساب</span>
     </nav>
 
-    <header
-      class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"
-    >
+    <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-solar-text-heading md:text-3xl">
-          الملف الشخصي وإعدادات الحساب
-        </h1>
-
-        <p class="mt-2 text-sm leading-7 text-solar-text-muted">
-          حدّث بياناتك الشخصية ومعلومات الاتصال وموقع حسابك.
-        </p>
+        <h1 class="text-2xl font-black text-solar-text-heading md:text-3xl">الملف الشخصي وإعدادات الحساب</h1>
+        <p class="mt-1 text-sm text-solar-text-muted">إدارة البيانات الشخصية ومعلومات الاتصال وخيارات الأمان الخاصة بحسابك.</p>
       </div>
-
-      <button
-        v-if="profileLoaded && !loading && !loadError"
-        type="button"
-        :disabled="saveState === 'saving'"
-        class="shrink-0 self-start rounded-lg border border-solar-border-card bg-white px-4 py-2 text-xs font-bold text-solar-text-heading disabled:cursor-not-allowed disabled:opacity-50"
-        @click="loadProfile"
-      >
-        إعادة تحميل بيانات الحساب
-      </button>
+      <span class="inline-flex w-fit items-center gap-2 rounded-full border border-solar-border-card bg-solar-bg-subtle px-4 py-2 text-xs font-semibold text-solar-text-body"><Shield class="size-4 text-emerald-600" aria-hidden="true" /> حماية الحساب نشطة</span>
     </header>
 
-    <section
-      v-if="loading"
-      role="status"
-      aria-live="polite"
-      class="rounded-xl border border-solar-border-card bg-white px-5 py-14 text-center text-sm text-solar-text-muted"
-    >
-      جارٍ تحميل بيانات الحساب…
-    </section>
+    <ProfileSummaryCard :profile="form" :summary="summary" />
 
-    <section
-      v-else-if="loadError"
-      role="alert"
-      class="rounded-xl border border-red-200 bg-red-50 p-6"
-    >
-      <p class="text-sm leading-7 text-red-800">
-        {{ loadError }}
-      </p>
-
-      <button
-        type="button"
-        class="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-bold text-red-800"
-        @click="loadProfile"
-      >
-        إعادة المحاولة
-      </button>
-    </section>
-
-    <template v-else-if="profileLoaded">
-      <section
-        class="solar-card flex flex-col items-center gap-4 p-5 sm:flex-row sm:p-6"
-        aria-label="ملخص الحساب"
-      >
-        <div
-          class="flex size-20 shrink-0 items-center justify-center rounded-full bg-solar-navy-dark text-2xl font-bold text-white"
-          aria-hidden="true"
-        >
-          {{ summary.initials }}
+    <form class="solar-card p-4 sm:p-7 lg:p-8" novalidate @submit.prevent="saveProfile">
+      <section aria-labelledby="personal-heading">
+        <div class="mb-6 flex items-start gap-3">
+          <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-navy"><UserRound class="size-5" aria-hidden="true" /></span>
+          <div><h2 id="personal-heading" class="text-lg font-extrabold text-solar-text-heading">المعلومات الشخصية</h2><p class="text-xs text-solar-text-muted">البيانات الأساسية ونوع الحساب المعتمد.</p></div>
         </div>
-
-        <div class="min-w-0 flex-1 text-center sm:text-right">
-          <h2 class="break-words text-xl font-bold text-solar-text-heading">
-            {{ form.fullName }}
-          </h2>
-
-          <p class="mt-2 break-all text-sm text-solar-text-muted">
-            {{ form.email }}
-          </p>
-
-          <p class="mt-2 text-xs text-solar-text-muted">
-            معرف الحساب: {{ summary.customerId }}
-          </p>
-
-          <span
-            class="mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold"
-            :class="
-              summary.verified
-                ? 'bg-emerald-50 text-emerald-800'
-                : 'bg-amber-50 text-amber-800'
-            "
-          >
-            {{
-              summary.verified
-                ? 'البريد الإلكتروني مؤكد'
-                : 'البريد الإلكتروني غير مؤكد'
-            }}
-          </span>
+        <div class="grid gap-5 md:grid-cols-3">
+          <FormField label="الاسم الكامل" :error="errors.fullName" required><input v-model.trim="form.fullName" type="text" autocomplete="name" class="solar-input h-11" :class="errors.fullName ? 'border-red-400' : ''" /></FormField>
+          <FormField label="المحافظة / المنطقة" :error="errors.city" required>
+            <div class="relative flex items-center">
+              <select
+                v-model="form.city"
+                class="solar-input h-11 w-full appearance-none pr-3.5 pl-10 cursor-pointer bg-white"
+                :class="errors.city ? 'border-red-400' : ''"
+              >
+                <option value="" disabled>اختر المحافظة</option>
+                <option v-for="gov in governorates" :key="gov" :value="gov">
+                  {{ gov }}
+                </option>
+              </select>
+              <ChevronDown class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-solar-text-muted" />
+            </div>
+          </FormField>
         </div>
       </section>
 
-      <form
-        class="solar-card p-5 sm:p-7"
-        novalidate
-        :aria-busy="saveState === 'saving'"
-        @submit.prevent="handleSubmit"
-      >
-        <fieldset :disabled="fieldsDisabled" class="min-w-0">
-          <legend class="sr-only">
-            تعديل بيانات الحساب
-          </legend>
+      <hr class="my-8 border-solar-border-card" />
 
-          <section aria-labelledby="personal-heading">
-            <h2
-              id="personal-heading"
-              class="mb-5 flex items-center gap-2 text-lg font-bold text-solar-text-heading"
-            >
-              <UserRound class="size-5" aria-hidden="true" />
-              المعلومات الشخصية
-            </h2>
-
-            <div class="grid gap-5 md:grid-cols-2">
-              <FormField
-                label="الاسم الكامل"
-                :error="errors.fullName"
-                required
-              >
-                <input
-                  v-model.trim="form.fullName"
-                  type="text"
-                  autocomplete="name"
-                  maxlength="150"
-                  required
-                  :aria-invalid="Boolean(errors.fullName)"
-                  class="solar-input h-11"
-                >
-              </FormField>
-
-              <FormField
-                label="المحافظة"
-                :error="errors.city"
-              >
-                <select
-                  v-model="form.city"
-                  :aria-invalid="Boolean(errors.city)"
-                  class="solar-input h-11"
-                >
-                  <option value="">
-                    غير محددة
-                  </option>
-
-                  <option
-                    v-for="option in governorateOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
-              </FormField>
-            </div>
-
-            <p class="mt-4 text-xs text-solar-text-muted">
-              نوع الحساب: {{ form.accountType }}
-            </p>
-          </section>
-
-          <hr class="my-7 border-solar-border-card">
-
-          <section aria-labelledby="contact-heading">
-            <h2
-              id="contact-heading"
-              class="mb-5 flex items-center gap-2 text-lg font-bold text-solar-text-heading"
-            >
-              <AtSign class="size-5" aria-hidden="true" />
-              معلومات الاتصال
-            </h2>
-
-            <div class="grid gap-5 md:grid-cols-2">
-              <FormField
-                label="البريد الإلكتروني"
-                :error="errors.email"
-              >
-                <input
-                  :value="form.email"
-                  type="email"
-                  autocomplete="email"
-                  dir="ltr"
-                  readonly
-                  class="solar-input h-11 bg-solar-bg-subtle"
-                >
-
-                <p class="mt-2 text-xs leading-6 text-solar-text-muted">
-                  تغيير البريد غير متاح من هذه الصفحة.
-                </p>
-              </FormField>
-
-              <FormField
-                label="رقم الجوال"
-                :error="errors.phone"
-                required
-              >
-                <input
-                  v-model.trim="form.phone"
-                  type="tel"
-                  autocomplete="tel"
-                  dir="ltr"
-                  maxlength="30"
-                  required
-                  :aria-invalid="Boolean(errors.phone)"
-                  class="solar-input h-11"
-                >
-              </FormField>
-            </div>
-          </section>
-
-          <hr class="my-7 border-solar-border-card">
-
-          <section aria-labelledby="location-heading">
-            <h2
-              id="location-heading"
-              class="mb-5 flex items-center gap-2 text-lg font-bold text-solar-text-heading"
-            >
-              <MapPin class="size-5" aria-hidden="true" />
-              موقع الحساب
-            </h2>
-
-            <FormField
-              label="الموقع المحدد"
-              :error="errors.address"
-            >
-              <div class="flex flex-col gap-3 sm:flex-row">
-                <input
-                  :value="displayedAddress"
-                  type="text"
-                  readonly
-                  placeholder="اختر الموقع من الخريطة"
-                  class="solar-input h-11 min-w-0 flex-1 bg-solar-bg-subtle"
-                >
-
-                <button
-                  type="button"
-                  class="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-solar-yellow px-5 text-sm font-bold text-solar-navy-dark"
-                  @click="openMap"
-                >
-                  <MapPin class="size-4" aria-hidden="true" />
-                  تحديد الموقع
-                </button>
-              </div>
-            </FormField>
-
-            <p class="mt-3 text-xs leading-6 text-solar-text-muted">
-              حدد نقطة الموقع على الخريطة لحفظها مع حسابك.
-            </p>
-
-            <p
-              v-if="coordinatesChanged"
-              class="mt-2 text-xs font-bold text-amber-800"
-            >
-              موقع جديد بانتظار حفظ التعديلات.
-            </p>
-          </section>
-
-          <hr class="my-7 border-solar-border-card">
-
-          <section aria-labelledby="password-heading">
-            <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2
-                  id="password-heading"
-                  class="text-lg font-bold text-solar-text-heading"
-                >
-                  تغيير كلمة المرور
-                </h2>
-
-                <p class="mt-2 text-xs leading-6 text-solar-text-muted">
-                  اترك هذه الحقول فارغة إذا لم ترغب في تغيير كلمة المرور.
-                </p>
-              </div>
-
+      <section aria-labelledby="contact-heading">
+        <div class="mb-6 flex items-start gap-3">
+          <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-navy"><AtSign class="size-5" aria-hidden="true" /></span>
+          <div><h2 id="contact-heading" class="text-lg font-extrabold text-solar-text-heading">بيانات الاتصال</h2><p class="text-xs text-solar-text-muted">معلومات التواصل وتأكيد التوصيل واستلام الإشعارات.</p></div>
+        </div>
+        <div class="grid gap-5 md:grid-cols-2">
+          <FormField label="البريد الإلكتروني" :error="errors.email" required><input v-model.trim="form.email" type="email" autocomplete="email" dir="ltr" class="solar-input h-11 text-right" :class="errors.email ? 'border-red-400' : ''" /></FormField>
+          <FormField label="رقم الجوال" :error="errors.phone" required>
+            <span class="flex" dir="ltr"><span class="flex h-11 items-center rounded-l-lg border border-r-0 border-solar-border-input bg-solar-bg-subtle px-3 text-sm text-solar-text-muted">+966</span><input v-model.trim="form.phone" type="tel" inputmode="numeric" autocomplete="tel" class="solar-input h-11 rounded-l-none text-right" :class="errors.phone ? 'border-red-400' : ''" /></span>
+          </FormField>
+          <FormField label="العنوان الوطني / موقع التوصيل" :error="errors.address" required class="md:col-span-2">
+            <div class="flex gap-2">
+              <input v-model.trim="form.address" type="text" autocomplete="street-address" class="solar-input h-11 flex-1" :class="errors.address ? 'border-red-400' : ''" placeholder="مثال: الرياض - حي الملز - شارع الستين" />
               <button
                 type="button"
-                :aria-pressed="showPasswords"
-                class="inline-flex items-center gap-2 rounded-lg border border-solar-border-card px-3 py-2 text-xs font-bold text-solar-text-heading"
-                @click="showPasswords = !showPasswords"
+                @click="isMapModalOpen = true"
+                class="flex items-center gap-1.5 h-11 px-4 rounded-xl border border-solar-yellow bg-solar-yellow/20 text-xs font-bold text-solar-navy-dark hover:bg-solar-yellow/30 transition-all shrink-0 cursor-pointer shadow-2xs"
               >
-                <EyeOff
-                  v-if="showPasswords"
-                  class="size-4"
-                  aria-hidden="true"
-                />
-
-                <Eye
-                  v-else
-                  class="size-4"
-                  aria-hidden="true"
-                />
-
-                {{ showPasswords ? 'إخفاء كلمات المرور' : 'إظهار كلمات المرور' }}
+                <MapPin class="size-4 text-solar-navy-dark" />
+                <span>الخريطة</span>
               </button>
             </div>
-
-            <div class="grid gap-5 md:grid-cols-2">
-              <FormField
-                label="كلمة المرور الحالية"
-                :error="errors.currentPassword"
-                class="md:col-span-2"
-              >
-                <input
-                  v-model="form.currentPassword"
-                  :type="showPasswords ? 'text' : 'password'"
-                  autocomplete="current-password"
-                  :aria-invalid="Boolean(errors.currentPassword)"
-                  class="solar-input h-11"
-                >
-              </FormField>
-
-              <FormField
-                label="كلمة المرور الجديدة"
-                :error="errors.newPassword"
-              >
-                <input
-                  v-model="form.newPassword"
-                  :type="showPasswords ? 'text' : 'password'"
-                  autocomplete="new-password"
-                  :aria-invalid="Boolean(errors.newPassword)"
-                  class="solar-input h-11"
-                >
-              </FormField>
-
-              <FormField
-                label="تأكيد كلمة المرور الجديدة"
-                :error="errors.confirmPassword"
-              >
-                <input
-                  v-model="form.confirmPassword"
-                  :type="showPasswords ? 'text' : 'password'"
-                  autocomplete="new-password"
-                  :aria-invalid="Boolean(errors.confirmPassword)"
-                  class="solar-input h-11"
-                >
-              </FormField>
-            </div>
-
-            <p class="mt-3 text-xs text-solar-text-muted">
-              كلمة المرور الجديدة: 8 أحرف على الأقل.
-            </p>
-          </section>
-        </fieldset>
-
-        <div
-          class="mt-7 flex flex-col gap-4 border-t border-solar-border-card pt-5 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <p
-            v-if="statusMessage"
-            role="status"
-            aria-live="polite"
-            class="text-sm leading-7"
-            :class="
-              saveState === 'error'
-                ? 'text-red-700'
-                : 'text-emerald-800'
-            "
-          >
-            {{ statusMessage }}
-          </p>
-
-          <span v-else />
-
-          <div class="flex shrink-0 gap-3">
-            <button
-              type="button"
-              :disabled="fieldsDisabled"
-              class="rounded-lg border border-solar-border-card bg-white px-5 py-3 text-sm font-bold text-solar-text-heading disabled:cursor-not-allowed disabled:opacity-50"
-              @click="handleReset"
-            >
-              إلغاء التعديلات
-            </button>
-
-            <button
-              type="submit"
-              :disabled="fieldsDisabled"
-              class="inline-flex items-center justify-center gap-2 rounded-lg bg-solar-yellow px-5 py-3 text-sm font-bold text-solar-navy-dark disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Check class="size-4" aria-hidden="true" />
-
-              {{ saveState === 'saving' ? 'جارٍ الحفظ…' : 'حفظ التعديلات' }}
-            </button>
-          </div>
+          </FormField>
         </div>
-      </form>
+      </section>
 
-      <section
-        class="solar-card p-5 sm:p-7"
-        aria-labelledby="security-heading"
-      >
-        <h2
-          id="security-heading"
-          class="mb-5 flex items-center gap-2 text-lg font-bold text-solar-text-heading"
-        >
-          <Shield class="size-5" aria-hidden="true" />
-          خيارات الأمان
-        </h2>
+      <hr class="my-8 border-solar-border-card" />
 
-        <div class="grid gap-4 md:grid-cols-2">
-          <div
-            class="rounded-xl border border-solar-border-card bg-solar-bg-subtle p-4"
-          >
-            <h3 class="text-sm font-bold text-solar-text-heading">
-              التحقق بخطوتين
-            </h3>
+      <section aria-labelledby="security-heading">
+        <div class="mb-6 flex items-start gap-3">
+          <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-navy"><ShieldCheck class="size-5" aria-hidden="true" /></span>
+          <div><h2 id="security-heading" class="text-lg font-extrabold text-solar-text-heading">الأمان والتحقق</h2><p class="text-xs text-solar-text-muted">إعدادات الدخول الثنائي ومراقبة الجلسات الحالية.</p></div>
+        </div>
 
-            <p class="mt-2 text-xs leading-6 text-solar-text-muted">
-              إدارة التحقق بخطوتين غير متاحة حاليًا.
-            </p>
-
-            <button
-              type="button"
-              disabled
-              class="mt-3 rounded-lg border border-solar-border-card px-4 py-2 text-xs opacity-50"
-            >
-              غير متاح
-            </button>
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-4 rounded-xl border border-solar-border-card bg-solar-bg-subtle/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-start gap-3"><span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-solar-navy"><MessageSquareText class="size-5" aria-hidden="true" /></span><div><h3 class="text-sm font-bold text-solar-text-heading">التحقق بخطوتين (2FA)</h3><p class="mt-1 text-xs leading-5 text-solar-text-muted">إرسال رمز تحقق مؤقت عبر رسالة نصية (SMS) عند كل تسجيل دخول جديد.</p></div></div>
+            <div class="flex items-center gap-3"><span class="text-xs font-bold text-emerald-600">{{ form.twoFactorEnabled ? 'مفعل حاليًا' : 'غير مفعل' }}</span><button type="button" role="switch" aria-label="التحقق بخطوتين" :aria-checked="form.twoFactorEnabled" class="relative h-6 w-11 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow" :class="form.twoFactorEnabled ? 'bg-solar-navy' : 'bg-slate-300'" @click="form.twoFactorEnabled = !form.twoFactorEnabled"><span class="absolute top-1 size-4 rounded-full bg-white transition-all" :class="form.twoFactorEnabled ? 'right-6' : 'right-1'" /></button></div>
           </div>
 
-          <div
-            class="rounded-xl border border-solar-border-card bg-solar-bg-subtle p-4"
-          >
-            <h3
-              class="flex items-center gap-2 text-sm font-bold text-solar-text-heading"
-            >
-              <Laptop class="size-4" aria-hidden="true" />
-              إدارة الجلسات
-            </h3>
-
-            <p class="mt-2 text-xs leading-6 text-solar-text-muted">
-              عرض الجلسات الأخرى وإنهاؤها غير متاحين حاليًا.
-            </p>
-
-            <button
-              type="button"
-              disabled
-              class="mt-3 rounded-lg border border-solar-border-card px-4 py-2 text-xs opacity-50"
-            >
-              غير متاح
-            </button>
+          <div class="flex flex-col gap-4 rounded-xl border border-solar-border-card bg-solar-bg-subtle/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-start gap-3"><span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-solar-navy"><Laptop class="size-5" aria-hidden="true" /></span><div><div class="flex flex-wrap items-center gap-2"><h3 class="text-sm font-bold text-solar-text-heading">الجلسات النشطة وسجل الدخول</h3><span class="rounded bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">جلسة نشطة حاليًا</span></div><p v-if="currentSession" class="mt-1 text-xs text-solar-text-muted">متصفح {{ currentSession.browser }} • نظام {{ currentSession.operatingSystem }} ({{ currentSession.location }}، الآن)</p></div></div>
+            <button type="button" class="text-xs font-semibold text-solar-text-body hover:text-red-600 disabled:opacity-60" :disabled="terminatingSessions" @click="terminateOtherSessions">{{ terminatingSessions ? 'جارٍ التحقق...' : 'إنهاء الجلسات الأخرى' }}</button>
           </div>
         </div>
       </section>
 
-      <MapLocationModal
-        :is-open="isMapModalOpen"
-        :current-location="form.coordinates || form.address"
-        title="تحديد موقع الحساب"
-        subtitle="حدد الموقع ثم أكد اختياره"
-        @select="handleLocationSelected"
-        @close="isMapModalOpen = false"
-      />
-    </template>
+      <hr class="my-8 border-solar-border-card" />
+
+      <section aria-labelledby="password-heading">
+        <div class="mb-6 flex items-start gap-3">
+          <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-navy"><LockKeyhole class="size-5" aria-hidden="true" /></span>
+          <div><h2 id="password-heading" class="text-lg font-extrabold text-solar-text-heading">إدارة كلمة المرور</h2><p class="text-xs text-solar-text-muted">تحديث كلمة المرور لحماية وتأمين بيانات حسابك.</p></div>
+        </div>
+        <div class="grid gap-5 md:grid-cols-2">
+          <ProfilePasswordField v-model="form.currentPassword" label="كلمة المرور الحالية" placeholder="أدخل كلمة المرور الحالية" autocomplete="current-password" :error="errors.currentPassword" class="md:col-span-2" />
+          <ProfilePasswordField v-model="form.newPassword" label="كلمة المرور الجديدة" placeholder="أدخل كلمة المرور الجديدة" autocomplete="new-password" :error="errors.newPassword" />
+          <ProfilePasswordField v-model="form.confirmPassword" label="تأكيد كلمة المرور الجديدة" placeholder="أعد إدخال كلمة المرور" autocomplete="new-password" :error="errors.confirmPassword" />
+        </div>
+        <p class="mt-3 text-xs text-solar-text-muted">يجب أن تحتوي على 8 أحرف على الأقل، بما في ذلك أرقام وحروف.</p>
+      </section>
+
+      <div class="mt-8 flex flex-col-reverse gap-3 border-t border-solar-border-card pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <p v-if="statusMessage" class="text-sm font-medium" :class="saveState === 'error' ? 'text-red-600' : 'text-emerald-700'" role="status" aria-live="polite">{{ statusMessage }}</p><span v-else />
+        <div class="flex gap-3">
+          <button type="button" class="btn-outline" :disabled="saveState === 'saving'" @click="resetProfile">إلغاء</button>
+          <button type="submit" class="btn-primary min-w-40" :disabled="saveState === 'saving'"><Check class="size-4" aria-hidden="true" />{{ saveState === 'saving' ? 'جارٍ الحفظ...' : 'حفظ التعديلات' }}</button>
+        </div>
+      </div>
+      <p class="mt-4 text-[10px] leading-6 text-solar-text-muted">يتم حفظ وتحديث البيانات مباشرة في خادم سولار هب وقاعدة البيانات بشكل آمن.</p>
+    </form>
+
+    <!-- نافذة اختيار وتأكيد العنوان الوطني وموقع التوصيل على الخريطة -->
+    <CommonMapLocationModal
+      :is-open="isMapModalOpen"
+      :current-location="form.address"
+      title="تحديد وتعديل العنوان الوطني / موقع التوصيل"
+      subtitle="اختر موقعك بدقة على الخريطة لتحديث بيانات التوصيل الافتراضية"
+      @close="isMapModalOpen = false"
+      @select="handleLocationSelected"
+    />
   </div>
 </template>

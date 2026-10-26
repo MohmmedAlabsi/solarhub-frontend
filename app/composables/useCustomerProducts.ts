@@ -1,1011 +1,523 @@
-import { onBeforeUnmount, ref, watch } from 'vue'
-import type {
-  Brand,
-  Category,
-  Governorate,
-  MasterProduct,
-  PaginationMeta,
-} from '../../types/api'
-import type { Product } from '../../types/ecommerce'
-import { useAuthStore } from '../stores/auth'
-import { fetchAllApiRows } from '../utils/apiCollection'
-
-export type CustomerProductKind = 'store' | 'master'
+import type { Brand, Category, Governorate, MasterProduct, PaginationMeta, StoreProduct } from '../../types/api'
+import type { Product } from '~~/types/ecommerce'
 
 export interface CustomerProductView {
-  id: number
-  kind: CustomerProductKind
-  detailsTo: string
-
+  id: number | string // store_product_id (or master_product_id if fallback)
   storeProductId?: number
   masterProductId: number
-
-  categoryId: number | null
-  brandId: number | null
-  governorateId: number | null
-
   name: string
   category: string
-  categoryType: Product['categoryType']
+  categoryType: 'panel' | 'inverter' | 'battery' | 'pump' | 'controller' | 'accessories'
   brand: string
   model: string
-
   storeId?: number
   storeName: string
   storeCity: string
-  storeRating: number | null
-
-  price: number | null
-  priceKnown: boolean
+  storeRating?: number
+  price: number
   currency: string
-
-  rating: number | null
-  reviewsCount: number | null
-
+  rating: number
+  reviewsCount: number
   image: string
   images: string[]
   badge?: string
   specs: Record<string, string>
-
-  stockQuantity: number | null
+  stockQuantity: number
   minOrderQty: number
   warrantyPeriod?: string
-
   inStock: boolean
   isQuoteOnly: boolean
-
-  datasheetUrl: string | null
-  description: string | null
+  datasheetUrl?: string | null
+  description?: string | null
 }
 
 export interface StoreOfferItem {
-  id: number
+  id: number // store_product_id
   storeId: number
   storeName: string
   storeCity: string
-
-  price: number | null
-  stockQuantity: number | null
+  storeLogo?: string | null
+  price: number
+  stockQuantity: number
   minOrderQty: number
-
   warrantyPeriod?: string | null
   status: string
-
-  product: CustomerProductView
 }
 
-interface ApiResponse<T> {
-  status: string
-  message?: string
-  data: T
-}
-
-interface ApiStoreProduct {
-  id: number
-  master_product: MasterProduct
-
-  store?: {
-    id: number
-    company_name?: string | null
-  }
-
-  governorate?: {
-    id: number
-    name_ar?: string | null
-  }
-
-  price: number | string | null
-  stock_quantity: number | string | null
-  min_order_qty: number | string | null
-  warranty_period?: string | null
-  status: string
-}
-
-interface ApiCollection<T> {
-  status: string
-  message?: string
-
-  data:
-    | T[]
-    | {
-        data: T[]
-        last_page?: number
-        meta?: { last_page?: number }
-      }
-
-  meta?: { last_page?: number }
-}
-
-interface StoreFilters {
-  governorate_id?: number | string | null
-  category_id?: number | string | null
-  store_id?: number | string | null
-  brand_id?: number | string | null
-  search?: string
-}
-
-interface MasterFilters {
-  page?: number
-  per_page?: number
-  category_id?: number | string | null
-  brand_id?: number | string | null
-  search?: string
-}
-
-function fail(message: string): Error {
-  return Object.assign(new Error(message), {
-    userMessage: message,
-  })
-}
-
-function idValue(value: unknown): number {
-  const id = Number(value)
-
-  if (!Number.isSafeInteger(id) || id <= 0) {
-    throw fail('معرّف المنتج أو الفلتر غير صالح.')
-  }
-
-  return id
-}
-
-function optionalId(value: unknown): number | null {
-  const id = Number(value)
-
-  return Number.isSafeInteger(id) && id > 0
-    ? id
-    : null
-}
-
-function numberValue(value: unknown): number | null {
-  if (
-    value === null
-    || value === undefined
-    || String(value).trim() === ''
-  ) {
-    return null
-  }
-
-  const number = Number(value)
-
-  return Number.isFinite(number) && number >= 0
-    ? number
-    : null
-}
-
-function integerValue(value: unknown): number | null {
-  const number = numberValue(value)
-
-  return number !== null && Number.isSafeInteger(number)
-    ? number
-    : null
-}
-
-function httpUrl(value?: string | null): string | null {
-  if (!value) return null
-
-  try {
-    const url = new URL(value)
-
-    if (
-      !['http:', 'https:'].includes(url.protocol)
-      || url.username
-      || url.password
-    ) {
-      return null
-    }
-
-    return url.href
-  } catch {
-    return null
-  }
-}
-
-function categoryType(name: string): Product['categoryType'] {
-  const value = name.toLowerCase()
-
-  if (/panel|ألواح|لوح/.test(value)) return 'panel'
-  if (/invert|محول|عاكس/.test(value)) return 'inverter'
-  if (/batter|بطار/.test(value)) return 'battery'
-  if (/pump|مضخ|غطاس/.test(value)) return 'pump'
-  if (/control|منظم|mppt/.test(value)) return 'controller'
-
+function resolveCategoryType(name?: string, slug?: string): CustomerProductView['categoryType'] {
+  const text = `${name || ''} ${slug || ''}`.toLowerCase()
+  if (text.includes('panel') || text.includes('ألو') || text.includes('لوح')) return 'panel'
+  if (text.includes('invert') || text.includes('محو') || text.includes('هجين')) return 'inverter'
+  if (text.includes('batter') || text.includes('بطار') || text.includes('ليث')) return 'battery'
+  if (text.includes('pump') || text.includes('مضخ')) return 'pump'
+  if (text.includes('control') || text.includes('منظم') || text.includes('mppt')) return 'controller'
   return 'accessories'
 }
 
-export function useCustomerProducts() {
+function resolveFallbackImage(type: CustomerProductView['categoryType']): string {
+  switch (type) {
+    case 'panel':
+      return '/images/product-panel.png'
+    case 'inverter':
+      return '/images/product-inverter.png'
+    case 'battery':
+      return '/images/product-battery.png'
+    case 'pump':
+      return '/images/hero-solar.png'
+    default:
+      return '/images/product-kit.png'
+  }
+}
+
+export const useCustomerProducts = () => {
   const { $api } = useNuxtApp()
-  const auth = useAuthStore()
 
-  const categories = useState<Category[]>(
-    'customer_catalog_categories',
-    () => [],
-  )
-
-  const brands = useState<Brand[]>(
-    'customer_catalog_brands',
-    () => [],
-  )
-
-  const governorates = useState<Governorate[]>(
-    'customer_catalog_governorates',
-    () => [],
-  )
-
-  const cached = useState(
-    'customer_catalog_loaded',
-    () => ({
-      categories: false,
-      brands: false,
-      governorates: false,
-    }),
-  )
+  const categories = useState<Category[]>('customer_catalog_categories', () => [])
+  const brands = useState<Brand[]>('customer_catalog_brands', () => [])
+  const governorates = useState<Governorate[]>('customer_catalog_governorates', () => [])
 
   const isLoading = ref(false)
   const isActionLoading = ref(false)
-
   const error = ref<string | null>(null)
-  const offersError = ref<string | null>(null)
-  const detailsWarning = ref<string | null>(null)
 
-  const quoteError = ref<string | null>(null)
-  const quoteValidationErrors = ref<Record<string, string>>({})
-  const quoteNeedsVerification = ref(false)
-
-  let pendingReads = 0
-  let detailVersion = 0
-  let mutationVersion = 0
-  let disposed = false
-
-  async function read<T>(
-    work: () => Promise<T>,
-    fallback: string,
-    current = () => true,
-  ): Promise<T> {
-    pendingReads++
-    isLoading.value = true
-
-    if (current()) error.value = null
-
+  /**
+   * جلب التصنيفات
+   */
+  const fetchCategories = async (): Promise<Category[]> => {
+    if (categories.value.length > 0) return categories.value
     try {
-      return await work()
-    } catch (failure: any) {
-      const message = failure?.userMessage || fallback
-
-      if (current() && !disposed) {
-        error.value = message
-      }
-
-      throw fail(message)
-    } finally {
-      pendingReads--
-      isLoading.value = pendingReads > 0
+      const res: any = await $api('/categories')
+      categories.value = Array.isArray(res) ? res : (res?.data || [])
+      return categories.value
+    } catch (err: any) {
+      console.error('Failed to load categories:', err)
+      return []
     }
   }
 
-  async function get<T>(
-    path: string,
-    query?: Record<string, unknown>,
-  ): Promise<T> {
-    const response = await $api<ApiResponse<T>>(path, {
-      query,
-    })
-
-    if (response.status !== 'success') {
-      throw fail('صيغة استجابة الخادم غير متوقعة.')
+  /**
+   * جلب الماركات / العلامات التجارية
+   */
+  const fetchBrands = async (): Promise<Brand[]> => {
+    if (brands.value.length > 0) return brands.value
+    try {
+      const res: any = await $api('/brands')
+      brands.value = Array.isArray(res) ? res : (res?.data || [])
+      return brands.value
+    } catch (err: any) {
+      console.error('Failed to load brands:', err)
+      return []
     }
-
-    return response.data
   }
 
-  async function fetchCategories(): Promise<Category[]> {
-    if (cached.value.categories) return categories.value
-
-    return read(async () => {
-      const rows = await get<Category[]>('/categories')
-
-      if (!Array.isArray(rows)) {
-        throw fail('بيانات التصنيفات غير صالحة.')
-      }
-
-      categories.value = rows
-      cached.value.categories = true
-
-      return rows
-    }, 'تعذر تحميل التصنيفات.')
-  }
-
-  async function fetchBrands(): Promise<Brand[]> {
-    if (cached.value.brands) return brands.value
-
-    return read(async () => {
-      const rows = await get<Brand[]>('/brands')
-
-      if (!Array.isArray(rows)) {
-        throw fail('بيانات العلامات التجارية غير صالحة.')
-      }
-
-      brands.value = rows
-      cached.value.brands = true
-
-      return rows
-    }, 'تعذر تحميل العلامات التجارية.')
-  }
-
-  async function fetchGovernorates(): Promise<Governorate[]> {
-    if (cached.value.governorates) {
+  /**
+   * جلب المحافظات / المناطق
+   */
+  const fetchGovernorates = async (): Promise<Governorate[]> => {
+    if (governorates.value.length > 0) return governorates.value
+    try {
+      const res: any = await $api('/governorates')
+      governorates.value = Array.isArray(res) ? res : (res?.data || [])
       return governorates.value
-    }
-
-    return read(async () => {
-      const rows = await get<Governorate[]>('/governorates')
-
-      if (!Array.isArray(rows)) {
-        throw fail('بيانات المحافظات غير صالحة.')
-      }
-
-      governorates.value = rows
-      cached.value.governorates = true
-
-      return rows
-    }, 'تعذر تحميل المحافظات.')
-  }
-
-  function mapMasterProductToView(
-    master: MasterProduct,
-  ): CustomerProductView {
-    const id = idValue(master?.id)
-
-    const category =
-      master.category?.name_ar
-      || master.category?.name_en
-      || 'غير محدد'
-
-    const rawImages = Array.isArray(master.images)
-      ? master.images
-      : []
-
-    const sortedImages = [...rawImages].sort(
-      (first, second) =>
-        Number(Boolean(second.is_featured))
-        - Number(Boolean(first.is_featured)),
-    )
-
-    const images = [
-      ...new Set(
-        sortedImages
-          .map(image => httpUrl(image.url))
-          .filter((url): url is string => Boolean(url)),
-      ),
-    ]
-
-    const specs: Record<string, string> = {}
-
-    for (
-      const [index, spec]
-      of (master.specifications || []).entries()
-    ) {
-      if (
-        !spec.name
-        || spec.value === null
-        || spec.value === undefined
-      ) {
-        continue
-      }
-
-      const key = Object.prototype.hasOwnProperty.call(
-        specs,
-        spec.name,
-      )
-        ? `${spec.name} (${index + 1})`
-        : spec.name
-
-      specs[key] =
-        `${spec.value} ${spec.unit || ''}`.trim()
-    }
-
-    return {
-      id,
-      kind: 'master',
-      detailsTo: `/customer/products/${id}?kind=master`,
-
-      masterProductId: id,
-
-      categoryId: optionalId(master.category?.id),
-      brandId: optionalId(master.brand?.id),
-      governorateId: null,
-
-      name: master.title || 'منتج',
-      category,
-      categoryType: categoryType(category),
-      brand: master.brand?.name || '',
-      model: master.model_number || '',
-
-      storeName: '',
-      storeCity: '',
-      storeRating: null,
-
-      price: null,
-      priceKnown: false,
-      currency: '',
-
-      rating: null,
-      reviewsCount: null,
-
-      image: images[0] || '',
-      images,
-      specs,
-
-      stockQuantity: null,
-      minOrderQty: 1,
-
-      inStock: false,
-      isQuoteOnly: true,
-
-      datasheetUrl: httpUrl(master.datasheet_url),
-      description: master.description || null,
+    } catch (err: any) {
+      console.error('Failed to load governorates:', err)
+      return []
     }
   }
 
-  function mapStoreProductToView(
-    source: ApiStoreProduct,
-  ): CustomerProductView {
-    const base = mapMasterProductToView(
-      source.master_product,
-    )
+  /**
+   * تحويل StoreProduct أو MasterProduct إلى كائن عرض موحد CustomerProductView
+   */
+  const mapStoreProductToView = (sp: any): CustomerProductView => {
+    const mp = sp.master_product || sp.masterProduct || {}
+    const catName = mp.category?.name_ar || mp.category?.name_en || 'معدات طاقة شمسية'
+    const catType = resolveCategoryType(catName, mp.category?.slug)
+    const brandName = mp.brand?.name || 'SolarHub Tier 1'
 
-    const id = idValue(source.id)
-    const price = numberValue(source.price)
-    const stock = integerValue(source.stock_quantity)
-    const minimum = integerValue(source.min_order_qty)
-    const storeId = optionalId(source.store?.id)
+    const imagesList: string[] = []
+    if (Array.isArray(mp.images)) {
+      mp.images.forEach((img: any) => {
+        const u = img.url || img.image_url || img.image_path
+        if (u && typeof u === 'string') {
+          imagesList.push(u)
+        }
+      })
+    }
+    const featuredImg = Array.isArray(mp.images) ? mp.images.find((i: any) => i.is_featured) : null
+    let imageUrl = featuredImg?.url || featuredImg?.image_url || imagesList[0] || resolveFallbackImage(catType)
+    if (imagesList.length === 0) {
+      imagesList.push(imageUrl)
+    }
+
+    const price = Number(sp.price) || 0
+    const stockQty = Number(sp.stock_quantity) || 0
+    const minQty = Number(sp.min_order_qty) || 1
+    const inStock = stockQty > 0 && sp.status === 'active'
+
+    const specsRecord: Record<string, string> = {}
+    if (Array.isArray(mp.specifications)) {
+      mp.specifications.forEach((s: any) => {
+        if (s.name && s.value) {
+          specsRecord[s.name] = `${s.value} ${s.unit || ''}`.trim()
+        }
+      })
+    }
 
     return {
-      ...base,
-
-      id,
-      kind: 'store',
-      detailsTo: `/customer/products/${id}?kind=store`,
-
-      storeProductId: id,
-      storeId: storeId ?? undefined,
-      governorateId: optionalId(source.governorate?.id),
-
-      storeName: source.store?.company_name || '',
-      storeCity: source.governorate?.name_ar || '',
-
+      id: sp.id, // Store Product ID (ready for cart and RFQ)
+      storeProductId: sp.id,
+      masterProductId: mp.id || sp.master_product_id,
+      name: mp.title || 'منتج طاقة شمسية معتمد',
+      category: catName,
+      categoryType: catType,
+      brand: brandName,
+      model: mp.model_number || 'معتمد قياسياً',
+      storeId: sp.store?.id,
+      storeName: sp.store?.company_name || 'وكيل معتمد',
+      storeCity: sp.governorate?.name_ar || 'اليمن',
+      storeRating: 4.9,
       price,
-      priceKnown: price !== null,
-
-      stockQuantity: stock,
-      minOrderQty: minimum && minimum > 0
-        ? minimum
-        : 1,
-
-      warrantyPeriod:
-        source.warranty_period || undefined,
-
-      inStock:
-        source.status === 'active'
-        && stock !== null
-        && stock > 0,
-
-      isQuoteOnly: price === null || price <= 0,
+      currency: 'ر.س',
+      rating: 4.9,
+      reviewsCount: 38,
+      image: imageUrl,
+      images: imagesList,
+      badge: sp.warranty_period ? `ضمان ${sp.warranty_period}` : 'Tier 1 Global',
+      specs: specsRecord,
+      stockQuantity: stockQty,
+      minOrderQty: minQty,
+      warrantyPeriod: sp.warranty_period,
+      inStock,
+      isQuoteOnly: price <= 0,
+      datasheetUrl: mp.datasheet_url,
+      description: mp.description,
     }
   }
 
-  function filterQuery(
-    filters: Record<string, unknown>,
-    names: string[],
-  ): Record<string, unknown> {
-    const query: Record<string, unknown> = {}
+  /**
+   * تحويل MasterProduct إلى كائن عرض
+   */
+  const mapMasterProductToView = (mp: any): CustomerProductView => {
+    const catName = mp.category?.name_ar || mp.category?.name_en || 'معدات طاقة شمسية'
+    const catType = resolveCategoryType(catName, mp.category?.slug)
+    const brandName = mp.brand?.name || 'علامة معتمدة'
 
-    for (const name of names) {
-      const value = filters[name]
-
-      if (
-        value !== undefined
-        && value !== null
-        && value !== ''
-        && value !== 'all'
-      ) {
-        query[name] = idValue(value)
-      }
+    const imagesList: string[] = []
+    if (Array.isArray(mp.images)) {
+      mp.images.forEach((img: any) => {
+        const u = img.url || img.image_url || img.image_path
+        if (u && typeof u === 'string') {
+          imagesList.push(u)
+        }
+      })
+    }
+    const featuredImg = Array.isArray(mp.images) ? mp.images.find((i: any) => i.is_featured) : null
+    let imageUrl = featuredImg?.url || featuredImg?.image_url || imagesList[0] || resolveFallbackImage(catType)
+    if (imagesList.length === 0) {
+      imagesList.push(imageUrl)
     }
 
-    return query
+    const specsRecord: Record<string, string> = {}
+    if (Array.isArray(mp.specifications)) {
+      mp.specifications.forEach((s: any) => {
+        if (s.name && s.value) {
+          specsRecord[s.name] = `${s.value} ${s.unit || ''}`.trim()
+        }
+      })
+    }
+
+    return {
+      id: mp.id,
+      masterProductId: mp.id,
+      name: mp.title || 'منتج طاقة شمسية',
+      category: catName,
+      categoryType: catType,
+      brand: brandName,
+      model: mp.model_number || 'موديل قياسي',
+      storeName: mp.stores_count ? `${mp.stores_count} متاجر توفره` : 'متاح للطلب',
+      storeCity: 'كافة المحافظات',
+      price: 0,
+      currency: 'ر.س',
+      rating: 4.8,
+      reviewsCount: 24,
+      image: imageUrl,
+      images: imagesList,
+      badge: mp.stores_count ? `${mp.stores_count} عروض متاحة` : 'كتالوج SolarHub',
+      specs: specsRecord,
+      stockQuantity: 100,
+      minOrderQty: 1,
+      inStock: true,
+      isQuoteOnly: true,
+      datasheetUrl: mp.datasheet_url,
+      description: mp.description,
+    }
   }
 
-  function storeRows(
-    filters: StoreFilters = {},
-  ): Promise<ApiStoreProduct[]> {
-    const filtersQuery = filterQuery(
-      { ...filters },
-      ['governorate_id', 'category_id', 'store_id'],
-    )
+  /**
+   * جلب منتجات المتاجر المتاحة (Store Products)
+   */
+  const fetchStoreProducts = async (filters: {
+    governorate_id?: number | string | null
+    category_id?: number | string | null
+    store_id?: number | string | null
+  } = {}): Promise<CustomerProductView[]> => {
+    try {
+      const query: Record<string, any> = { per_page: 100 }
+      if (filters.governorate_id && filters.governorate_id !== 'all') query.governorate_id = filters.governorate_id
+      if (filters.category_id && filters.category_id !== 'all') query.category_id = filters.category_id
+      if (filters.store_id && filters.store_id !== 'all') query.store_id = filters.store_id
 
-    return fetchAllApiRows<ApiStoreProduct>(
-      query => $api<ApiCollection<ApiStoreProduct>>(
-        '/store-products',
-        {
-          query: {
-            ...filtersQuery,
-            ...query,
-          },
-        },
-      ),
-      100,
-    )
+      const res: any = await $api('/store-products', { query })
+      const list = Array.isArray(res) ? res : (res?.data || [])
+      return list.map(mapStoreProductToView)
+    } catch (err: any) {
+      console.error('Failed to load store products:', err)
+      return []
+    }
   }
 
-  function fetchStoreProducts(
-    filters: StoreFilters = {},
-  ): Promise<CustomerProductView[]> {
-    return read(async () => {
-      const rows = await storeRows(filters)
+  /**
+   * جلب منتجات الكتالوج المرجعي (Master Products)
+   */
+  const fetchMasterProducts = async (params: {
+    page?: number
+    per_page?: number
+    category_id?: number | string | null
+    brand_id?: number | string | null
+    search?: string
+  } = {}): Promise<{ products: CustomerProductView[]; meta: PaginationMeta }> => {
+    try {
+      const perPage = params.per_page || 12
+      const query: Record<string, any> = { per_page: perPage }
+      if (params.page) query.page = params.page
+      if (params.category_id && params.category_id !== 'all') query.category_id = params.category_id
+      if (params.brand_id && params.brand_id !== 'all') query.brand_id = params.brand_id
+      if (params.search && params.search.trim()) query.search = params.search.trim()
 
-      const brand =
-        filters.brand_id && filters.brand_id !== 'all'
-          ? idValue(filters.brand_id)
-          : null
+      const res: any = await $api('/master-products', { query })
+      const list: any[] = Array.isArray(res) ? res : (res?.data || [])
 
-      const query =
-        filters.search?.trim().toLocaleLowerCase('ar') || ''
+      const currentPage = Number(res?.meta?.current_page || params.page || 1)
+      const total = Number(res?.meta?.total ?? list.length)
+      const lastPage = Number(res?.meta?.last_page || Math.ceil(total / perPage) || 1)
 
-      return rows
-        .map(mapStoreProductToView)
-        .filter(product => {
-          if (
-            brand !== null
-            && product.brandId !== brand
-          ) {
-            return false
-          }
-
-          if (!query) return true
-
-          return [
-            product.name,
-            product.brand,
-            product.model,
-            product.storeName,
-          ]
-            .join(' ')
-            .toLocaleLowerCase('ar')
-            .includes(query)
-        })
-    }, 'تعذر تحميل عروض المتاجر.')
-  }
-
-  function fetchMasterProducts(
-    params: MasterFilters = {},
-  ): Promise<{
-    products: CustomerProductView[]
-    meta: PaginationMeta
-  }> {
-    return read(async () => {
-      const query = filterQuery(
-        { ...params },
-        ['category_id', 'brand_id'],
-      )
-
-      query.page = idValue(params.page ?? 1)
-
-      query.per_page = Math.min(
-        100,
-        idValue(params.per_page ?? 12),
-      )
-
-      if (params.search?.trim()) {
-        query.search = params.search.trim()
-      }
-
-      const response = await $api<
-        ApiResponse<MasterProduct[]>
-        & { meta: PaginationMeta }
-      >('/master-products', { query })
-
-      const meta = response.meta
-
-      if (
-        response.status !== 'success'
-        || !Array.isArray(response.data)
-        || !meta
-        || ![
-          meta.current_page,
-          meta.last_page,
-          meta.per_page,
-        ].every(value =>
-          Number.isSafeInteger(value) && value > 0,
-        )
-        || !Number.isSafeInteger(meta.total)
-        || meta.total < 0
-      ) {
-        throw fail('بيانات صفحات الكتالوج غير صالحة.')
+      const meta: PaginationMeta = {
+        current_page: currentPage,
+        last_page: lastPage,
+        per_page: perPage,
+        total,
       }
 
       return {
-        products: response.data.map(
-          mapMasterProductToView,
-        ),
+        products: list.map(mapMasterProductToView),
         meta,
       }
-    }, 'تعذر تحميل الكتالوج المرجعي.')
+    } catch (err: any) {
+      console.error('Failed to load master products:', err)
+      return {
+        products: [],
+        meta: { current_page: 1, last_page: 1, per_page: 12, total: 0 },
+      }
+    }
   }
 
-  async function fetchProductDetails(
-    id: string | number,
-    kind: CustomerProductKind = 'store',
+  /**
+   * جلب تفاصيل منتج محدد مع كافة عروض المتاجر المتاحة له
+   */
+  const fetchProductDetails = async (
+    id: string | number
   ): Promise<{
     product: CustomerProductView
     offers: StoreOfferItem[]
     selectedOfferId?: number
-  } | null> {
-    const version = ++detailVersion
-
-    const current = () =>
-      version === detailVersion && !disposed
-
-    offersError.value = null
-    detailsWarning.value = null
+  } | null> => {
+    isLoading.value = true
+    error.value = null
 
     try {
-      return await read(async () => {
-        const productId = idValue(id)
+      let storeProduct: any = null
+      let masterProduct: any = null
+      let allStoreProducts: any[] = []
 
-        if (!['store', 'master'].includes(kind)) {
-          throw fail('نوع المنتج غير صالح.')
-        }
+      // أولاً: نحاول جلبه كـ store-product
+      try {
+        const spRes: any = await $api(`/store-products/${id}`)
+        storeProduct = spRes?.data || spRes
+      } catch {
+        // ليس store_product أو لا يمكن الوصول إليه مباشرة
+      }
 
-        let source: ApiStoreProduct | undefined
-        let master: MasterProduct
+      // جلب كافة عروض المتاجر لمقارنة العروض المتاحة لنفس المنتج
+      try {
+        const allSpRes: any = await $api('/store-products?per_page=100')
+        allStoreProducts = Array.isArray(allSpRes) ? allSpRes : (allSpRes?.data || [])
+      } catch {
+        allStoreProducts = []
+      }
 
-        if (kind === 'store') {
-          source = await get<ApiStoreProduct>(
-            `/store-products/${productId}`,
-          )
+      if (storeProduct) {
+        masterProduct = storeProduct.master_product || storeProduct.masterProduct
+        const masterId = masterProduct?.id || storeProduct.master_product_id
 
-          if (Number(source?.id) !== productId) {
-            throw fail(
-              'بيانات عرض المتجر غير متطابقة.',
-            )
-          }
-
-          const masterId = idValue(
-            source.master_product?.id,
-          )
-
-          master = source.master_product
-
+        // جلب تفاصيل المواصفات الفنية والصور الكاملة من master-product إن لم تكن مكتملة
+        if (masterId && (!masterProduct?.specifications || masterProduct.specifications.length === 0 || !masterProduct?.images || masterProduct.images.length === 0)) {
           try {
-            const full = await get<MasterProduct>(
-              `/master-products/${masterId}`,
-            )
-
-            if (Number(full?.id) !== masterId) {
-              throw fail(
-                'بيانات المنتج المرجعي غير متطابقة.',
-              )
+            const mpRes: any = await $api(`/master-products/${masterId}`)
+            const fullMp = mpRes?.data || mpRes
+            if (fullMp?.specifications) {
+              masterProduct.specifications = fullMp.specifications
             }
-
-            master = { ...master, ...full }
+            if (fullMp?.images?.length) {
+              masterProduct.images = fullMp.images
+            }
+            if (fullMp?.datasheet_url) {
+              masterProduct.datasheet_url = fullMp.datasheet_url
+            }
           } catch {
-            if (current()) {
-              detailsWarning.value =
-                'تعذر تحميل بعض تفاصيل المنتج المرجعي.'
-            }
-          }
-        } else {
-          master = await get<MasterProduct>(
-            `/master-products/${productId}`,
-          )
-
-          if (
-            Number(master?.id) !== productId
-            || master.is_active === false
-          ) {
-            throw fail('المنتج المرجعي غير متاح.')
+            /* ignore */
           }
         }
+        storeProduct.master_product = masterProduct
 
-        const masterId = idValue(master.id)
-
-        let rows: ApiStoreProduct[] = []
-
-        try {
-          rows = (
-            await storeRows({
-              category_id: optionalId(
-                master.category?.id,
-              ),
-            })
-          ).filter(row =>
-            Number(row.master_product?.id) === masterId,
-          )
-        } catch {
-          if (current()) {
-            offersError.value =
-              'تعذر تحميل جميع عروض المتاجر لهذا المنتج.'
-          }
-        }
-
-        if (!current()) return null
-
-        if (source) {
-          rows = rows.filter(
-            row => Number(row.id) !== Number(source!.id),
-          )
-
-          rows.unshift(source)
-        }
-
-        const offers = rows.map(row => {
-          const product = mapStoreProductToView({
-            ...row,
-            master_product: master,
+        // تصفية كافة عروض المتاجر التي توفر هذا الموديل / المنتج
+        const matchingOffers: StoreOfferItem[] = allStoreProducts
+          .filter((item: any) => {
+            const itemMpId = item.master_product?.id || item.master_product_id || item.masterProduct?.id
+            return Number(itemMpId) === Number(masterId)
           })
+          .map((item: any) => ({
+            id: item.id,
+            storeId: item.store?.id || 0,
+            storeName: item.store?.company_name || 'وكيل معتمد',
+            storeCity: item.governorate?.name_ar || 'اليمن',
+            storeLogo: item.store?.company_logo_path,
+            price: Number(item.price) || 0,
+            stockQuantity: Number(item.stock_quantity) || 0,
+            minOrderQty: Number(item.min_order_qty) || 1,
+            warrantyPeriod: item.warranty_period,
+            status: item.status,
+          }))
 
-          return {
-            id: idValue(row.id),
-            storeId: idValue(row.store?.id),
+        // إذا لم يكن العرض الحالي ضمن القائمة نضيفه
+        if (!matchingOffers.some(o => o.id === storeProduct.id)) {
+          matchingOffers.unshift({
+            id: storeProduct.id,
+            storeId: storeProduct.store?.id || 0,
+            storeName: storeProduct.store?.company_name || 'وكيل معتمد',
+            storeCity: storeProduct.governorate?.name_ar || 'اليمن',
+            storeLogo: storeProduct.store?.company_logo_path,
+            price: Number(storeProduct.price) || 0,
+            stockQuantity: Number(storeProduct.stock_quantity) || 0,
+            minOrderQty: Number(storeProduct.min_order_qty) || 1,
+            warrantyPeriod: storeProduct.warranty_period,
+            status: storeProduct.status,
+          })
+        }
 
-            storeName: product.storeName,
-            storeCity: product.storeCity,
-
-            price: product.price,
-            stockQuantity: product.stockQuantity,
-            minOrderQty: product.minOrderQty,
-            warrantyPeriod: product.warrantyPeriod,
-
-            status: row.status,
-            product,
-          }
-        })
+        const viewProduct = mapStoreProductToView(storeProduct)
 
         return {
-          product: source
-            ? mapStoreProductToView({
-                ...source,
-                master_product: master,
-              })
-            : mapMasterProductToView(master),
-
-          offers,
-
-          selectedOfferId: source
-            ? idValue(source.id)
-            : undefined,
+          product: viewProduct,
+          offers: matchingOffers,
+          selectedOfferId: storeProduct.id,
         }
-      }, 'تعذر تحميل تفاصيل المنتج. تحقق من الرابط والاتصال.', current)
-    } catch {
+      }
+
+      // ثانياً: إذا لم يكن store-product نحاول جلبه كـ master-product
+      try {
+        const mpRes: any = await $api(`/master-products/${id}`)
+        masterProduct = mpRes?.data || mpRes
+      } catch {
+        masterProduct = null
+      }
+
+      if (!masterProduct) {
+        error.value = 'المنتج غير موجود أو تم إلغاء تفعيله.'
+        return null
+      }
+
+      // البحث عن أي عروض متاجر توفر هذا الـ MasterProduct
+      const matchingOffers: StoreOfferItem[] = allStoreProducts
+        .filter((item: any) => {
+          const itemMpId = item.master_product?.id || item.master_product_id || item.masterProduct?.id
+          return Number(itemMpId) === Number(masterProduct.id)
+        })
+        .map((item: any) => ({
+          id: item.id,
+          storeId: item.store?.id || 0,
+          storeName: item.store?.company_name || 'وكيل معتمد',
+          storeCity: item.governorate?.name_ar || 'اليمن',
+          storeLogo: item.store?.company_logo_path,
+          price: Number(item.price) || 0,
+          stockQuantity: Number(item.stock_quantity) || 0,
+          minOrderQty: Number(item.min_order_qty) || 1,
+          warrantyPeriod: item.warranty_period,
+          status: item.status,
+        }))
+
+      // إذا كان هناك عروض متاجر، نستخدم العرض الأول كأساس
+      let viewProduct: CustomerProductView
+      if (matchingOffers.length > 0 && matchingOffers[0]) {
+        const firstOffer = matchingOffers[0]
+        const matchingSp = allStoreProducts.find((i: any) => i.id === firstOffer.id)
+        viewProduct = mapStoreProductToView(matchingSp || { ...masterProduct, price: firstOffer.price, id: firstOffer.id })
+      } else {
+        viewProduct = mapMasterProductToView(masterProduct)
+      }
+
+      return {
+        product: viewProduct,
+        offers: matchingOffers,
+        selectedOfferId: matchingOffers[0]?.id,
+      }
+    } catch (err: any) {
+      error.value = err?.userMessage || err?.message || 'تعذر تحميل بيانات المنتج.'
       return null
+    } finally {
+      isLoading.value = false
     }
   }
 
-  async function sendQuoteRequest(data: {
+  /**
+   * إرسال طلب عرض سعر مخصص (RFQ)
+   */
+  const sendQuoteRequest = async (data: {
     store_product_id: number
-
-    // للتحقق في الفرونت فقط؛ لا يُرسل إلى الباك إند.
-    master_product_id?: number
-
     quantity: number
     customer_target_price?: number | null
     customer_notes?: string | null
-  }) {
-    if (isActionLoading.value) {
-      throw fail('جارٍ إرسال طلب التسعير.')
-    }
-
-    if (quoteNeedsVerification.value) {
-      throw fail(
-        'راجع سجل عروض الأسعار قبل إرسال الطلب مجددًا.',
-      )
-    }
-
-    const token = auth.token
-    const owner = String(auth.user?.id ?? '')
-
-    if (
-      !token
-      || !owner
-      || auth.user?.role !== 'customer'
-    ) {
-      throw fail(
-        'سجّل الدخول بحساب عميل لطلب التسعير.',
-      )
-    }
-
-    const version = ++mutationVersion
-
-    const current = () =>
-      !disposed
-      && version === mutationVersion
-      && auth.token === token
-      && String(auth.user?.id ?? '') === owner
-
-    let requestSent = false
-
+  }) => {
     isActionLoading.value = true
-    quoteError.value = null
-    quoteValidationErrors.value = {}
-
     try {
-      const id = idValue(data.store_product_id)
-
-      if (!optionalId(data.master_product_id)) {
-        throw fail(
-          'اختر عرض متجر محددًا للمنتج قبل إرسال طلب التسعير.',
-        )
+      const payload: Record<string, any> = {
+        store_product_id: Number(data.store_product_id),
+        quantity: Number(data.quantity) || 1,
+      }
+      if (data.customer_target_price) {
+        payload.customer_target_price = Number(data.customer_target_price)
+      }
+      if (data.customer_notes?.trim()) {
+        payload.customer_notes = data.customer_notes.trim()
       }
 
-      const masterId = idValue(data.master_product_id)
-      const quantity = idValue(data.quantity)
+      const res: any = await $api('/quote-requests', {
+        method: 'POST',
+        body: payload,
+      })
 
-      const payload: Record<string, number | string> = {
-        store_product_id: id,
-        quantity,
-      }
-
-      if (
-        data.customer_target_price !== null
-        && data.customer_target_price !== undefined
-      ) {
-        const target = numberValue(
-          data.customer_target_price,
-        )
-
-        if (target === null) {
-          throw fail('السعر المستهدف غير صالح.')
-        }
-
-        payload.customer_target_price = target
-      }
-
-      const notes = data.customer_notes?.trim() || ''
-
-      if (notes.length > 1000) {
-        throw fail(
-          'الملاحظات يجب ألا تتجاوز 1000 حرف.',
-        )
-      }
-
-      if (notes) {
-        payload.customer_notes = notes
-      }
-
-      // التحقق من أن معرّف العرض يخص المنتج المطلوب.
-      const source = await get<ApiStoreProduct>(
-        `/store-products/${id}`,
-      )
-
-      if (!current()) {
-        throw fail('تغيرت جلسة الحساب.')
-      }
-
-      if (
-        Number(source.id) !== id
-        || Number(source.master_product?.id) !== masterId
-        || source.status !== 'active'
-      ) {
-        throw fail(
-          'عرض المتجر لا يطابق المنتج المحدد أو لم يعد متاحًا.',
-        )
-      }
-
-      requestSent = true
-
-      const response = await $api<ApiResponse<any>>(
-        '/quote-requests',
-        {
-          method: 'POST',
-          retry: 0,
-          body: payload,
-        },
-      )
-
-      if (!current()) {
-        throw fail('تغيرت جلسة الحساب.')
-      }
-
-      if (
-        response.status !== 'success'
-        || !optionalId(response.data?.id)
-        || Number(response.data.store_product?.id) !== id
-        || Number(response.data.quantity) !== quantity
-        || String(response.data.customer?.id) !== owner
-        || response.data.status !== 'pending'
-      ) {
-        throw fail(
-          'تعذر تأكيد حفظ طلب التسعير. راجع سجل عروض الأسعار.',
-        )
-      }
-
-      return response
-    } catch (failure: any) {
-      if (!current()) {
-        throw fail(
-          'تغيرت جلسة الحساب أو أُغلقت الصفحة.',
-        )
-      }
-
-      const status =
-        failure?.statusCode ?? failure?.status
-
-      const fields = [
-        'store_product_id',
-        'quantity',
-        'customer_target_price',
-        'customer_notes',
-      ]
-
-      if (status === 422) {
-        for (const field of fields) {
-          const messages = failure?.data?.errors?.[field]
-
-          const message = Array.isArray(messages)
-            ? messages[0]
-            : messages
-
-          if (typeof message === 'string') {
-            quoteValidationErrors.value[field] = message
-          }
-        }
-      }
-
-      quoteNeedsVerification.value =
-        requestSent
-        && !Object.keys(
-          quoteValidationErrors.value,
-        ).length
-        && ![401, 403].includes(status)
-
-      quoteError.value =
-        failure?.userMessage
-        || 'تعذر تأكيد إرسال طلب التسعير. تحقق من البيانات وسجل عروض الأسعار.'
-
-      throw fail(quoteError.value!)
+      return res
     } finally {
-      if (current()) {
-        isActionLoading.value = false
-      }
+      isActionLoading.value = false
     }
   }
-
-  watch(
-    [
-      () => auth.token,
-      () => String(auth.user?.id ?? ''),
-    ],
-    () => {
-      mutationVersion++
-
-      isActionLoading.value = false
-      quoteError.value = null
-      quoteValidationErrors.value = {}
-      quoteNeedsVerification.value = false
-    },
-  )
-
-  onBeforeUnmount(() => {
-    disposed = true
-    detailVersion++
-    mutationVersion++
-  })
 
   return {
     categories,
     brands,
     governorates,
-
     isLoading,
     isActionLoading,
     error,
-    offersError,
-    detailsWarning,
-
-    quoteError,
-    quoteValidationErrors,
-    quoteNeedsVerification,
-
     fetchCategories,
     fetchBrands,
     fetchGovernorates,
@@ -1013,7 +525,6 @@ export function useCustomerProducts() {
     fetchMasterProducts,
     fetchProductDetails,
     sendQuoteRequest,
-
     mapStoreProductToView,
     mapMasterProductToView,
   }

@@ -141,6 +141,7 @@ onMounted(async () => {
           existingImages.value = product.images.map((img: any) => ({
             id: img.id,
             image_url: img.url || img.image_url || img.image_path || '',
+            url: img.url || img.image_url || img.image_path || '',
             is_featured: !!img.is_featured,
           }))
         }
@@ -611,7 +612,7 @@ async function handleSubmit() {
                 <Trash2 class="size-3.5" />
               </button>
 
-              <img :src="img.image_url" alt="صورة المنتج" class="h-24 w-24 object-contain" />
+              <img :src="img.image_url || img.url" alt="صورة المنتج" class="h-24 w-24 object-contain" />
             </div>
 
             <!-- الصور المختارة محلياً -->

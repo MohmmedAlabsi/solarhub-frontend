@@ -1,47 +1,29 @@
 <script setup lang="ts">
 import {
-  computed,
-  onBeforeUnmount,
-  onMounted,
-  reactive,
-  ref,
-} from 'vue'
-import { Loader2, PackageSearch, Search } from 'lucide-vue-next'
-import {
-  useCustomerProducts,
-  type CustomerProductKind,
-  type CustomerProductView,
-} from '../../../composables/useCustomerProducts'
-import type { Category } from '../../../../types/api'
-import ProductCard from '../../../components/customer/ecommerce/ProductCard.vue'
-import RfqModal from '../../../components/customer/ecommerce/RfqModal.vue'
+  Award,
+  Box,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Loader2,
+  PackageCheck,
+  PackageSearch,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  Truck,
+  Wrench,
+} from 'lucide-vue-next'
+import { useCustomerProducts, type CustomerProductView } from '~~/app/composables/useCustomerProducts'
 
 definePageMeta({
   layout: 'customer',
 })
 
 useSeoMeta({
-  title: 'كتالوج المنتجات | SolarHub',
-  description: 'تصفح المنتجات وعروض المتاجر واطلب عروض الأسعار.',
+  title: 'كتالوج المنتجات ومكونات الطاقة الشمسية | SolarHub',
+  description: 'تصفح وشراء منتجات ومعدات الطاقة الكهروضوئية المعتمدة (Tier 1) من الموردين والوكلاء المعتمدين.',
 })
-
-type DisplayMode = 'cart' | 'rfq'
-
-interface CatalogFilters {
-  search: string
-  categoryId: string
-  brandId: string
-  governorateId: string
-}
-
-function emptyFilters(): CatalogFilters {
-  return {
-    search: '',
-    categoryId: '',
-    brandId: '',
-    governorateId: '',
-  }
-}
 
 const {
   categories,
@@ -54,798 +36,444 @@ const {
   fetchMasterProducts,
 } = useCustomerProducts()
 
-const displayMode = ref<DisplayMode>('cart')
+// أنماط العرض: إضافة للسلة (شراء فوري) أو طلب عرض سعر (RFQ)
+const displayMode = ref<'cart' | 'rfq'>('cart')
+const searchQuery = ref('')
+const selectedBrand = ref<string | number>('all')
+const selectedGovernorate = ref<string | number>('all')
+const selectedCategory = ref<string | number>('all')
 
-const draft = reactive<CatalogFilters>(emptyFilters())
-const applied = ref<CatalogFilters>(emptyFilters())
+const isLoading = ref(true)
+const storeProductsList = ref<CustomerProductView[]>([])
+const masterProductsList = ref<CustomerProductView[]>([])
 
-const storeProducts = ref<CustomerProductView[]>([])
-const masterProducts = ref<CustomerProductView[]>([])
-
-const productsLoading = ref(true)
-const productsReady = ref(false)
-const productsError = ref('')
-
-const filtersLoading = ref(true)
-const filterErrors = ref<string[]>([])
-
+// ترقيم الصفحات
 const currentPage = ref(1)
+const totalItems = ref(0)
 const lastPage = ref(1)
-const totalItems = ref<number | null>(null)
 
-const selectedProductForRfq = ref<CustomerProductView | null>(null)
+// نافذة RFQ
+const selectedProductForRfq = ref<any | null>(null)
 const isRfqModalOpen = ref(false)
-const noticeMessage = ref('')
 
-const pageSize = 12
-
-let productsVersion = 0
-let filtersVersion = 0
-let disposed = false
-
-const categoryOptions = computed(() => {
-  const options: Array<{
-    value: string
-    label: string
-  }> = []
-
-  const seen = new Set<string>()
-
-  function visit(rows: Category[], parent = '') {
-    for (const category of rows) {
-      const value = String(category.id)
-
-      if (seen.has(value)) continue
-
-      seen.add(value)
-
-      const name =
-        category.name_ar
-        || category.name_en
-        || `تصنيف #${category.id}`
-
-      const label = parent
-        ? `${parent} / ${name}`
-        : name
-
-      options.push({ value, label })
-
-      if (Array.isArray(category.children)) {
-        visit(category.children, label)
-      }
-    }
-  }
-
-  visit(categories.value)
-
-  return options
-})
-
-const searchPending = computed(() =>
-  draft.search.trim() !== applied.value.search,
-)
-
-const hasFilters = computed(() =>
-  Boolean(
-    applied.value.search
-    || applied.value.categoryId
-    || applied.value.brandId
-    || applied.value.governorateId,
-  ),
-)
-
-const displayedProducts = computed(() => {
-  if (displayMode.value === 'rfq') {
-    return masterProducts.value
-  }
-
-  const start = (currentPage.value - 1) * pageSize
-
-  return storeProducts.value.slice(start, start + pageSize)
-})
-
-const visiblePages = computed(() => {
-  const end = Math.min(
-    lastPage.value,
-    Math.max(1, currentPage.value - 2) + 4,
-  )
-
-  const start = Math.max(1, end - 4)
-
-  return Array.from(
-    { length: end - start + 1 },
-    (_, index) => start + index,
-  )
-})
-
-function filterId(value: string): number | undefined {
-  if (!value) return undefined
-
-  const id = Number(value)
-
-  if (!Number.isSafeInteger(id) || id <= 0) {
-    throw Object.assign(
-      new Error('أحد معرّفات التصفية غير صالح. أعد ضبط الفلاتر.'),
-      {
-        userMessage:
-          'أحد معرّفات التصفية غير صالح. أعد ضبط الفلاتر.',
-      },
-    )
-  }
-
-  return id
-}
-
-async function loadFilterOptions() {
-  const version = ++filtersVersion
-
-  filtersLoading.value = true
-  filterErrors.value = []
-
-  const jobs = [
-    {
-      label: 'التصنيفات',
-      run: fetchCategories,
-    },
-    {
-      label: 'العلامات التجارية',
-      run: fetchBrands,
-    },
-    {
-      label: 'المحافظات',
-      run: fetchGovernorates,
-    },
-  ]
-
-  const results = await Promise.allSettled(
-    jobs.map(job => job.run()),
-  )
-
-  if (disposed || version !== filtersVersion) return
-
-  filterErrors.value = results.flatMap((result, index) =>
-    result.status === 'rejected'
-      ? [jobs[index]!.label]
-      : [],
-  )
-
-  filtersLoading.value = false
-}
-
-async function loadProducts() {
-  const version = ++productsVersion
-  const mode = displayMode.value
-  const filters = { ...applied.value }
-  const requestedPage = currentPage.value
-
-  productsLoading.value = true
-  productsReady.value = false
-  productsError.value = ''
-  totalItems.value = null
-
-  const current = () =>
-    !disposed && version === productsVersion
-
-  try {
-    const categoryId = filterId(filters.categoryId)
-    const brandId = filterId(filters.brandId)
-
-    if (mode === 'cart') {
-      const rows = await fetchStoreProducts({
-        category_id: categoryId,
-        brand_id: brandId,
-        governorate_id: filterId(filters.governorateId),
-        search: filters.search,
-      })
-
-      if (!current()) return
-
-      storeProducts.value = rows
-
-      totalItems.value = rows.length
-      lastPage.value = Math.max(
-        1,
-        Math.ceil(rows.length / pageSize),
-      )
-
-      currentPage.value = Math.min(
-        requestedPage,
-        lastPage.value,
-      )
-
-      productsReady.value = true
-      return
-    }
-
-    let page = requestedPage
-
-    // معالجة الصفحة التي لم تعد موجودة بعد تغير البيانات.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const result = await fetchMasterProducts({
-        page,
-        per_page: pageSize,
-        category_id: categoryId,
-        brand_id: brandId,
-        search: filters.search,
-      })
-
-      if (!current()) return
-
-      if (result.meta.total === 0) {
-        masterProducts.value = []
-        totalItems.value = 0
-        currentPage.value = 1
-        lastPage.value = 1
-        productsReady.value = true
-        return
-      }
-
-      if (
-        result.meta.current_page > result.meta.last_page
-      ) {
-        page = result.meta.last_page
-        continue
-      }
-
-      masterProducts.value = result.products
-      totalItems.value = result.meta.total
-      currentPage.value = result.meta.current_page
-      lastPage.value = result.meta.last_page
-      productsReady.value = true
-      return
-    }
-
-    productsError.value =
-      'تغيرت صفحات الكتالوج أثناء التحميل. أعد المحاولة.'
-  } catch (failure: unknown) {
-    if (!current()) return
-
-    const requestError = failure as {
-      userMessage?: string
-    }
-
-    productsError.value =
-      requestError.userMessage
-      || 'تعذر تحميل المنتجات. تحقق من الاتصال وأعد المحاولة.'
-  } finally {
-    if (current()) {
-      productsLoading.value = false
-    }
-  }
-}
-
-function applyFilters() {
-  applied.value = {
-    search: draft.search.trim(),
-    categoryId: draft.categoryId,
-    brandId: draft.brandId,
-
-    // المنتج المرجعي غير مرتبط بمحافظة.
-    governorateId: displayMode.value === 'cart'
-      ? draft.governorateId
-      : '',
-  }
-
-  currentPage.value = 1
-  noticeMessage.value = ''
-
-  void loadProducts()
-}
-
-function setMode(mode: DisplayMode) {
-  if (displayMode.value === mode) return
-
-  displayMode.value = mode
-  applyFilters()
-}
-
-function resetFilters() {
-  Object.assign(draft, emptyFilters())
-  applied.value = emptyFilters()
-  currentPage.value = 1
-  noticeMessage.value = ''
-
-  void loadProducts()
-}
-
-async function changePage(page: number) {
-  if (
-    productsLoading.value
-    || !productsReady.value
-    || productsError.value
-    || !Number.isInteger(page)
-    || page < 1
-    || page > lastPage.value
-    || page === currentPage.value
-  ) {
-    return
-  }
-
-  const mode = displayMode.value
-  currentPage.value = page
-
-  if (mode === 'rfq') {
-    await loadProducts()
-  }
-
-  if (
-    !disposed
-    && displayMode.value === mode
-    && import.meta.client
-  ) {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    })
-  }
-}
-
-function openRfqModal(candidate: {
-  id: number | string
-  kind?: CustomerProductKind
-}) {
-  const rows = candidate.kind === 'master'
-    ? masterProducts.value
-    : storeProducts.value
-
-  const product = rows.find(row =>
-    row.kind === candidate.kind
-    && Number(row.id) === Number(candidate.id),
-  )
-
-  if (!product) return
-
+function openRfqModal(product: any) {
   selectedProductForRfq.value = product
   isRfqModalOpen.value = true
 }
 
-function handleRfqSubmitted(submission: { id: number }) {
-  noticeMessage.value =
-    `تم حفظ طلب التسعير #${submission.id}.`
+// جلب البيانات الأولية
+const loadInitialFilters = async () => {
+  await Promise.allSettled([
+    fetchCategories(),
+    fetchBrands(),
+    fetchGovernorates(),
+  ])
 }
 
-onMounted(() => {
-  void loadFilterOptions()
-  void loadProducts()
+// جلب المنتجات وفقاً للوضع والفلاتر
+const loadProducts = async () => {
+  isLoading.value = true
+  try {
+    if (displayMode.value === 'cart') {
+      // وضع الشراء الفوري والسلة: جلب عروض المتاجر المتاحة
+      const items = await fetchStoreProducts({
+        category_id: selectedCategory.value === 'all' ? undefined : selectedCategory.value,
+        governorate_id: selectedGovernorate.value === 'all' ? undefined : selectedGovernorate.value,
+      })
+      storeProductsList.value = items
+      totalItems.value = filteredStoreProducts.value.length
+      lastPage.value = Math.max(1, Math.ceil(filteredStoreProducts.value.length / 12))
+    } else {
+      // وضع عروض الأسعار: جلب الكتالوج المرجعي الشامل
+      const result = await fetchMasterProducts({
+        page: currentPage.value,
+        per_page: 12,
+        category_id: selectedCategory.value === 'all' ? undefined : selectedCategory.value,
+        brand_id: selectedBrand.value === 'all' ? undefined : selectedBrand.value,
+        search: searchQuery.value,
+      })
+      masterProductsList.value = result.products
+      totalItems.value = result.meta.total
+      lastPage.value = result.meta.last_page
+      currentPage.value = result.meta.current_page
+    }
+  } catch (err) {
+    console.error('Error loading customer products:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// مراقبة التبديل بين الأنماط وإعادة التحميل
+watch(displayMode, () => {
+  currentPage.value = 1
+  loadProducts()
 })
 
-onBeforeUnmount(() => {
-  disposed = true
-  productsVersion++
-  filtersVersion++
+// تصفية نتائج المتجر محلياً حسب البحث والموديل والماركة
+const filteredStoreProducts = computed(() => {
+  return storeProductsList.value.filter((p) => {
+    const q = searchQuery.value.trim().toLowerCase()
+    const matchSearch =
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      p.brand.toLowerCase().includes(q) ||
+      p.model.toLowerCase().includes(q) ||
+      p.storeName.toLowerCase().includes(q)
+
+    const matchBrand =
+      selectedBrand.value === 'all' ||
+      String(p.brand).toLowerCase().includes(String(selectedBrand.value).toLowerCase())
+
+    return matchSearch && matchBrand
+  })
+})
+
+// تحديث إجمالي العناصر والصفحات عند تغير الفلترة في وضع السلة
+watch([filteredStoreProducts, displayMode], () => {
+  if (displayMode.value === 'cart') {
+    totalItems.value = filteredStoreProducts.value.length
+    lastPage.value = Math.max(1, Math.ceil(filteredStoreProducts.value.length / 12))
+    if (currentPage.value > lastPage.value) {
+      currentPage.value = 1
+    }
+  }
+})
+
+// المنتجات المعروضة في الصفحة الحالية
+const displayedProducts = computed(() => {
+  if (displayMode.value === 'rfq') {
+    return masterProductsList.value
+  }
+
+  // في وضع السلة (store products): تقطيع حسب الصفحة الحالية (12 منتج لكل صفحة)
+  const pageSize = 12
+  const start = (currentPage.value - 1) * pageSize
+  return filteredStoreProducts.value.slice(start, start + pageSize)
+})
+
+// أرقام الصفحات المعروضة بشكل نافذة منزلقة
+const visiblePages = computed(() => {
+  const pages: number[] = []
+  const maxButtons = 5
+  let start = Math.max(1, currentPage.value - Math.floor(maxButtons / 2))
+  let end = Math.min(lastPage.value, start + maxButtons - 1)
+
+  if (end - start + 1 < maxButtons) {
+    start = Math.max(1, end - maxButtons + 1)
+  }
+
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
+})
+
+function handleSearchSubmit() {
+  currentPage.value = 1
+  loadProducts()
+}
+
+function handlePageChange(page: number) {
+  if (page < 1 || page > lastPage.value) return
+  currentPage.value = page
+  if (displayMode.value === 'rfq') {
+    loadProducts()
+  }
+  if (import.meta.client) {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
+onMounted(async () => {
+  await loadInitialFilters()
+  await loadProducts()
 })
 </script>
 
 <template>
-  <div dir="rtl" class="flex min-w-0 flex-col gap-6">
-    <nav
-      class="flex flex-wrap items-center gap-2 text-xs text-solar-text-muted"
-      aria-label="مسار التنقل"
-    >
-      <NuxtLink to="/customer/dashboard">
-        الرئيسية
-      </NuxtLink>
-
-      <span aria-hidden="true">‹</span>
-
-      <span>كتالوج المنتجات</span>
+  <div class="flex flex-col gap-8">
+    <!-- فتات الخبز (Breadcrumbs) -->
+    <nav class="flex items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل">
+      <NuxtLink to="/customer/dashboard" class="hover:text-solar-text-heading">الرئيسية</NuxtLink>
+      <span>/</span>
+      <span class="font-bold text-solar-text-heading">كتالوج المنتجات ومكونات الطاقة</span>
     </nav>
 
-    <header>
-      <h1 class="text-2xl font-bold text-solar-text-heading md:text-3xl">
-        كتالوج المنتجات
-      </h1>
-
-      <p class="mt-3 text-sm leading-7 text-solar-text-muted">
-        تصفح عروض المتاجر، أو استعرض المنتجات المرجعية لاختيار
-        متجر وطلب تسعيرته.
-      </p>
-    </header>
-
-    <nav
-      class="flex flex-wrap gap-3"
-      aria-label="طريقة تصفح المنتجات"
-    >
-      <button
-        type="button"
-        :aria-pressed="displayMode === 'cart'"
-        class="rounded-lg border px-5 py-3 text-sm font-bold"
-        :class="
-          displayMode === 'cart'
-            ? 'border-solar-yellow bg-solar-yellow text-solar-navy-dark'
-            : 'border-solar-border-card bg-white text-solar-text-heading'
-        "
-        @click="setMode('cart')"
-      >
-        عروض المتاجر
-      </button>
-
-      <button
-        type="button"
-        :aria-pressed="displayMode === 'rfq'"
-        class="rounded-lg border px-5 py-3 text-sm font-bold"
-        :class="
-          displayMode === 'rfq'
-            ? 'border-solar-yellow bg-solar-yellow text-solar-navy-dark'
-            : 'border-solar-border-card bg-white text-solar-text-heading'
-        "
-        @click="setMode('rfq')"
-      >
-        الكتالوج المرجعي
-      </button>
-    </nav>
-
-    <section
-      class="rounded-xl border border-solar-border-card bg-white p-5"
-      aria-label="البحث وتصفية المنتجات"
-    >
-      <form
-        class="flex flex-col gap-3 sm:flex-row"
-        @submit.prevent="applyFilters"
-      >
-        <label class="relative min-w-0 flex-1">
-          <span class="sr-only">البحث في المنتجات</span>
-
-          <Search
-            class="pointer-events-none absolute right-3 top-3.5 size-4 text-solar-text-muted"
-            aria-hidden="true"
-          />
-
-          <input
-            v-model="draft.search"
-            type="search"
-            :placeholder="
-              displayMode === 'rfq'
-                ? 'ابحث باسم المنتج'
-                : 'المنتج أو الموديل أو العلامة أو المتجر'
-            "
-            class="solar-input h-11 pr-10"
-          >
-        </label>
-
-        <button
-          type="submit"
-          class="rounded-lg bg-solar-navy px-6 py-3 text-sm font-bold text-white"
-        >
-          بحث
-        </button>
-      </form>
-
-      <p
-        v-if="searchPending"
-        class="mt-3 text-xs leading-6 text-amber-800"
-      >
-        اضغط «بحث» لتطبيق النص الذي كتبته.
-      </p>
-
-      <div
-        class="mt-5 grid gap-4 border-t border-solar-border-card pt-5 sm:grid-cols-2 lg:grid-cols-3"
-      >
-        <label class="flex flex-col gap-2">
-          <span class="text-xs font-bold text-solar-text-heading">
-            التصنيف
-          </span>
-
-          <select
-            v-model="draft.categoryId"
-            :disabled="filtersLoading"
-            class="solar-input h-11 disabled:opacity-50"
-            @change="applyFilters"
-          >
-            <option value="">جميع التصنيفات</option>
-
-            <option
-              v-for="category in categoryOptions"
-              :key="category.value"
-              :value="category.value"
-            >
-              {{ category.label }}
-            </option>
-          </select>
-        </label>
-
-        <label class="flex flex-col gap-2">
-          <span class="text-xs font-bold text-solar-text-heading">
-            العلامة التجارية
-          </span>
-
-          <select
-            v-model="draft.brandId"
-            :disabled="filtersLoading"
-            class="solar-input h-11 disabled:opacity-50"
-            @change="applyFilters"
-          >
-            <option value="">جميع العلامات</option>
-
-            <option
-              v-for="brand in brands"
-              :key="brand.id"
-              :value="String(brand.id)"
-            >
-              {{ brand.name }}
-            </option>
-          </select>
-        </label>
-
-        <label
-          v-if="displayMode === 'cart'"
-          class="flex flex-col gap-2"
-        >
-          <span class="text-xs font-bold text-solar-text-heading">
-            محافظة عرض المتجر
-          </span>
-
-          <select
-            v-model="draft.governorateId"
-            :disabled="filtersLoading"
-            class="solar-input h-11 disabled:opacity-50"
-            @change="applyFilters"
-          >
-            <option value="">جميع المحافظات</option>
-
-            <option
-              v-for="governorate in governorates"
-              :key="governorate.id"
-              :value="String(governorate.id)"
-            >
-              {{ governorate.name_ar || governorate.name_en }}
-            </option>
-          </select>
-        </label>
+    <!-- رأس الصفحة وبطاقات الإحصاءات المعتمدة -->
+    <header class="flex flex-col gap-4 text-center sm:text-right">
+      <div class="flex flex-col gap-2">
+        <h1 class="text-2xl font-extrabold text-solar-text-heading md:text-3xl">
+          كتالوج المنتجات ومكونات الطاقة الكهروضوئية
+        </h1>
+        <p class="max-w-4xl text-sm leading-relaxed text-solar-text-secondary">
+          تصفح وشراء أكثر من 240 منتج أصلي من كبرى الماركات العالمية (Tier 1) مباشرة من الوكلاء والموزعين المعتمدين مع فواتير ضريبية وضمانات مصنعية حتى 25 عاماً.
+        </p>
       </div>
 
-      <p
-        v-if="filtersLoading"
-        role="status"
-        class="mt-4 text-xs text-solar-text-muted"
-      >
-        جارٍ تحميل خيارات التصفية…
-      </p>
+      <!-- كبسولات الأرقام والشارات الإحصائية -->
+      <div class="flex flex-wrap items-center gap-3 pt-2">
+        <span class="inline-flex items-center gap-2 rounded-xl bg-solar-status-info-bg px-3.5 py-1.5 text-xs font-bold text-solar-status-info-text border border-blue-100">
+          <Box class="size-4" />
+          <span>معدة مسجلة +245</span>
+        </span>
+        <span class="inline-flex items-center gap-2 rounded-xl bg-solar-status-info-bg px-3.5 py-1.5 text-xs font-bold text-solar-status-info-text border border-blue-100">
+          <ShieldCheck class="size-4" />
+          <span>وكلاء معتمدون</span>
+        </span>
+        <span class="inline-flex items-center gap-2 rounded-xl bg-solar-status-info-bg px-3.5 py-1.5 text-xs font-bold text-solar-status-info-text border border-blue-100">
+          <Award class="size-4" />
+          <span>معايير فحص Tier 1 عالمية</span>
+        </span>
+      </div>
+    </header>
 
-      <section
-        v-if="filterErrors.length"
-        role="alert"
-        class="mt-4 rounded-lg bg-amber-50 p-4"
-      >
-        <p class="text-xs leading-7 text-amber-900">
-          تعذر تحميل: {{ filterErrors.join('، ') }}.
-        </p>
+    <!-- شريط البحث السريع والتبديل بين وضعي الشراء وطلب عرض السعر -->
+    <div class="flex flex-col gap-4 rounded-2xl border border-solar-border-card bg-white p-4 shadow-sm">
+      <div class="flex flex-col gap-3 md:flex-row">
+        <!-- حقل البحث -->
+        <form @submit.prevent="handleSearchSubmit" class="relative flex-1">
+          <Search class="absolute top-3.5 right-3.5 size-4 text-solar-text-muted" />
+          <input
+            v-model="searchQuery"
+            type="search"
+            placeholder="ابحث باسم المنتج، الموديل، الماركة (مثل: Jinko, Deye, Pylontech)..."
+            class="solar-input pr-10"
+          />
+        </form>
 
-        <button
-          type="button"
-          :disabled="filtersLoading"
-          class="mt-2 text-xs font-bold text-amber-900 underline disabled:opacity-50"
-          @click="loadFilterOptions"
-        >
-          إعادة تحميل خيارات التصفية
+        <button type="button" @click="handleSearchSubmit" class="btn-dark px-6">
+          <span>بحث</span>
         </button>
-      </section>
-    </section>
 
-    <section
-      v-if="noticeMessage"
-      role="status"
-      aria-live="polite"
-      class="rounded-xl bg-emerald-50 p-4 text-sm leading-7 text-emerald-800"
+        <!-- زر التبديل التفاعلي بين وضع الشراء المباشر وطلب عرض السعر -->
+        <div class="flex items-center rounded-xl bg-solar-bg-subtle p-1 border border-solar-border-card text-xs font-bold">
+          <button
+            type="button"
+            @click="displayMode = 'cart'"
+            class="rounded-lg px-3 py-2 transition-all cursor-pointer flex items-center gap-1.5"
+            :class="displayMode === 'cart' ? 'bg-solar-yellow text-solar-navy-dark shadow-sm' : 'text-solar-text-secondary hover:text-solar-text-heading'"
+          >
+            <span>عروض المتاجر (شراء فوري)</span>
+            <span
+              class="rounded-full px-1.5 py-0.5 text-[10px] font-black"
+              :class="displayMode === 'cart' ? 'bg-solar-navy text-white' : 'bg-solar-border-card text-solar-text-muted'"
+            >
+              {{ storeProductsList.length }}
+            </span>
+          </button>
+          <button
+            type="button"
+            @click="displayMode = 'rfq'"
+            class="rounded-lg px-3 py-2 transition-all cursor-pointer flex items-center gap-1.5"
+            :class="displayMode === 'rfq' ? 'bg-solar-navy text-white shadow-sm' : 'text-solar-text-secondary hover:text-solar-text-heading'"
+          >
+            <span>كتالوج المعدات الشامل (RFQ)</span>
+            <span
+              class="rounded-full px-1.5 py-0.5 text-[10px] font-black"
+              :class="displayMode === 'rfq' ? 'bg-solar-yellow text-solar-navy-dark' : 'bg-solar-border-card text-solar-text-muted'"
+            >
+              245+
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- الفلاتر المنسدلة (تصفية النتائج) -->
+      <div class="flex flex-wrap items-center gap-3 border-t border-solar-border-card pt-3 text-xs">
+        <span class="flex items-center gap-1.5 font-bold text-solar-text-heading">
+          <SlidersHorizontal class="size-4 text-solar-yellow" />
+          تصفية النتائج:
+        </span>
+
+        <!-- فلتر التصنيف -->
+        <select
+          v-model="selectedCategory"
+          @change="loadProducts"
+          class="rounded-lg border border-solar-border-input bg-white px-3 py-1.5 text-xs text-solar-text-body focus:outline-none"
+        >
+          <option value="all">التصنيف: كافة الأنواع</option>
+          <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+            {{ cat.name_ar || cat.name_en }}
+          </option>
+        </select>
+
+        <!-- فلتر الماركة -->
+        <select
+          v-model="selectedBrand"
+          @change="loadProducts"
+          class="rounded-lg border border-solar-border-input bg-white px-3 py-1.5 text-xs text-solar-text-body focus:outline-none"
+        >
+          <option value="all">الماركة: الكل</option>
+          <option v-for="b in brands" :key="b.id" :value="b.id || b.name">
+            {{ b.name }}
+          </option>
+        </select>
+
+        <!-- فلتر المحافظة (في وضع السلة والمتاجر) -->
+        <select
+          v-if="displayMode === 'cart'"
+          v-model="selectedGovernorate"
+          @change="loadProducts"
+          class="rounded-lg border border-solar-border-input bg-white px-3 py-1.5 text-xs text-solar-text-body focus:outline-none"
+        >
+          <option value="all">المحافظة: كافة المناطق</option>
+          <option v-for="gov in governorates" :key="gov.id" :value="gov.id">
+            {{ gov.name_ar }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <!-- مؤشر التحميل أثناء جلب المنتجات -->
+    <div v-if="isLoading" class="flex flex-col items-center justify-center py-20">
+      <Loader2 class="size-10 animate-spin text-solar-yellow mb-4" />
+      <p class="text-sm font-semibold text-solar-text-muted">جاري تحميل المنتجات من قاعدة البيانات المعتمدة...</p>
+    </div>
+
+    <!-- شبكة المنتجات عند اكتمال التحميل -->
+    <div v-else-if="displayedProducts.length > 0" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <CustomerEcommerceProductCard
+        v-for="product in displayedProducts"
+        :key="product.id"
+        :product="product"
+        :mode="displayMode"
+        @open-rfq="openRfqModal"
+      />
+    </div>
+
+    <!-- الحالة الفارغة عند عدم العثور على نتائج -->
+    <div
+      v-else
+      class="flex flex-col items-center justify-center rounded-2xl border border-solar-border-card bg-white p-12 text-center shadow-sm"
     >
-      <p>{{ noticeMessage }}</p>
-
-      <NuxtLink
-        to="/customer/orders?tab=quotes"
-        class="mt-2 inline-flex text-xs font-bold underline"
-      >
-        عرض طلبات التسعير
-      </NuxtLink>
-    </section>
-
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <p
-        v-if="productsReady && !productsLoading && !productsError"
-        role="status"
-        aria-live="polite"
-        class="text-sm text-solar-text-muted"
-      >
-        عدد النتائج: {{ totalItems }}
-        {{ displayMode === 'cart' ? 'عرض متجر' : 'منتج مرجعي' }}
+      <div class="flex size-20 items-center justify-center rounded-full bg-solar-bg-subtle text-solar-text-muted mb-4">
+        <PackageSearch class="size-10 stroke-[1.5]" />
+      </div>
+      <h3 class="text-lg font-bold text-solar-text-heading mb-1">لا توجد منتجات مطابقة لخيارات التصفية</h3>
+      <p class="text-xs text-solar-text-muted max-w-sm mb-5">
+        لم نتمكن من العثور على منتجات تطابق الفلاتر المحددة حالياً. حاول إعادة ضبط خيارات البحث أو التصفية.
       </p>
+      <button
+        type="button"
+        @click="selectedCategory = 'all'; selectedBrand = 'all'; selectedGovernorate = 'all'; searchQuery = ''; loadProducts()"
+        class="btn-primary text-xs px-5 py-2"
+      >
+        إعادة ضبط خيارات الفلترة
+      </button>
+    </div>
 
-      <span v-else />
+    <!-- شريط الترقيم والتنقل بين الصفحات (Pagination) -->
+    <div
+      v-if="!isLoading && lastPage > 1"
+      class="flex flex-col items-center justify-between gap-4 rounded-xl border border-solar-border-card bg-white p-4 sm:flex-row"
+    >
+      <span class="text-xs text-solar-text-muted">
+        صفحة {{ currentPage }} من {{ lastPage }} (إجمالي {{ totalItems }} منتج مسجل)
+      </span>
 
-      <div class="flex flex-wrap gap-3">
+      <div class="flex items-center gap-1.5 text-xs font-bold">
         <button
-          v-if="hasFilters || searchPending"
           type="button"
-          class="rounded-lg border border-solar-border-card bg-white px-4 py-2 text-xs font-bold text-solar-text-heading"
-          @click="resetFilters"
+          @click="handlePageChange(currentPage - 1)"
+          :disabled="currentPage === 1"
+          class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-muted hover:border-solar-navy-dark hover:text-solar-navy-dark disabled:opacity-40 disabled:cursor-not-allowed"
+          title="الصفحة السابقة"
         >
-          إعادة ضبط الفلاتر
+          <ChevronRight class="size-4" />
+        </button>
+
+        <button
+          v-if="visiblePages[0] > 1"
+          type="button"
+          @click="handlePageChange(1)"
+          class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-xs text-solar-text-body hover:bg-solar-bg-subtle"
+        >
+          1
+        </button>
+        <span v-if="visiblePages[0] > 2" class="px-1 text-solar-text-muted">...</span>
+
+        <button
+          v-for="p in visiblePages"
+          :key="p"
+          type="button"
+          @click="handlePageChange(p)"
+          class="flex size-8 items-center justify-center rounded-lg border text-xs"
+          :class="currentPage === p ? 'bg-solar-navy-dark text-white border-solar-navy-dark font-black' : 'border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle'"
+        >
+          {{ p }}
+        </button>
+
+        <span v-if="visiblePages[visiblePages.length - 1] < lastPage - 1" class="px-1 text-solar-text-muted">...</span>
+        <button
+          v-if="visiblePages[visiblePages.length - 1] < lastPage"
+          type="button"
+          @click="handlePageChange(lastPage)"
+          class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-xs text-solar-text-body hover:bg-solar-bg-subtle"
+        >
+          {{ lastPage }}
         </button>
 
         <button
           type="button"
-          :disabled="productsLoading"
-          class="rounded-lg border border-solar-border-card bg-white px-4 py-2 text-xs font-bold text-solar-text-heading disabled:opacity-50"
-          @click="loadProducts"
+          @click="handlePageChange(currentPage + 1)"
+          :disabled="currentPage === lastPage"
+          class="flex size-8 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-muted hover:border-solar-navy-dark hover:text-solar-navy-dark disabled:opacity-40 disabled:cursor-not-allowed"
+          title="الصفحة التالية"
         >
-          تحديث النتائج
+          <ChevronLeft class="size-4" />
         </button>
       </div>
     </div>
 
-    <section
-      v-if="
-        productsLoading
-        || (!productsReady && !productsError)
-      "
-      role="status"
-      aria-live="polite"
-      class="rounded-xl border border-solar-border-card bg-white p-12 text-center"
-    >
-      <Loader2
-        class="mx-auto size-8 animate-spin text-amber-600"
-        aria-hidden="true"
-      />
-
-      <p class="mt-4 text-sm text-solar-text-muted">
-        جارٍ تحميل المنتجات…
-      </p>
-    </section>
-
-    <section
-      v-else-if="productsError"
-      role="alert"
-      class="rounded-xl border border-red-200 bg-red-50 p-5"
-    >
-      <p class="text-sm leading-7 text-red-800">
-        {{ productsError }}
-      </p>
-
-      <div class="mt-4 flex flex-wrap gap-3">
-        <button
-          type="button"
-          class="rounded-lg bg-white px-4 py-2 text-sm font-bold text-red-800"
-          @click="loadProducts"
-        >
-          إعادة المحاولة
-        </button>
-
-        <button
-          type="button"
-          class="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-800"
-          @click="resetFilters"
-        >
-          إعادة ضبط الفلاتر
-        </button>
-      </div>
-    </section>
-
-    <template v-else>
-      <div
-        v-if="displayedProducts.length"
-        class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-      >
-        <ProductCard
-          v-for="product in displayedProducts"
-          :key="`${product.kind}:${product.id}`"
-          :product="product"
-          :mode="displayMode"
-          @open-rfq="openRfqModal"
-        />
-      </div>
-
-      <section
-        v-else
-        class="rounded-xl border border-dashed border-solar-border-card bg-white p-12 text-center"
-      >
-        <PackageSearch
-          class="mx-auto size-12 text-solar-text-muted"
-          aria-hidden="true"
-        />
-
-        <h2 class="mt-4 text-lg font-bold text-solar-text-heading">
-          {{
-            hasFilters
-              ? 'لا توجد نتائج تطابق خيارات التصفية'
-              : displayMode === 'cart'
-                ? 'لا توجد عروض متاجر متاحة حاليًا'
-                : 'لا توجد منتجات مرجعية متاحة حاليًا'
-          }}
-        </h2>
-
-        <button
-          v-if="hasFilters"
-          type="button"
-          class="mt-5 rounded-lg bg-solar-yellow px-5 py-3 text-sm font-bold text-solar-navy-dark"
-          @click="resetFilters"
-        >
-          إظهار جميع النتائج
-        </button>
-      </section>
-
-      <nav
-        v-if="lastPage > 1"
-        class="flex flex-col items-center justify-between gap-4 rounded-xl border border-solar-border-card bg-white p-4 sm:flex-row"
-        aria-label="صفحات المنتجات"
-      >
-        <p class="text-xs text-solar-text-muted">
-          الصفحة {{ currentPage }} من {{ lastPage }}
-        </p>
-
-        <div class="flex flex-wrap items-center justify-center gap-2">
-          <button
-            type="button"
-            :disabled="currentPage === 1"
-            class="rounded-lg border border-solar-border-card px-3 py-2 text-xs disabled:opacity-40"
-            @click="changePage(currentPage - 1)"
-          >
-            السابق
-          </button>
-
-          <button
-            v-if="visiblePages[0] > 1"
-            type="button"
-            class="rounded-lg border border-solar-border-card px-3 py-2 text-xs"
-            @click="changePage(1)"
-          >
-            1
-          </button>
-
-          <span
-            v-if="visiblePages[0] > 2"
-            class="text-xs text-solar-text-muted"
-          >
-            …
-          </span>
-
-          <button
-            v-for="page in visiblePages"
-            :key="page"
-            type="button"
-            :aria-current="currentPage === page ? 'page' : undefined"
-            class="rounded-lg border px-3 py-2 text-xs font-bold"
-            :class="
-              currentPage === page
-                ? 'border-solar-yellow bg-solar-yellow text-solar-navy-dark'
-                : 'border-solar-border-card text-solar-text-heading'
-            "
-            @click="changePage(page)"
-          >
-            {{ page }}
-          </button>
-
-          <span
-            v-if="visiblePages[visiblePages.length - 1] < lastPage - 1"
-            class="text-xs text-solar-text-muted"
-          >
-            …
-          </span>
-
-          <button
-            v-if="visiblePages[visiblePages.length - 1] < lastPage"
-            type="button"
-            class="rounded-lg border border-solar-border-card px-3 py-2 text-xs"
-            @click="changePage(lastPage)"
-          >
-            {{ lastPage }}
-          </button>
-
-          <button
-            type="button"
-            :disabled="currentPage === lastPage"
-            class="rounded-lg border border-solar-border-card px-3 py-2 text-xs disabled:opacity-40"
-            @click="changePage(currentPage + 1)"
-          >
-            التالي
-          </button>
+    <!-- بانر مميزات وضمانات سولار هب -->
+    <section class="grid gap-4 rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm md:grid-cols-2 lg:grid-cols-4">
+      <div class="flex items-start gap-3.5">
+        <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-solar-status-info-bg text-solar-status-info-text">
+          <ShieldCheck class="size-6" />
         </div>
-      </nav>
-    </template>
+        <div class="flex flex-col gap-1">
+          <h2 class="text-sm font-bold text-solar-text-heading">وكلاء وموردون موثقون</h2>
+          <p class="text-xs leading-relaxed text-solar-text-muted">سجلات تجارية مفحوصة ومطابقة تامة للكود والمواصفات القياسية المعتمدة.</p>
+        </div>
+      </div>
 
-    <RfqModal
+      <div class="flex items-start gap-3.5">
+        <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-solar-status-info-bg text-solar-status-info-text">
+          <Truck class="size-6" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <h2 class="text-sm font-bold text-solar-text-heading">شحن مخصص للمعدات</h2>
+          <p class="text-xs leading-relaxed text-solar-text-muted">تغليف آمن وناقلون معتمدون لنقل الألواح والبطاريات الحساسة بدون مخاطر.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start gap-3.5">
+        <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-solar-status-info-bg text-solar-status-info-text">
+          <PackageCheck class="size-6" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <h2 class="text-sm font-bold text-solar-text-heading">ضمانات معتمدة حتى 25 سنة</h2>
+          <p class="text-xs leading-relaxed text-solar-text-muted">فواتير إلكترونية معتمدة وضمان خطي مباشر مع كل طلبية تشتريها.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start gap-3.5">
+        <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-solar-status-info-bg text-solar-status-info-text">
+          <Wrench class="size-6" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <h2 class="text-sm font-bold text-solar-text-heading">مطابقة أحمال هندسية</h2>
+          <p class="text-xs leading-relaxed text-solar-text-muted">إشراف هندسي للتأكد من توافق المكونات قبل الشحن واعتماد التثبيت الميداني.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- النافذة المنبثقة لطلب عرض السعر -->
+    <CustomerEcommerceRfqModal
       :product="selectedProductForRfq"
       :is-open="isRfqModalOpen"
       @close="isRfqModalOpen = false"
-      @submitted="handleRfqSubmitted"
     />
   </div>
 </template>

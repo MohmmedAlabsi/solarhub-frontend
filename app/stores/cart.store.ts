@@ -1,178 +1,24 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
 import type { Product } from '~~/types/ecommerce'
-import { fetchAllApiRows } from '../utils/apiCollection'
-
-export interface CartProduct extends Product {
-  storeProductId: number
-  stockQuantity?: number
-  minOrderQty: number
-  priceKnown: boolean
-}
 
 export interface CartStoreItem {
-  id?: number
-  product: CartProduct
+  id?: number // cart item id in Laravel DB
+  product: Product
   quantity: number
   line_total?: number
 }
 
-interface SessionContext {
-  token: string | null
-  version: number
-}
+function resolveProductImage(sp: any, catName?: string): string {
+  const mp = sp?.master_product || sp?.masterProduct
+  const img = mp?.images?.[0]?.image_url || mp?.images?.[0]?.image_path
+  if (img) return img
 
-function userError(message: string): Error {
-  return Object.assign(new Error(message), {
-    userMessage: message,
-  })
-}
-
-function textValue(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
-}
-
-function numberValue(value: unknown): number | null {
-  if (
-    value === null
-    || value === undefined
-    || String(value).trim() === ''
-  ) {
-    return null
-  }
-
-  const number = Number(value)
-
-  return Number.isFinite(number) && number >= 0
-    ? number
-    : null
-}
-
-function positiveInteger(value: unknown): number {
-  const number = Number(value)
-
-  if (!Number.isSafeInteger(number) || number <= 0) {
-    throw userError('معرّف العنصر أو الكمية غير صالح.')
-  }
-
-  return number
-}
-
-function productImage(source: any): string {
-  const images = source?.master_product?.images
-
-  if (Array.isArray(images)) {
-    const featured = images.find(
-      image => image?.is_featured && image?.url,
-    )
-
-    const image = featured || images.find(image => image?.url)
-
-    if (image) return textValue(image.url)
-  }
-
-  return textValue(source?.image)
-}
-
-function mapProduct(source: any): CartProduct {
-  const master = source?.master_product || {}
-
-  const price = numberValue(source?.price)
-
-  const stock = numberValue(
-    source?.stock_quantity ?? source?.stockQuantity,
-  )
-
-  const minimum = numberValue(
-    source?.min_order_qty ?? source?.minOrderQty,
-  )
-
-  const id = positiveInteger(
-    source?.storeProductId ?? source?.id,
-  )
-
-  const category =
-    master.category?.name_ar
-    || master.category?.name_en
-    || source?.category
-
-  const types = [
-    'panel',
-    'inverter',
-    'battery',
-    'pump',
-    'controller',
-    'accessories',
-  ]
-
-  return {
-    id,
-    storeProductId: id,
-
-    name:
-      textValue(source?.title)
-      || textValue(master.title)
-      || textValue(source?.name)
-      || 'منتج',
-
-    category: textValue(category) || 'غير محدد',
-
-    categoryType: types.includes(source?.categoryType)
-      ? source.categoryType
-      : 'accessories',
-
-    brand:
-      textValue(master.brand?.name)
-      || textValue(source?.brand),
-
-    model:
-      textValue(master.model_number)
-      || textValue(source?.model),
-
-    storeName:
-      textValue(source?.store?.company_name)
-      || textValue(source?.storeName),
-
-    storeCity:
-      textValue(source?.governorate?.name_ar)
-      || textValue(source?.storeCity),
-
-    // الصفر هنا للتوافق مع النوع القديم.
-    // priceKnown يحدد هل السعر متاح فعلًا.
-    price: price ?? 0,
-    priceKnown: source?.priceKnown !== false && price !== null,
-
-    currency: '',
-
-    // الباك إند لا يعيد تقييمًا للمنتج ضمن هذه الاستجابات.
-    rating: 0,
-    reviewsCount: 0,
-
-    image: productImage(source),
-    specs: {},
-
-    stockQuantity:
-      stock !== null && Number.isSafeInteger(stock)
-        ? stock
-        : undefined,
-
-    minOrderQty:
-      minimum !== null
-      && Number.isSafeInteger(minimum)
-      && minimum > 0
-        ? minimum
-        : 1,
-
-    inStock:
-      stock !== null
-        ? stock > 0
-        : source?.inStock === true,
-
-    isQuoteOnly:
-      source?.isQuoteOnly === true
-      || price === null
-      || price <= 0,
-  }
+  const text = `${catName || ''} ${mp?.title || ''}`.toLowerCase()
+  if (text.includes('panel') || text.includes('ألو') || text.includes('لوح')) return '/images/product-panel.png'
+  if (text.includes('invert') || text.includes('محو') || text.includes('هجين')) return '/images/product-inverter.png'
+  if (text.includes('batter') || text.includes('بطار') || text.includes('ليث')) return '/images/product-battery.png'
+  if (text.includes('pump') || text.includes('مضخ')) return '/images/hero-solar.png'
+  return '/images/product-kit.png'
 }
 
 export const useCartStore = defineStore('cart', () => {
@@ -180,878 +26,436 @@ export const useCartStore = defineStore('cart', () => {
   const tokenCookie = useCookie<string | null>('auth_token')
 
   const items = ref<CartStoreItem[]>([])
-  const wishlist = ref<CartProduct[]>([])
-
+  const wishlist = ref<Product[]>([])
   const isLoading = ref(false)
   const isUpdating = ref<Record<string | number, boolean>>({})
   const errorMessage = ref<string | null>(null)
   const isInitialized = ref(false)
 
-  const wishlistLoading = ref(false)
-  const wishlistError = ref<string | null>(null)
-  const wishlistInitialized = ref(false)
+  // هل المستخدم مسجل دخول؟
+  const isAuthenticated = computed(() => {
+    if (tokenCookie.value) return true
+    if (import.meta.client) {
+      return Boolean(localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token'))
+    }
+    return false
+  })
 
-  const serverTotal = ref<number | null>(null)
+  // إجمالي عدد العناصر في السلة
+  const totalItemsCount = computed(() => {
+    return items.value.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0)
+  })
 
-  let version = 0
-  let cartTask: Promise<boolean> | null = null
-  let wishlistTask: Promise<boolean> | null = null
+  // المجموع الفرعي
+  const subtotal = computed(() => {
+    return items.value.reduce((acc, item) => {
+      const price = Number(item.product?.price) || 0
+      const qty = Number(item.quantity) || 0
+      return acc + (item.line_total ?? price * qty)
+    }, 0)
+  })
 
-  function sessionToken(): string | null {
-    if (tokenCookie.value) return tokenCookie.value
+  // ضريبة القيمة المضافة 15%
+  const vat = computed(() => {
+    return Math.round(subtotal.value * 0.15 * 100) / 100
+  })
 
-    if (!import.meta.client) return null
+  // رسوم الشحن (مجاني إذا تجاوز 1000 ر.س)
+  const shippingFee = computed(() => {
+    if (items.value.length === 0) return 0
+    return subtotal.value >= 1000 ? 0 : 50
+  })
 
+  // الإجمالي الكلي
+  const total = computed(() => {
+    return Math.round((subtotal.value + vat.value + shippingFee.value) * 100) / 100
+  })
+
+  /**
+   * حفظ محتويات السلة في التخزين المحلي للزوار غير المسجلين
+   */
+  const saveLocalCart = () => {
+    if (import.meta.client) {
+      try {
+        localStorage.setItem('solarhub_guest_cart', JSON.stringify(items.value))
+      } catch {
+        /* storage fallback */
+      }
+    }
+  }
+
+  /**
+   * تحميل السلة من التخزين المحلي للزوار غير المسجلين
+   */
+  const loadLocalCart = () => {
+    if (import.meta.client) {
+      try {
+        const raw = localStorage.getItem('solarhub_guest_cart')
+        if (raw) {
+          items.value = JSON.parse(raw)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  /**
+   * تحويل استجابة عنصر سلة Laravel إلى CartStoreItem
+   */
+  const mapApiCartItem = (apiItem: any): CartStoreItem => {
+    const sp = apiItem.store_product || {}
+    const storeObj = sp.store || {}
+    const price = Number(sp.price) || 0
+    const qty = Number(apiItem.quantity) || 1
+    const lineTotal = Number(apiItem.line_total) || price * qty
+
+    const product: Product = {
+      id: sp.id || apiItem.id, // store_product_id
+      name: sp.title || 'منتج طاقة شمسية معتمد',
+      category: 'معدات كهروضوئية',
+      categoryType: 'panel',
+      brand: 'SolarHub Tier 1',
+      model: 'معتمد',
+      storeName: storeObj.company_name || 'المتجر المعتمد',
+      storeCity: 'اليمن',
+      price,
+      currency: 'ر.س',
+      rating: 4.9,
+      reviewsCount: 35,
+      image: resolveProductImage(sp),
+      badge: 'Tier 1 Global',
+      specs: { warranty: 'معتمد' },
+      inStock: (Number(sp.stock_quantity) || 1) > 0,
+    }
+
+    return {
+      id: apiItem.id,
+      quantity: qty,
+      product,
+      line_total: lineTotal,
+    }
+  }
+
+  /**
+   * جلب سلة المشتريات من مخدم Laravel
+   */
+  const fetchCart = async () => {
+    if (!isAuthenticated.value) {
+      loadLocalCart()
+      isInitialized.value = true
+      return
+    }
+
+    isLoading.value = true
+    errorMessage.value = null
     try {
-      return localStorage.getItem('solarhub_token')
-        || localStorage.getItem('auth_token')
-    } catch {
-      return null
-    }
-  }
-
-  let ownerToken = sessionToken()
-
-  function syncSession(): SessionContext {
-    const token = sessionToken()
-
-    if (token !== ownerToken) {
-      version++
-      ownerToken = token
-
-      items.value = []
-      wishlist.value = []
-      serverTotal.value = null
-
-      isLoading.value = false
-      wishlistLoading.value = false
-      isUpdating.value = {}
-
-      isInitialized.value = false
-      wishlistInitialized.value = false
-
-      errorMessage.value = null
-      wishlistError.value = null
-
-      cartTask = null
-      wishlistTask = null
-    }
-
-    return { token, version }
-  }
-
-  function isCurrent(context: SessionContext): boolean {
-    return context.version === version
-      && context.token === sessionToken()
-  }
-
-  function requireCurrent(context: SessionContext) {
-    if (!isCurrent(context)) {
-      throw userError(
-        'تغيرت جلسة الحساب. أعد تحميل البيانات.',
-      )
-    }
-  }
-
-  const totalItemsCount = computed(() =>
-    items.value.reduce(
-      (sum, row) => sum + row.quantity,
-      0,
-    ),
-  )
-
-  const subtotal = computed(() =>
-    serverTotal.value
-    ?? Math.round(
-      items.value.reduce(
-        (sum, row) =>
-          sum + (
-            row.line_total
-            ?? row.product.price * row.quantity
-          ),
-        0,
-      ) * 100,
-    ) / 100,
-  )
-
-  const hasCompletePricing = computed(() =>
-    items.value.every(row => row.product.priceKnown),
-  )
-
-  // للتوافق مع الصفحات القديمة فقط.
-  // الباك إند لا يعيد معلومات الضريبة والشحن.
-  const vat = computed(() => 0)
-  const shippingFee = computed(() => 0)
-
-  const hasTaxInformation = computed(() => false)
-  const hasShippingInformation = computed(() => false)
-
-  // إجمالي المنتجات، دون إضافة رسوم مفترضة.
-  const total = computed(() => subtotal.value)
-
-  const canCheckout = computed(() =>
-    Boolean(
-      sessionToken()
-      && isInitialized.value
-      && !isLoading.value
-      && !errorMessage.value
-      && items.value.length
-      && hasCompletePricing.value
-      && items.value.every(row =>
-        row.product.price > 0
-        && row.product.stockQuantity !== undefined
-        && row.quantity <= row.product.stockQuantity
-        && row.quantity >= row.product.minOrderQty,
-      ),
-    ),
-  )
-
-  function run(
-    kind: 'cart' | 'wishlist',
-    work: (context: SessionContext) => Promise<void> | void,
-    fallback: string,
-    reading = false,
-  ): Promise<boolean> {
-    const context = syncSession()
-
-    const active = kind === 'cart'
-      ? cartTask
-      : wishlistTask
-
-    if (active) {
-      return reading
-        ? active.catch(() => false)
-        : Promise.reject(
-          userError('جارٍ حفظ عملية أخرى. انتظر قليلًا.'),
-        )
-    }
-
-    const loading = kind === 'cart'
-      ? isLoading
-      : wishlistLoading
-
-    const error = kind === 'cart'
-      ? errorMessage
-      : wishlistError
-
-    const initialized = kind === 'cart'
-      ? isInitialized
-      : wishlistInitialized
-
-    if (
-      kind === 'cart'
-      && !reading
-      && !initialized.value
-      && error.value
-    ) {
-      return Promise.reject(
-        userError(
-          'حدّث السلة للتحقق من حالتها قبل إجراء تعديل آخر.',
-        ),
-      )
-    }
-
-    loading.value = true
-    error.value = null
-
-    const task = Promise.resolve()
-      .then(() => {
-        requireCurrent(context)
-        return work(context)
-      })
-      .then(() => true)
-      .catch((failure: any) => {
-        const status =
-          failure?.statusCode ?? failure?.status
-
-        const message =
-          failure?.userMessage
-          || (
-            status === 401
-              ? 'انتهت جلسة الدخول. سجّل الدخول مجددًا.'
-              : fallback
-          )
-
-        if (isCurrent(context)) {
-          error.value = message
-          initialized.value = false
-        }
-
-        if (!reading) {
-          throw userError(message)
-        }
-
-        return false
-      })
-      .finally(() => {
-        if (!isCurrent(context)) return
-
-        loading.value = false
-
-        if (kind === 'cart') {
-          cartTask = null
-          isUpdating.value = {}
-        } else {
-          wishlistTask = null
-        }
-      })
-
-    if (kind === 'cart') {
-      cartTask = task
-    } else {
-      wishlistTask = task
-    }
-
-    return task
-  }
-
-  function readArray(key: string): any[] {
-    if (!import.meta.client) {
-      throw userError('التخزين المحلي غير متاح.')
-    }
-
-    const raw = localStorage.getItem(key)
-    const rows = raw ? JSON.parse(raw) : []
-
-    if (!Array.isArray(rows)) {
-      throw userError(
-        'بيانات التخزين المحلي غير صالحة.',
-      )
-    }
-
-    return rows
-  }
-
-  function readGuestCart(): CartStoreItem[] {
-    const seen = new Set<number>()
-
-    return readArray('solarhub_guest_cart').map(row => {
-      const product = mapProduct(row?.product)
-
-      if (seen.has(Number(product.id))) {
-        throw userError('تكررت عناصر السلة المحلية.')
-      }
-
-      seen.add(Number(product.id))
-
-      const quantity = positiveInteger(row?.quantity)
-
-      return {
-        product,
-        quantity,
-        line_total: product.priceKnown
-          ? product.price * quantity
-          : undefined,
-      }
-    })
-  }
-
-  function saveGuestCart(
-    context: SessionContext,
-    rows: CartStoreItem[],
-  ) {
-    requireCurrent(context)
-
-    if (!import.meta.client) {
-      throw userError('التخزين المحلي غير متاح.')
-    }
-
-    localStorage.setItem(
-      'solarhub_guest_cart',
-      JSON.stringify(rows),
-    )
-
-    items.value = rows
-    serverTotal.value = null
-    isInitialized.value = true
-  }
-
-  function applyServerCart(
-    context: SessionContext,
-    response: any,
-  ) {
-    requireCurrent(context)
-
-    if (
-      response?.status !== 'success'
-      || !Array.isArray(response?.data?.items)
-    ) {
-      throw userError(
-        'تعذر تأكيد بيانات السلة. حدّثها للتحقق.',
-      )
-    }
-
-    const seen = new Set<number>()
-
-    const mapped: CartStoreItem[] =
-      response.data.items.map((row: any) => {
-        const id = positiveInteger(row?.id)
-
-        if (seen.has(id)) {
-          throw userError('تكررت عناصر السلة المستلمة.')
-        }
-
-        seen.add(id)
-
-        const quantity = positiveInteger(row?.quantity)
-        const product = mapProduct(row?.store_product)
-
-        return {
-          id,
-          product,
-          quantity,
-          line_total:
-            numberValue(row?.line_total) ?? undefined,
-        }
-      })
-
-    const amount = numberValue(
-      response.data.total_amount,
-    )
-
-    if (amount === null) {
-      throw userError('تعذر تأكيد إجمالي السلة.')
-    }
-
-    items.value = mapped
-    serverTotal.value = amount
-    isInitialized.value = true
-  }
-
-  function fetchCart(): Promise<boolean> {
-    return run(
-      'cart',
-      async context => {
-        isInitialized.value = false
+      const res: any = await $api('/my/cart')
+      const cartData = res?.data || res
+      if (cartData && Array.isArray(cartData.items)) {
+        items.value = cartData.items.map(mapApiCartItem)
+      } else {
         items.value = []
-        serverTotal.value = null
-
-        if (context.token) {
-          const response = await $api('/my/cart')
-          applyServerCart(context, response)
-        } else {
-          const rows = readGuestCart()
-
-          requireCurrent(context)
-
-          items.value = rows
-          isInitialized.value = true
-        }
-      },
-      'تعذر تحميل السلة. تحقق من الاتصال وأعد المحاولة.',
-      true,
-    )
-  }
-
-  function addToCart(
-    product: Product | any,
-    quantity = 1,
-  ): Promise<boolean> {
-    return run(
-      'cart',
-      async context => {
-        const id = positiveInteger(
-          product?.storeProductId ?? product?.id,
-        )
-
-        const qty = positiveInteger(quantity)
-
-        if (context.token) {
-          const response: any = await $api(
-            '/my/cart/items',
-            {
-              method: 'POST',
-              retry: 0,
-              body: {
-                store_product_id: id,
-                quantity: qty,
-              },
-            },
-          )
-
-          const added = response?.data?.items?.find(
-            (row: any) =>
-              Number(row?.store_product?.id) === id,
-          )
-
-          if (!added || Number(added.quantity) < qty) {
-            throw userError(
-              'تعذر تأكيد إضافة المنتج. حدّث السلة للتحقق.',
-            )
-          }
-
-          applyServerCart(context, response)
-        } else {
-          const rows = readGuestCart()
-
-          const mapped = mapProduct({
-            ...product,
-            id,
-            storeProductId: id,
-          })
-
-          if (!mapped.priceKnown) {
-            throw userError('سعر المنتج غير متاح.')
-          }
-
-          const existing = rows.find(
-            row => Number(row.product.id) === id,
-          )
-
-          const newQuantity = positiveInteger(
-            qty + (existing?.quantity ?? 0),
-          )
-
-          if (existing) {
-            Object.assign(existing, {
-              product: mapped,
-              quantity: newQuantity,
-              line_total: newQuantity * mapped.price,
-            })
-          } else {
-            rows.push({
-              product: mapped,
-              quantity: qty,
-              line_total: qty * mapped.price,
-            })
-          }
-
-          saveGuestCart(context, rows)
-        }
-      },
-      'تعذر تأكيد الإضافة. حدّث السلة قبل إعادة المحاولة.',
-    )
-  }
-
-  function findItem(
-    context: SessionContext,
-    identifier: string | number,
-    rows: CartStoreItem[],
-  ): CartStoreItem {
-    const item = rows.find(row =>
-      String(
-        context.token ? row.id : row.product.id,
-      ) === String(identifier),
-    )
-
-    if (!item) {
-      throw userError(
-        'العنصر غير موجود في السلة الحالية. أعد تحميلها.',
-      )
-    }
-
-    return item
-  }
-
-  function updateQuantity(
-    identifier: string | number,
-    quantity: number,
-  ): Promise<boolean> {
-    if (Number(quantity) === 0) {
-      return removeFromCart(identifier)
-    }
-
-    return run(
-      'cart',
-      async context => {
-        const qty = positiveInteger(quantity)
-
-        const rows = context.token
-          ? items.value
-          : readGuestCart()
-
-        const item = findItem(context, identifier, rows)
-
-        if (context.token) {
-          const id = positiveInteger(item.id)
-
-          isUpdating.value[id] = true
-
-          const response: any = await $api(
-            `/my/cart/items/${id}`,
-            {
-              method: 'PUT',
-              retry: 0,
-              body: { quantity: qty },
-            },
-          )
-
-          const updated = response?.data?.items?.find(
-            (row: any) => Number(row.id) === id,
-          )
-
-          if (
-            !updated
-            || Number(updated.quantity) !== qty
-          ) {
-            throw userError(
-              'تعذر تأكيد تعديل الكمية.',
-            )
-          }
-
-          applyServerCart(context, response)
-        } else {
-          item.quantity = qty
-
-          item.line_total = item.product.priceKnown
-            ? item.product.price * qty
-            : undefined
-
-          saveGuestCart(context, rows)
-        }
-      },
-      'تعذر تعديل الكمية. تحقق من المخزون والحد الأدنى ثم حدّث السلة.',
-    )
-  }
-
-  function removeFromCart(
-    identifier: string | number,
-  ): Promise<boolean> {
-    return run(
-      'cart',
-      async context => {
-        const rows = context.token
-          ? items.value
-          : readGuestCart()
-
-        const item = findItem(context, identifier, rows)
-
-        if (context.token) {
-          const id = positiveInteger(item.id)
-
-          isUpdating.value[id] = true
-
-          const response: any = await $api(
-            `/my/cart/items/${id}`,
-            {
-              method: 'DELETE',
-              retry: 0,
-            },
-          )
-
-          const stillExists =
-            response?.data?.items?.some(
-              (row: any) => Number(row.id) === id,
-            )
-
-          if (stillExists) {
-            throw userError(
-              'تعذر تأكيد حذف العنصر.',
-            )
-          }
-
-          applyServerCart(context, response)
-        } else {
-          saveGuestCart(
-            context,
-            rows.filter(row => row !== item),
-          )
-        }
-      },
-      'تعذر تأكيد الحذف. حدّث السلة للتحقق.',
-    )
-  }
-
-  function clearCart(): Promise<boolean> {
-    return run(
-      'cart',
-      async context => {
-        if (context.token) {
-          const response: any = await $api(
-            '/my/cart',
-            {
-              method: 'DELETE',
-              retry: 0,
-            },
-          )
-
-          requireCurrent(context)
-
-          if (
-            response?.status !== 'success'
-            || response.data !== null
-          ) {
-            throw userError(
-              'تعذر تأكيد تفريغ السلة.',
-            )
-          }
-
-          items.value = []
-          serverTotal.value = 0
-          isInitialized.value = true
-        } else {
-          saveGuestCart(context, [])
-        }
-      },
-      'تعذر تأكيد تفريغ السلة. حدّثها للتحقق.',
-    )
-  }
-
-  function readGuestWishlist(): CartProduct[] {
-    return readArray('solarhub_guest_wishlist')
-      .map(mapProduct)
-  }
-
-  function saveGuestWishlist(
-    context: SessionContext,
-    rows: CartProduct[],
-  ) {
-    requireCurrent(context)
-
-    if (!import.meta.client) {
-      throw userError('التخزين المحلي غير متاح.')
-    }
-
-    localStorage.setItem(
-      'solarhub_guest_wishlist',
-      JSON.stringify(rows),
-    )
-
-    wishlist.value = rows
-    wishlistInitialized.value = true
-  }
-
-  async function loadWishlist(
-    context: SessionContext,
-  ) {
-    if (!context.token) {
-      const rows = readGuestWishlist()
-
-      requireCurrent(context)
-
-      wishlist.value = rows
-    } else {
-      // استجابة المفضلة ليست داخل status/data
-      // مثل بقية المسارات؛ هي Laravel Resource مباشرة.
-      const rows = await fetchAllApiRows<any>(
-        async query => {
-          const response: any = await $api(
-            '/favorites',
-            { query },
-          )
-
-          if (!Array.isArray(response?.data)) {
-            throw userError(
-              'بيانات المفضلة غير متوقعة.',
-            )
-          }
-
-          return {
-            status: 'success',
-            data: response.data,
-            meta: response.meta,
-          }
-        },
-        100,
-      )
-
-      requireCurrent(context)
-
-      wishlist.value = rows.map(row =>
-        mapProduct({
-          ...row.product,
-          id: row.store_product_id,
-        }),
-      )
-    }
-
-    wishlistInitialized.value = true
-  }
-
-  function fetchWishlist(): Promise<boolean> {
-    return run(
-      'wishlist',
-      loadWishlist,
-      'تعذر تحميل المفضلة. أعد المحاولة.',
-      true,
-    )
-  }
-
-  async function deleteFavorite(
-    context: SessionContext,
-    id: number,
-  ) {
-    try {
-      await $api(`/favorites/${id}`, {
-        method: 'DELETE',
-        retry: 0,
-      })
-    } catch (failure: any) {
-      const status =
-        failure?.statusCode ?? failure?.status
-
-      // العنصر المحذوف مسبقًا لا يحتاج حذفًا آخر.
-      if (status !== 404) throw failure
-    }
-
-    requireCurrent(context)
-
-    wishlist.value = wishlist.value.filter(
-      product => Number(product.id) !== id,
-    )
-  }
-
-  function toggleWishlist(
-    product: Product | any,
-  ): Promise<boolean> {
-    return run(
-      'wishlist',
-      async context => {
-        const id = positiveInteger(
-          product?.storeProductId ?? product?.id,
-        )
-
-        // نحفظ نية المستخدم قبل تحديث الحالة.
-        // هذا يمنع عكس العملية عند فقدان استجابة الحفظ.
-        const wantAdded = !wishlist.value.some(
-          row => Number(row.id) === id,
-        )
-
-        if (!wishlistInitialized.value) {
-          await loadWishlist(context)
-        }
-
-        const exists = wishlist.value.some(
-          row => Number(row.id) === id,
-        )
-
-        if (wantAdded === exists) return
-
-        if (context.token) {
-          if (!wantAdded) {
-            await deleteFavorite(context, id)
-          } else {
-            const response: any = await $api(
-              '/favorites',
-              {
-                method: 'POST',
-                retry: 0,
-                body: {
-                  store_product_id: id,
-                },
-              },
-            )
-
-            requireCurrent(context)
-
-            if (
-              Number(
-                response?.data?.store_product_id,
-              ) !== id
-            ) {
-              throw userError(
-                'تعذر تأكيد إضافة المفضلة.',
-              )
-            }
-
-            wishlist.value = [
-              ...wishlist.value,
-              mapProduct({
-                ...product,
-                id,
-                storeProductId: id,
-              }),
-            ]
-          }
-        } else {
-          const nextItems = wantAdded
-            ? [
-                ...wishlist.value,
-                mapProduct({
-                  ...product,
-                  id,
-                  storeProductId: id,
-                }),
-              ]
-            : wishlist.value.filter(
-                row => Number(row.id) !== id,
-              )
-
-          saveGuestWishlist(context, nextItems)
-        }
-      },
-      'تعذر حفظ المفضلة. حدّثها للتحقق قبل المحاولة مجددًا.',
-    )
-  }
-
-  function removeFromWishlist(
-    identifier: string | number,
-  ): Promise<boolean> {
-    return run(
-      'wishlist',
-      async context => {
-        const id = positiveInteger(identifier)
-
-        if (!wishlistInitialized.value) {
-          await loadWishlist(context)
-        }
-
-        if (context.token) {
-          await deleteFavorite(context, id)
-        } else {
-          saveGuestWishlist(
-            context,
-            wishlist.value.filter(
-              row => Number(row.id) !== id,
-            ),
-          )
-        }
-      },
-      'تعذر حذف المنتج من المفضلة.',
-    )
-  }
-
-  const isInWishlist = (id: string | number) =>
-    wishlist.value.some(
-      row => String(row.id) === String(id),
-    )
-
-  watch(
-    tokenCookie,
-    () => {
-      syncSession()
-
-      if (import.meta.client) {
-        void fetchWishlist()
       }
-    },
-    { flush: 'sync' },
-  )
+    } catch (err: any) {
+      console.warn('Could not fetch server cart, falling back to local:', err?.message)
+      loadLocalCart()
+    } finally {
+      isLoading.value = false
+      isInitialized.value = true
+    }
+  }
 
+  /**
+   * إضافة منتج إلى سلة المشتريات
+   */
+  const addToCart = async (productOrStoreProduct: Product | any, quantity = 1) => {
+    const qty = Math.max(1, Number(quantity) || 1)
+    const storeProductId = Number(productOrStoreProduct.storeProductId || productOrStoreProduct.id)
+
+    // للمستخدم المسجل: إرسال الطلب فوراً إلى API السلة
+    if (isAuthenticated.value && storeProductId) {
+      isLoading.value = true
+      try {
+        const res: any = await $api('/my/cart/items', {
+          method: 'POST',
+          body: {
+            store_product_id: storeProductId,
+            quantity: qty,
+          },
+        })
+        const cartData = res?.data || res
+        if (cartData && Array.isArray(cartData.items)) {
+          items.value = cartData.items.map(mapApiCartItem)
+        }
+        return true
+      } catch (err: any) {
+        console.error('Failed to add item to API cart:', err)
+        // Fallback to local
+      } finally {
+        isLoading.value = false
+      }
+    }
+
+    // للمستخدم غير المسجل أو fallback
+    const productIdStr = String(productOrStoreProduct.id)
+    const existingIndex = items.value.findIndex(i => String(i.product.id) === productIdStr)
+
+    if (existingIndex > -1) {
+      const existing = items.value[existingIndex]
+      if (existing) {
+        existing.quantity += qty
+        existing.line_total = existing.quantity * (Number(existing.product.price) || 0)
+      }
+    } else {
+      const newProduct: Product = {
+        id: productOrStoreProduct.id,
+        name: productOrStoreProduct.name || productOrStoreProduct.title || 'منتج طاقة شمسية',
+        category: productOrStoreProduct.category || 'معدات طاقة شمسية',
+        categoryType: productOrStoreProduct.categoryType || 'panel',
+        brand: productOrStoreProduct.brand || 'معتمد',
+        model: productOrStoreProduct.model || '',
+        storeName: productOrStoreProduct.storeName || 'المتجر المعتمد',
+        storeCity: productOrStoreProduct.storeCity || 'اليمن',
+        price: Number(productOrStoreProduct.price) || 0,
+        currency: productOrStoreProduct.currency || 'ر.س',
+        rating: productOrStoreProduct.rating || 4.9,
+        reviewsCount: productOrStoreProduct.reviewsCount || 20,
+        image: productOrStoreProduct.image || '/images/product-panel.png',
+        badge: productOrStoreProduct.badge || 'Tier 1 Global',
+        specs: productOrStoreProduct.specs || {},
+        inStock: true,
+      }
+
+      items.value.push({
+        product: newProduct,
+        quantity: qty,
+        line_total: qty * (Number(newProduct.price) || 0),
+      })
+    }
+
+    saveLocalCart()
+    return true
+  }
+
+  /**
+   * تحديث كمية عنصر في السلة
+   */
+  const updateQuantity = async (productIdOrCartItemId: string | number, newQuantity: number) => {
+    const qty = Number(newQuantity)
+    if (qty <= 0) {
+      return removeFromCart(productIdOrCartItemId)
+    }
+
+    const item = items.value.find(
+      i => String(i.id) === String(productIdOrCartItemId) || String(i.product.id) === String(productIdOrCartItemId)
+    )
+    if (!item) return
+
+    // تحديث تفاؤلي سريع (Optimistic UI)
+    const oldQty = item.quantity
+    item.quantity = qty
+    item.line_total = qty * (Number(item.product.price) || 0)
+
+    const cartItemId = item.id
+    if (isAuthenticated.value && cartItemId) {
+      isUpdating.value[cartItemId] = true
+      try {
+        const res: any = await $api(`/my/cart/items/${cartItemId}`, {
+          method: 'PUT',
+          body: { quantity: qty },
+        })
+        const cartData = res?.data || res
+        if (cartData && Array.isArray(cartData.items)) {
+          items.value = cartData.items.map(mapApiCartItem)
+        }
+      } catch (err: any) {
+        console.error('Failed to update cart quantity on server:', err)
+        item.quantity = oldQty
+        item.line_total = oldQty * (Number(item.product.price) || 0)
+      } finally {
+        isUpdating.value[cartItemId] = false
+      }
+    } else {
+      saveLocalCart()
+    }
+  }
+
+  /**
+   * حذف عنصر من السلة
+   */
+  const removeFromCart = async (productIdOrCartItemId: string | number) => {
+    const itemIndex = items.value.findIndex(
+      i => String(i.id) === String(productIdOrCartItemId) || String(i.product.id) === String(productIdOrCartItemId)
+    )
+    if (itemIndex === -1) return
+
+    const item = items.value[itemIndex]
+    const cartItemId = item?.id
+
+    // إزالة محلية فورية
+    items.value.splice(itemIndex, 1)
+
+    if (isAuthenticated.value && cartItemId) {
+      try {
+        const res: any = await $api(`/my/cart/items/${cartItemId}`, {
+          method: 'DELETE',
+        })
+        const cartData = res?.data || res
+        if (cartData && Array.isArray(cartData.items)) {
+          items.value = cartData.items.map(mapApiCartItem)
+        }
+      } catch (err: any) {
+        console.error('Failed to delete item from server cart:', err)
+      }
+    } else {
+      saveLocalCart()
+    }
+  }
+
+  /**
+   * تفريغ السلة بالكامل
+   */
+  const clearCart = async () => {
+    items.value = []
+    if (isAuthenticated.value) {
+      try {
+        await $api('/my/cart', { method: 'DELETE' })
+      } catch (err: any) {
+        console.error('Failed to clear cart on server:', err)
+      }
+    } else {
+      saveLocalCart()
+    }
+  }
+
+  function mapFavoriteToProduct(fav: any): Product {
+    const sp = fav.product || fav.store_product || fav
+    const mp = sp?.master_product || sp?.masterProduct || sp
+    const cat = mp?.category?.name || 'طاقة شمسية'
+    return {
+      id: sp?.id || fav.store_product_id,
+      name: mp?.title || mp?.name || 'منتج طاقة شمسية',
+      category: cat,
+      categoryType: 'panel',
+      brand: mp?.brand?.name || 'علامة معتمدة',
+      model: mp?.model_number || 'موديل قياسي',
+      storeName: sp?.store?.company_name || 'متجر معتمد',
+      storeCity: sp?.store?.address_details || 'اليمن',
+      price: Number(sp?.price || sp?.unit_price || 0),
+      currency: 'ر.س',
+      rating: 4.8,
+      reviewsCount: 12,
+      image: resolveProductImage(sp, cat),
+      inStock: (sp?.stock_quantity ?? 1) > 0,
+      stockQuantity: sp?.stock_quantity ?? 1,
+    }
+  }
+
+  /**
+   * جلب قائمة المفضلة من الخادم
+   */
+  const fetchWishlist = async () => {
+    if (!tokenCookie.value) return
+    try {
+      const res: any = await $api('/favorites')
+      const rawList = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : [])
+      if (rawList.length > 0) {
+        wishlist.value = rawList.map(mapFavoriteToProduct)
+      } else {
+        wishlist.value = []
+      }
+      if (import.meta.client) {
+        localStorage.setItem('solarhub_wishlist', JSON.stringify(wishlist.value))
+      }
+    } catch (err) {
+      console.warn('Could not fetch server favorites, using local fallback:', err)
+    }
+  }
+
+  /**
+   * إدارة وتبديل حالة المنتج في المفضلة
+   */
+  const toggleWishlist = async (product: Product) => {
+    const index = wishlist.value.findIndex(p => String(p.id) === String(product.id))
+    const wasIn = index > -1
+    if (wasIn) {
+      wishlist.value.splice(index, 1)
+    } else {
+      wishlist.value.push(product)
+    }
+    if (import.meta.client) {
+      try {
+        localStorage.setItem('solarhub_wishlist', JSON.stringify(wishlist.value))
+      } catch {
+        /* storage fallback */
+      }
+    }
+
+    if (tokenCookie.value) {
+      try {
+        await $api(`/favorites/${product.id}/toggle`, { method: 'POST' })
+      } catch (err) {
+        console.warn('Failed to sync favorite with server:', err)
+      }
+    }
+  }
+
+  const removeFromWishlist = async (productId: string | number) => {
+    const index = wishlist.value.findIndex(p => String(p.id) === String(productId))
+    if (index > -1) {
+      wishlist.value.splice(index, 1)
+      if (import.meta.client) {
+        try {
+          localStorage.setItem('solarhub_wishlist', JSON.stringify(wishlist.value))
+        } catch {
+          /* storage fallback */
+        }
+      }
+    }
+
+    if (tokenCookie.value) {
+      try {
+        await $api(`/favorites/${productId}`, { method: 'DELETE' })
+      } catch (err) {
+        console.warn('Failed to delete favorite on server:', err)
+      }
+    }
+  }
+
+  const isInWishlist = (productId: string | number) => {
+    return wishlist.value.some(p => String(p.id) === String(productId))
+  }
+
+  // تحميل المفضلة عند التشغيل
   if (import.meta.client) {
-    void fetchWishlist()
+    try {
+      const savedWishlist = localStorage.getItem('solarhub_wishlist')
+      if (savedWishlist) {
+        wishlist.value = JSON.parse(savedWishlist)
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   return {
     items,
     wishlist,
-
     isLoading,
     isUpdating,
     errorMessage,
     isInitialized,
-
-    wishlistLoading,
-    wishlistError,
-    wishlistInitialized,
-
     totalItemsCount,
     subtotal,
     vat,
     shippingFee,
     total,
-
-    hasCompletePricing,
-    hasTaxInformation,
-    hasShippingInformation,
-    canCheckout,
-
     fetchCart,
     addToCart,
     updateQuantity,
     removeFromCart,
     clearCart,
-
     fetchWishlist,
     toggleWishlist,
     removeFromWishlist,
