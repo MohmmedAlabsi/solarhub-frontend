@@ -1,463 +1,977 @@
 <script setup lang="ts">
 import {
-  AlertCircle,
-  ArrowLeft,
-  Check,
-  CheckCircle2,
-  ChevronLeft,
-  CreditCard,
-  FileText,
-  Loader2,
-  Lock,
-  Mail,
-  MapPin,
-  Phone,
-  ShieldCheck,
-  Store,
-  Truck,
-  User,
-  Wallet,
-} from 'lucide-vue-next'
-import { useCustomerOrders, type ApiOrder } from '~~/app/composables/useCustomerOrders'
-import { useCartStore } from '~~/app/stores/cart.store'
-import { useAuthStore } from '~~/app/stores/auth'
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+} from 'vue'
+import { CheckCircle2, Loader2, MapPin } from 'lucide-vue-next'
+import FormField from '../../../components/common/FormField.vue'
+import MapLocationModal, {
+  type LocationData,
+} from '../../../components/common/MapLocationModal.vue'
+import { useCartStore } from '../../../stores/cart.store'
+import { useAuthStore } from '../../../stores/auth'
 
 definePageMeta({
   layout: 'customer',
 })
 
 useSeoMeta({
-  title: 'إتمام الطلب وتحديد التوصيل والدفع | SolarHub',
-  description: 'أكمل بياناتك لتأكيد الشحن وتجهيز مشترياتك مباشرة من المستودعات المعتمدة.',
+  title: 'إتمام طلب الشراء | SolarHub',
 })
 
-const cartStore = useCartStore()
-const authStore = useAuthStore()
-const {
-  governorates,
-  walletProviders,
-  fetchGovernorates,
-  fetchWalletProviders,
-  placeOrder,
-  isActionLoading,
-} = useCustomerOrders()
+interface ApiResponse<T> {
+  status: string
+  message?: string
+  data: T
+}
 
-// بيانات العميل المعتمدة
-const fullName = ref(authStore.user?.name || '')
-const email = ref(authStore.user?.email || '')
-const phone = ref(authStore.user?.phone || '')
+interface Governorate {
+  id: number
+  name?: string | null
+  name_ar?: string | null
+  name_en?: string | null
+}
 
-// عنوان وبيانات التوصيل
-const selectedGovernorateId = ref<number | null>(null)
-const addressDetails = ref('')
-const notes = ref('')
-const deliveryCoordinates = ref<string | null>(null)
+interface AccountProfile {
+  id: number | string
+  name: string
+  phone: string
+  email: string
+  governorate?: {
+    id?: number | null
+    name_ar?: string | null
+  } | null
+}
 
-// طريقة الدفع
-const paymentMethod = ref<'wallet' | 'cod' | 'bank_transfer'>('wallet')
-const selectedWalletId = ref<number | null>(null)
-
-// نافذة نجاح الطلب
-const isSuccessModalOpen = ref(false)
-const createdOrder = ref<ApiOrder | null>(null)
-const errorMessage = ref<string | null>(null)
-
-// التحقق من الحقول
-const isFormValid = computed(() => {
-  return (
-    Boolean(addressDetails.value.trim()) &&
-    Boolean(fullName.value.trim()) &&
-    cartStore.items.length > 0
-  )
-})
-
-async function handlePlaceOrder() {
-  if (!isFormValid.value) {
-    errorMessage.value = 'يرجى استكمال عنوان التوصيل وبيانات الاستلام.'
-    return
-  }
-
-  errorMessage.value = null
-  try {
-    const order = await placeOrder({
-      delivery_governorate_id: selectedGovernorateId.value,
-      delivery_address: addressDetails.value.trim() + (notes.value ? ` (ملاحظات: ${notes.value.trim()})` : ''),
-      delivery_coordinates: deliveryCoordinates.value,
-    })
-
-    createdOrder.value = order
-    isSuccessModalOpen.value = true
-
-    // تفريغ السلة بعد إنشاء الطلب بنجاح
-    await cartStore.fetchCart()
-  } catch (err: any) {
-    console.error('Failed to create order:', err)
-    errorMessage.value =
-      err?.userMessage || err?.data?.message || err?.message || 'حدث خطأ أثناء تأكيد الطلب، يرجى المحاولة مرة أخرى.'
+interface CreatedOrder {
+  id: number
+  order_number: string
+  total_amount: number | string
+  status: string
+  customer?: {
+    id: number | string
+    name?: string
   }
 }
 
-onMounted(async () => {
-  await Promise.allSettled([
-    fetchGovernorates(),
-    fetchWalletProviders(),
-    cartStore.fetchCart(),
-  ])
+type DeliveryField = 'governorateId' | 'address' | 'coordinates'
 
-  if (governorates.value.length > 0 && !selectedGovernorateId.value) {
-    selectedGovernorateId.value = governorates.value[0]?.id || null
+interface RequestFailure {
+  status?: number
+  statusCode?: number
+  data?: {
+    errors?: Record<string, string[] | string>
   }
-  if (walletProviders.value.length > 0 && !selectedWalletId.value) {
-    selectedWalletId.value = walletProviders.value[0]?.id || null
+}
+
+const { $api } = useNuxtApp()
+
+const cartStore = useCartStore()
+const authStore = useAuthStore()
+
+const loading = ref(true)
+const metadataReady = ref(false)
+const loadError = ref('')
+const submitting = ref(false)
+const submissionError = ref('')
+const verificationRequired = ref(false)
+const cartRefreshWarning = ref('')
+
+const governorates = ref<Governorate[]>([])
+const createdOrder = ref<CreatedOrder | null>(null)
+const isMapOpen = ref(false)
+
+const form = reactive({
+  governorateId: '',
+  address: '',
+  coordinates: '',
+})
+
+const errors = reactive<
+  Partial<Record<DeliveryField, string>>
+>({})
+
+let loadVersion = 0
+let disposed = false
+let formInitialized = false
+
+const fieldsDisabled = computed(() =>
+  loading.value
+  || submitting.value
+  || cartStore.isLoading
+  || verificationRequired.value
+  || createdOrder.value !== null,
+)
+
+const canSubmit = computed(() =>
+  metadataReady.value
+  && !loadError.value
+  && !fieldsDisabled.value
+  && cartStore.canCheckout
+  && authStore.user?.role === 'customer',
+)
+
+function sameSession(token: string, owner: string): boolean {
+  return !disposed
+    && authStore.token === token
+    && String(authStore.user?.id ?? '') === owner
+}
+
+function governorateName(governorate: Governorate): string {
+  return governorate.name_ar
+    || governorate.name
+    || governorate.name_en
+    || ''
+}
+
+function normalizeRegion(value: string): string {
+  return value
+    .replace(/محافظة/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function formatAmount(value: unknown): string {
+  if (
+    value === null
+    || value === undefined
+    || String(value).trim() === ''
+  ) {
+    return 'غير متاح'
   }
-  if (authStore.user) {
-    fullName.value = authStore.user.name || fullName.value
-    email.value = authStore.user.email || email.value
-    phone.value = authStore.user.phone || phone.value
+
+  const amount = Number(value)
+
+  if (!Number.isFinite(amount) || amount < 0) {
+    return 'غير متاح'
   }
+
+  return new Intl.NumberFormat('ar', {
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+function clearErrors() {
+  for (const key of Object.keys(errors)) {
+    delete errors[key as DeliveryField]
+  }
+}
+
+function cartFingerprint(): string {
+  const rows = cartStore.items
+    .map(item => ({
+      id: Number(item.product.id),
+      quantity: item.quantity,
+      price: item.product.price,
+      priceKnown: item.product.priceKnown,
+    }))
+    .sort((first, second) => first.id - second.id)
+
+  return JSON.stringify({
+    rows,
+    amount: cartStore.subtotal,
+  })
+}
+
+async function loadPage() {
+  if (submitting.value || createdOrder.value) return
+
+  const version = ++loadVersion
+  const token = authStore.token
+  const owner = String(authStore.user?.id ?? '')
+
+  loading.value = true
+  metadataReady.value = false
+  loadError.value = ''
+  submissionError.value = ''
+
+  if (!token || !owner || authStore.user?.role !== 'customer') {
+    loadError.value = 'سجّل الدخول بحساب عميل لإتمام الطلب.'
+    loading.value = false
+    return
+  }
+
+  try {
+    const [
+      governoratesResponse,
+      profileResponse,
+      cartLoaded,
+    ] = await Promise.all([
+      $api<ApiResponse<Governorate[]>>('/governorates'),
+      $api<ApiResponse<AccountProfile>>('/auth/me'),
+      cartStore.fetchCart(),
+    ])
+
+    if (
+      version !== loadVersion
+      || !sameSession(token, owner)
+    ) {
+      return
+    }
+
+    if (
+      governoratesResponse.status !== 'success'
+      || !Array.isArray(governoratesResponse.data)
+      || profileResponse.status !== 'success'
+      || !profileResponse.data
+      || String(profileResponse.data.id) !== owner
+    ) {
+      throw new Error('Invalid checkout data')
+    }
+
+    if (!cartLoaded || !cartStore.isInitialized) {
+      loadError.value =
+        cartStore.errorMessage
+        || 'تعذر التحقق من السلة. أعد المحاولة.'
+      return
+    }
+
+    governorates.value = governoratesResponse.data
+    authStore.setUser(profileResponse.data)
+
+    if (!formInitialized) {
+      const governorateId =
+        profileResponse.data.governorate?.id
+
+      form.governorateId = governorates.value.some(
+        governorate => governorate.id === governorateId,
+      )
+        ? String(governorateId)
+        : ''
+
+      formInitialized = true
+    }
+
+    metadataReady.value = true
+  } catch {
+    if (
+      version !== loadVersion
+      || !sameSession(token, owner)
+    ) {
+      return
+    }
+
+    loadError.value =
+      'تعذر تحميل بيانات إتمام الطلب. أعد المحاولة.'
+  } finally {
+    if (!disposed && version === loadVersion) {
+      loading.value = false
+    }
+  }
+}
+
+function selectLocation(location: LocationData) {
+  if (fieldsDisabled.value) return
+
+  if (
+    !Number.isFinite(location.lat)
+    || !Number.isFinite(location.lng)
+    || location.lat < -90
+    || location.lat > 90
+    || location.lng < -180
+    || location.lng > 180
+  ) {
+    errors.coordinates = 'الموقع المحدد غير صالح.'
+    return
+  }
+
+  form.address = location.address.trim()
+
+  form.coordinates =
+    `POINT(${location.lng.toFixed(8)} ${location.lat.toFixed(8)})`
+
+  if (location.governorate) {
+    const region = normalizeRegion(location.governorate)
+
+    const matched = governorates.value.find(governorate =>
+      normalizeRegion(governorateName(governorate)) === region,
+    )
+
+    if (matched) {
+      form.governorateId = String(matched.id)
+    }
+  }
+
+  delete errors.coordinates
+  isMapOpen.value = false
+}
+
+function validate(): boolean {
+  clearErrors()
+
+  const address = form.address.trim()
+
+  if (!address || address.length > 500) {
+    errors.address =
+      'أدخل عنوان التوصيل، بحد أقصى 500 حرف.'
+  }
+
+  if (
+    form.governorateId
+    && !governorates.value.some(governorate =>
+      String(governorate.id) === form.governorateId,
+    )
+  ) {
+    errors.governorateId = 'اختر محافظة من القائمة.'
+  }
+
+  if (form.coordinates.length > 255) {
+    errors.coordinates = 'إحداثيات الموقع غير صالحة.'
+  }
+
+  return Object.keys(errors).length === 0
+}
+
+async function submitOrder() {
+  if (!canSubmit.value) return
+
+  submissionError.value = ''
+
+  if (!validate()) {
+    submissionError.value = 'راجع الحقول الموضحة.'
+    return
+  }
+
+  const token = authStore.token
+  const owner = String(authStore.user?.id ?? '')
+
+  if (!token || !owner) return
+
+  const previousCart = cartFingerprint()
+  let requestSent = false
+
+  submitting.value = true
+
+  try {
+    // التحقق من أحدث السلة قبل إنشاء الطلب.
+    const cartLoaded = await cartStore.fetchCart()
+
+    if (!sameSession(token, owner)) return
+
+    if (!cartLoaded || !cartStore.canCheckout) {
+      submissionError.value =
+        'تعذر تأكيد صلاحية السلة. راجع المنتجات والكميات قبل المتابعة.'
+      return
+    }
+
+    if (cartFingerprint() !== previousCart) {
+      submissionError.value =
+        'تغيرت بيانات السلة. راجع الملخص المحدث ثم أكد الطلب مجددًا.'
+      return
+    }
+
+    requestSent = true
+
+    const response = await $api<ApiResponse<CreatedOrder>>(
+      '/my/orders',
+      {
+        method: 'POST',
+        retry: 0,
+        body: {
+          delivery_governorate_id: form.governorateId
+            ? Number(form.governorateId)
+            : null,
+
+          delivery_address: form.address.trim(),
+
+          delivery_coordinates: form.coordinates || null,
+        },
+      },
+    )
+
+    if (!sameSession(token, owner)) return
+
+    const order = response.data
+    const id = Number(order?.id)
+
+    if (
+      response.status !== 'success'
+      || !order
+      || !Number.isSafeInteger(id)
+      || id <= 0
+      || typeof order.order_number !== 'string'
+      || !order.order_number.trim()
+      || (
+        order.customer
+        && String(order.customer.id) !== owner
+      )
+    ) {
+      throw new Error('Order creation was not confirmed')
+    }
+
+    // إظهار نجاح الإنشاء قبل تحديث السلة.
+    createdOrder.value = order
+
+    const refreshed = await cartStore.fetchCart()
+
+    if (!sameSession(token, owner)) return
+
+    if (!refreshed) {
+      cartRefreshWarning.value =
+        'تم إنشاء الطلب، لكن تعذر تحديث السلة. يمكنك متابعة الطلب من سجلك.'
+    }
+  } catch (failure: unknown) {
+    if (!sameSession(token, owner)) return
+
+    // نجاح الإنشاء يبقى محفوظًا حتى إن فشل التحديث اللاحق.
+    if (createdOrder.value) {
+      cartRefreshWarning.value =
+        'تم إنشاء الطلب، لكن تعذر تحديث السلة.'
+      return
+    }
+
+    const requestError = failure as RequestFailure
+    const status =
+      requestError.statusCode ?? requestError.status
+
+    const fieldErrors = requestError.data?.errors || {}
+
+    const fieldMap: Record<string, DeliveryField> = {
+      delivery_governorate_id: 'governorateId',
+      delivery_address: 'address',
+      delivery_coordinates: 'coordinates',
+    }
+
+    let hasFieldErrors = false
+
+    if (status === 422) {
+      for (const [apiField, formField] of Object.entries(fieldMap)) {
+        const messages = fieldErrors[apiField]
+
+        const message = Array.isArray(messages)
+          ? messages[0]
+          : messages
+
+        if (typeof message === 'string') {
+          errors[formField] = message
+          hasFieldErrors = true
+        }
+      }
+    }
+
+    if (status === 401) {
+      submissionError.value =
+        'انتهت جلسة الدخول. سجّل الدخول مجددًا.'
+    } else if (status === 403) {
+      submissionError.value =
+        'لا يملك الحساب صلاحية إنشاء هذا الطلب.'
+    } else if (hasFieldErrors) {
+      submissionError.value =
+        'راجع بيانات التوصيل الموضحة.'
+    } else if (requestSent) {
+      verificationRequired.value = true
+
+      submissionError.value =
+        'تعذر تأكيد نتيجة إنشاء الطلب. راجع سجل طلباتك قبل إعادة الإرسال.'
+    } else {
+      submissionError.value =
+        'تعذر التحقق من السلة. حدّث البيانات وأعد المحاولة.'
+    }
+  } finally {
+    if (sameSession(token, owner)) {
+      submitting.value = false
+    }
+  }
+}
+
+watch(
+  () => form.address,
+  () => {
+    // تعديل العنوان يدويًا يلغي ارتباطه بالنقطة السابقة.
+    form.coordinates = ''
+  },
+  { flush: 'sync' },
+)
+
+watch(fieldsDisabled, disabled => {
+  if (disabled) isMapOpen.value = false
+})
+
+watch(
+  () => String(authStore.user?.id ?? ''),
+  (next, previous) => {
+    if (next === previous) return
+
+    loadVersion++
+
+    form.governorateId = ''
+    form.address = ''
+    form.coordinates = ''
+
+    formInitialized = false
+    metadataReady.value = false
+    createdOrder.value = null
+    verificationRequired.value = false
+    cartRefreshWarning.value = ''
+    submissionError.value = ''
+    submitting.value = false
+    loading.value = false
+
+    clearErrors()
+
+    loadError.value =
+      'تغير الحساب. أعد تحميل البيانات للمتابعة.'
+  },
+)
+
+onMounted(() => {
+  void loadPage()
+})
+
+onBeforeUnmount(() => {
+  disposed = true
+  loadVersion++
 })
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <!-- Breadcrumbs -->
-    <nav class="flex items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل">
-      <NuxtLink to="/customer/dashboard" class="hover:text-solar-text-heading">الرئيسية</NuxtLink>
-      <span>/</span>
-      <NuxtLink to="/customer/cart" class="hover:text-solar-text-heading">سلة المشتريات</NuxtLink>
-      <span>/</span>
-      <span class="font-bold text-solar-text-heading">إتمام الطلب</span>
+  <div dir="rtl" class="flex min-w-0 flex-col gap-6">
+    <nav
+      class="flex flex-wrap items-center gap-2 text-xs text-solar-text-muted"
+      aria-label="مسار التنقل"
+    >
+      <NuxtLink to="/customer/dashboard">
+        الرئيسية
+      </NuxtLink>
+
+      <span aria-hidden="true">‹</span>
+
+      <NuxtLink to="/customer/cart">
+        السلة
+      </NuxtLink>
+
+      <span aria-hidden="true">‹</span>
+
+      <span>إتمام الطلب</span>
     </nav>
 
-    <!-- شريط المراحل (Stepper) -->
-    <div class="flex flex-col gap-3">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-black text-solar-text-heading">إتمام الطلب وتحديد التوصيل والدفع</h1>
-          <p class="text-xs text-solar-text-muted">أكمل بياناتك لتأكيد الشحن وتجهيز مشترياتك مباشرة من المستودعات المعتمدة</p>
-        </div>
-
-        <div class="hidden sm:flex items-center gap-3 text-xs font-bold">
-          <NuxtLink to="/customer/cart" class="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 hover:bg-emerald-100">
-            <Check class="size-3.5" />
-            <span>1 السلة</span>
-          </NuxtLink>
-          <span class="text-solar-text-muted">←</span>
-          <div class="flex items-center gap-1.5 rounded-full bg-solar-yellow px-3 py-1 text-solar-navy-dark shadow-sm">
-            <span>2 إتمام الطلب</span>
-          </div>
-          <span class="text-solar-text-muted">←</span>
-          <div class="flex items-center gap-1.5 rounded-full bg-solar-bg-subtle px-3 py-1 text-solar-text-muted">
-            <span>3 التأكيد والتتبع</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- تنبيه عند خلو السلة -->
-    <div
-      v-if="cartStore.items.length === 0"
-      class="flex flex-col items-center justify-center rounded-2xl border border-solar-border-card bg-white p-12 text-center shadow-sm"
+    <header
+      class="flex flex-wrap items-start justify-between gap-4"
     >
-      <div class="flex size-16 items-center justify-center rounded-full bg-solar-bg-subtle text-solar-text-muted mb-4">
-        <Store class="size-8 stroke-[1.5]" />
+      <div>
+        <h1 class="text-2xl font-bold text-solar-text-heading">
+          إتمام طلب الشراء
+        </h1>
+
+        <p class="mt-2 text-sm leading-7 text-solar-text-muted">
+          راجع المنتجات وأدخل عنوان التوصيل قبل تأكيد إنشاء الطلب.
+        </p>
       </div>
-      <h2 class="text-lg font-bold text-solar-text-heading mb-2">لا توجد منتجات في السلة لإتمام الطلب</h2>
-      <p class="max-w-md text-xs text-solar-text-muted mb-6">
-        قم بإضافة ألواح أو محولات أو بطاريات من كتالوج المتاجر المعتمدة أولاً لمتابعة الشراء.
+
+      <button
+        v-if="!createdOrder"
+        type="button"
+        :disabled="loading || submitting || cartStore.isLoading"
+        class="rounded-lg border border-solar-border-card bg-white px-4 py-2 text-xs font-bold text-solar-text-heading disabled:opacity-50"
+        @click="loadPage"
+      >
+        تحديث البيانات والسلة
+      </button>
+    </header>
+
+    <section
+      v-if="createdOrder"
+      class="rounded-xl border border-emerald-200 bg-white p-6 text-center"
+      aria-labelledby="order-success-heading"
+    >
+      <CheckCircle2
+        class="mx-auto size-12 text-emerald-700"
+        aria-hidden="true"
+      />
+
+      <h2
+        id="order-success-heading"
+        class="mt-4 text-xl font-bold text-solar-text-heading"
+      >
+        تم إنشاء الطلب بنجاح
+      </h2>
+
+      <p class="mt-3 font-bold text-solar-text-heading">
+        {{ createdOrder.order_number }}
       </p>
-      <NuxtLink to="/customer/products" class="btn-primary gap-2 text-xs px-6 py-2.5">
-        <span>تصفح كتالوج المنتجات</span>
-        <ArrowLeft class="size-4" />
-      </NuxtLink>
-    </div>
 
-    <!-- شبكة النموذج والملخص -->
-    <div v-else class="grid gap-8 lg:grid-cols-12">
-      <!-- نموذج البيانات (8 أعمدة) -->
-      <div class="lg:col-span-8 flex flex-col gap-6">
-        <!-- رسالة الخطأ إن وجدت -->
-        <div v-if="errorMessage" class="flex items-center gap-2 rounded-xl bg-red-50 p-4 text-xs text-red-700 border border-red-200">
-          <AlertCircle class="size-5 shrink-0" />
-          <span>{{ errorMessage }}</span>
-        </div>
+      <p class="mt-3 text-sm text-solar-text-muted">
+        إجمالي الطلب المسجل:
+        {{ formatAmount(createdOrder.total_amount) }}
+      </p>
 
-        <!-- 1. بيانات المستلم -->
-        <div class="rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm flex flex-col gap-4">
-          <div class="flex items-center gap-2 border-b border-solar-border-card pb-3">
-            <User class="size-5 text-solar-yellow" />
-            <h2 class="text-base font-bold text-solar-text-heading">1. بيانات المستلم والتواصل</h2>
-          </div>
+      <p class="mt-2 text-xs text-solar-text-muted">
+        العملة غير محددة في بيانات الطلب.
+      </p>
 
-          <div class="grid gap-4 sm:grid-cols-3">
-            <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-semibold text-solar-text-body">الاسم الكامل:</label>
-              <input
-                v-model="fullName"
-                type="text"
-                placeholder="اسم المستلم"
-                class="solar-input"
-              />
-            </div>
+      <p
+        v-if="cartRefreshWarning"
+        role="status"
+        class="mt-4 rounded-lg bg-amber-50 p-3 text-sm leading-7 text-amber-900"
+      >
+        {{ cartRefreshWarning }}
+      </p>
 
-            <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-semibold text-solar-text-body">رقم الهاتف:</label>
-              <input
-                v-model="phone"
-                type="tel"
-                placeholder="77XXXXXXX"
-                class="solar-input"
-              />
-            </div>
+      <div class="mt-6 flex flex-wrap justify-center gap-3">
+        <NuxtLink
+          :to="`/customer/orders/${createdOrder.id}/track`"
+          class="rounded-lg bg-solar-yellow px-5 py-3 text-sm font-bold text-solar-navy-dark"
+        >
+          عرض الطلب
+        </NuxtLink>
 
-            <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-semibold text-solar-text-body">البريد الإلكتروني:</label>
-              <input
-                v-model="email"
-                type="email"
-                placeholder="example@domain.com"
-                class="solar-input"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- 2. عنوان التوصيل والموقع -->
-        <div class="rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm flex flex-col gap-4">
-          <div class="flex items-center gap-2 border-b border-solar-border-card pb-3">
-            <MapPin class="size-5 text-solar-yellow" />
-            <h2 class="text-base font-bold text-solar-text-heading">2. موقع وعنوان التوصيل</h2>
-          </div>
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-semibold text-solar-text-body">المحافظة / المنطقة:</label>
-              <select v-model="selectedGovernorateId" class="solar-input">
-                <option v-for="gov in governorates" :key="gov.id" :value="gov.id">
-                  {{ gov.name_ar }}
-                </option>
-              </select>
-            </div>
-
-            <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-semibold text-solar-text-body">العنوان التفصيلي (المدينة، الحي، الشارع):</label>
-              <input
-                v-model="addressDetails"
-                type="text"
-                placeholder="مثال: صنعاء - حدة - بجوار جولة الرويشان"
-                class="solar-input"
-              />
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold text-solar-text-body">ملاحظات تسليم خاصة للشاحنة / الرافعة (اختياري):</label>
-            <textarea
-              v-model="notes"
-              rows="2"
-              placeholder="مثال: يرجى الاتصال قبل الوصول بنصف ساعة، يتوفر ونش تنزيل في الموقع..."
-              class="solar-input resize-none"
-            />
-          </div>
-        </div>
-
-        <!-- 3. طريقة الدفع -->
-        <div class="rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm flex flex-col gap-4">
-          <div class="flex items-center gap-2 border-b border-solar-border-card pb-3">
-            <Wallet class="size-5 text-solar-yellow" />
-            <h2 class="text-base font-bold text-solar-text-heading">3. طريقة الدفع المعتمدة</h2>
-          </div>
-
-          <div class="grid gap-3 sm:grid-cols-3">
-            <!-- خيار المحافظ الإلكترونية -->
-            <label
-              class="flex flex-col gap-2 rounded-xl border p-4 cursor-pointer transition-all"
-              :class="paymentMethod === 'wallet' ? 'border-amber-500 bg-amber-50/30 ring-1 ring-amber-500' : 'border-solar-border-card hover:bg-solar-bg-subtle'"
-            >
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-solar-text-heading">محفظة إلكترونية</span>
-                <input
-                  v-model="paymentMethod"
-                  type="radio"
-                  value="wallet"
-                  class="accent-amber-600"
-                />
-              </div>
-              <p class="text-[11px] text-solar-text-muted">الدفع عبر الكريمي، ون كاش، فلوسك، جايبي...</p>
-            </label>
-
-            <!-- خيار الدفع عند الاستلام -->
-            <label
-              class="flex flex-col gap-2 rounded-xl border p-4 cursor-pointer transition-all"
-              :class="paymentMethod === 'cod' ? 'border-amber-500 bg-amber-50/30 ring-1 ring-amber-500' : 'border-solar-border-card hover:bg-solar-bg-subtle'"
-            >
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-solar-text-heading">الدفع عند الاستلام</span>
-                <input
-                  v-model="paymentMethod"
-                  type="radio"
-                  value="cod"
-                  class="accent-amber-600"
-                />
-              </div>
-              <p class="text-[11px] text-solar-text-muted">الدفع نقداً بعد فحص ومطابقة الشحنة في الموقع</p>
-            </label>
-
-            <!-- خيار الحوالة البنكية -->
-            <label
-              class="flex flex-col gap-2 rounded-xl border p-4 cursor-pointer transition-all"
-              :class="paymentMethod === 'bank_transfer' ? 'border-amber-500 bg-amber-50/30 ring-1 ring-amber-500' : 'border-solar-border-card hover:bg-solar-bg-subtle'"
-            >
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-solar-text-heading">حوالة بنكية مباشرة</span>
-                <input
-                  v-model="paymentMethod"
-                  type="radio"
-                  value="bank_transfer"
-                  class="accent-amber-600"
-                />
-              </div>
-              <p class="text-[11px] text-solar-text-muted">إيداع في حساب المنصة المعتمد مع إرفاق السند</p>
-            </label>
-          </div>
-
-          <!-- تفاصيل مزود المحفظة عند اختيار المحفظة -->
-          <div v-if="paymentMethod === 'wallet' && walletProviders.length > 0" class="flex flex-col gap-2 pt-2 border-t border-solar-border-card">
-            <span class="text-xs font-bold text-solar-text-heading">اختر مزود المحفظة:</span>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="provider in walletProviders"
-                :key="provider.id"
-                type="button"
-                @click="selectedWalletId = provider.id"
-                class="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all cursor-pointer"
-                :class="selectedWalletId === provider.id ? 'border-amber-600 bg-amber-100 text-amber-900 font-bold' : 'border-solar-border-card bg-white text-solar-text-body hover:bg-solar-bg-subtle'"
-              >
-                <span>{{ provider.name_ar }}</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <NuxtLink
+          to="/customer/orders"
+          class="rounded-lg border border-solar-border-card px-5 py-3 text-sm font-bold text-solar-text-heading"
+        >
+          سجل طلباتي
+        </NuxtLink>
       </div>
+    </section>
 
-      <!-- العمود الأيسر: ملخص الطلب والتأكيد (4 أعمدة) -->
-      <div class="lg:col-span-4 flex flex-col gap-4">
-        <div class="rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm flex flex-col gap-4">
-          <h2 class="text-base font-bold text-solar-text-heading border-b border-solar-border-card pb-3">
-            ملخص المشتريات
+    <section
+      v-else-if="loading"
+      role="status"
+      aria-live="polite"
+      class="rounded-xl border border-solar-border-card bg-white p-12 text-center"
+    >
+      <Loader2
+        class="mx-auto size-8 animate-spin text-amber-600"
+        aria-hidden="true"
+      />
+
+      <p class="mt-4 text-sm text-solar-text-muted">
+        جارٍ تحميل بيانات الطلب…
+      </p>
+    </section>
+
+    <section
+      v-else-if="loadError"
+      role="alert"
+      class="rounded-xl border border-red-200 bg-red-50 p-5"
+    >
+      <p class="text-sm leading-7 text-red-800">
+        {{ loadError }}
+      </p>
+
+      <button
+        type="button"
+        class="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-bold text-red-800"
+        @click="loadPage"
+      >
+        إعادة المحاولة
+      </button>
+    </section>
+
+    <template v-else>
+      <section
+        v-if="submissionError"
+        role="alert"
+        class="rounded-xl border border-red-200 bg-red-50 p-5"
+      >
+        <p class="text-sm leading-7 text-red-800">
+          {{ submissionError }}
+        </p>
+
+        <div
+          v-if="verificationRequired"
+          class="mt-4 flex flex-wrap gap-3"
+        >
+          <NuxtLink
+            to="/customer/orders"
+            class="rounded-lg bg-white px-4 py-2 text-sm font-bold text-red-800"
+          >
+            مراجعة سجل طلباتي
+          </NuxtLink>
+
+          <NuxtLink
+            to="/customer/cart"
+            class="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-800"
+          >
+            العودة إلى السلة
+          </NuxtLink>
+        </div>
+      </section>
+
+      <section
+        v-if="!cartStore.isInitialized && !submitting"
+        class="rounded-xl border border-solar-border-card bg-white p-8 text-center"
+      >
+        <p class="text-sm leading-7 text-solar-text-muted">
+          {{ cartStore.errorMessage || 'لم يتم التحقق من السلة بعد.' }}
+        </p>
+
+        <button
+          type="button"
+          class="mt-4 rounded-lg bg-solar-yellow px-5 py-3 text-sm font-bold text-solar-navy-dark"
+          @click="loadPage"
+        >
+          إعادة تحميل البيانات
+        </button>
+      </section>
+
+      <section
+        v-else-if="!cartStore.items.length && !submitting"
+        class="rounded-xl border border-dashed border-solar-border-card bg-white p-12 text-center"
+      >
+        <h2 class="text-xl font-bold text-solar-text-heading">
+          لا توجد منتجات لإتمام الطلب
+        </h2>
+
+        <div class="mt-5 flex flex-wrap justify-center gap-3">
+          <NuxtLink
+            to="/customer/products"
+            class="rounded-lg bg-solar-yellow px-5 py-3 text-sm font-bold text-solar-navy-dark"
+          >
+            تصفح المنتجات
+          </NuxtLink>
+
+          <NuxtLink
+            to="/customer/orders"
+            class="rounded-lg border border-solar-border-card px-5 py-3 text-sm font-bold text-solar-text-heading"
+          >
+            عرض طلباتي
+          </NuxtLink>
+        </div>
+      </section>
+
+      <form
+        v-else
+        class="grid items-start gap-6 lg:grid-cols-3"
+        novalidate
+        :aria-busy="submitting"
+        @submit.prevent="submitOrder"
+      >
+        <div class="flex flex-col gap-6 lg:col-span-2">
+          <section class="solar-card p-5">
+            <h2 class="text-lg font-bold text-solar-text-heading">
+              بيانات صاحب الحساب
+            </h2>
+
+            <dl class="mt-5 grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt class="text-xs text-solar-text-muted">
+                  الاسم
+                </dt>
+                <dd class="mt-2 text-sm text-solar-text-heading">
+                  {{ authStore.user?.name || 'غير متاح' }}
+                </dd>
+              </div>
+
+              <div>
+                <dt class="text-xs text-solar-text-muted">
+                  الهاتف
+                </dt>
+                <dd class="mt-2 text-sm text-solar-text-heading">
+                  <bdi>{{ authStore.user?.phone || 'غير متاح' }}</bdi>
+                </dd>
+              </div>
+
+              <div class="sm:col-span-2">
+                <dt class="text-xs text-solar-text-muted">
+                  البريد الإلكتروني
+                </dt>
+                <dd class="mt-2 break-all text-sm text-solar-text-heading">
+                  {{ authStore.user?.email || 'غير متاح' }}
+                </dd>
+              </div>
+            </dl>
+
+            <NuxtLink
+              to="/customer/settings"
+              class="mt-5 inline-flex text-xs font-bold text-solar-text-heading underline"
+            >
+              تعديل بيانات الحساب
+            </NuxtLink>
+          </section>
+
+          <fieldset
+            :disabled="fieldsDisabled"
+            class="solar-card min-w-0 p-5"
+          >
+            <legend class="sr-only">
+              بيانات التوصيل
+            </legend>
+
+            <h2 class="mb-5 text-lg font-bold text-solar-text-heading">
+              عنوان التوصيل
+            </h2>
+
+            <div class="flex flex-col gap-5">
+              <FormField
+                label="المحافظة"
+                :error="errors.governorateId"
+              >
+                <select
+                  v-model="form.governorateId"
+                  class="solar-input h-11"
+                  :aria-invalid="Boolean(errors.governorateId)"
+                >
+                  <option value="">
+                    غير محددة
+                  </option>
+
+                  <option
+                    v-for="governorate in governorates"
+                    :key="governorate.id"
+                    :value="String(governorate.id)"
+                  >
+                    {{ governorateName(governorate) }}
+                  </option>
+                </select>
+              </FormField>
+
+              <FormField
+                label="العنوان التفصيلي وتعليمات الوصول"
+                :error="errors.address"
+                required
+              >
+                <textarea
+                  v-model="form.address"
+                  rows="4"
+                  maxlength="500"
+                  autocomplete="street-address"
+                  required
+                  :aria-invalid="Boolean(errors.address)"
+                  placeholder="المدينة، الحي، الشارع، وأقرب علامة معروفة"
+                  class="solar-input resize-y"
+                />
+
+                <p class="mt-2 text-xs text-solar-text-muted">
+                  {{ form.address.length }} / 500
+                </p>
+              </FormField>
+
+              <div>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-lg border border-solar-border-card px-4 py-3 text-xs font-bold text-solar-text-heading"
+                  @click="isMapOpen = true"
+                >
+                  <MapPin class="size-4" aria-hidden="true" />
+                  تحديد الموقع على الخريطة
+                </button>
+
+                <p
+                  v-if="form.coordinates"
+                  class="mt-3 text-xs font-bold text-emerald-800"
+                >
+                  تم تحديد نقطة التوصيل.
+                </p>
+
+                <button
+                  v-if="form.coordinates"
+                  type="button"
+                  class="mt-2 text-xs text-solar-text-muted underline"
+                  @click="form.coordinates = ''"
+                >
+                  إلغاء نقطة الخريطة
+                </button>
+
+                <p
+                  v-if="errors.coordinates"
+                  class="mt-2 text-xs leading-6 text-red-700"
+                >
+                  {{ errors.coordinates }}
+                </p>
+              </div>
+            </div>
+          </fieldset>
+        </div>
+
+        <aside class="solar-card p-5">
+          <h2 class="text-lg font-bold text-solar-text-heading">
+            مراجعة المنتجات
           </h2>
 
-          <!-- قائمة مختصرة بالمنتجات -->
-          <div class="flex flex-col gap-3 max-h-60 overflow-y-auto pr-1">
-            <div
+          <ul class="mt-5 flex flex-col gap-4">
+            <li
               v-for="item in cartStore.items"
-              :key="item.id || item.product.id"
-              class="flex items-center justify-between gap-3 text-xs border-b border-solar-border-card/50 pb-2"
+              :key="item.id ?? item.product.id"
+              class="border-b border-solar-border-card pb-4"
             >
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="flex size-5 shrink-0 items-center justify-center rounded bg-solar-bg-subtle font-bold text-[10px]">
-                  {{ item.quantity }}x
+              <p class="break-words text-sm font-bold text-solar-text-heading">
+                {{ item.product.name }}
+              </p>
+
+              <div
+                class="mt-2 flex justify-between gap-3 text-xs text-solar-text-muted"
+              >
+                <span>الكمية: {{ item.quantity }}</span>
+
+                <span>
+                  {{
+                    item.product.priceKnown
+                      ? formatAmount(
+                        item.line_total
+                          ?? item.product.price * item.quantity,
+                      )
+                      : 'السعر غير متاح'
+                  }}
                 </span>
-                <span class="truncate font-semibold text-solar-text-heading">{{ item.product.name }}</span>
               </div>
-              <span class="font-bold text-solar-navy-dark shrink-0">
-                {{ Number(item.line_total ?? (item.product.price * item.quantity)).toLocaleString() }} ر.س
-              </span>
-            </div>
-          </div>
+            </li>
+          </ul>
 
-          <!-- تفصيل المبالغ -->
-          <div class="flex flex-col gap-2.5 text-xs pt-2">
-            <div class="flex items-center justify-between text-solar-text-body">
-              <span>المجموع الفرعي</span>
-              <span class="font-bold text-solar-text-heading">{{ cartStore.subtotal.toLocaleString() }} ر.س</span>
-            </div>
-
-            <div class="flex items-center justify-between text-solar-text-body">
-              <span>ضريبة القيمة المضافة (15%)</span>
-              <span class="font-bold text-solar-text-heading">{{ cartStore.vat.toLocaleString() }} ر.س</span>
-            </div>
-
-            <div class="flex items-center justify-between text-solar-text-body">
-              <span>رسوم الشحن والتوصيل</span>
-              <span class="font-bold text-emerald-600">
-                {{ cartStore.shippingFee === 0 ? 'مجاني' : `${cartStore.shippingFee} ر.س` }}
-              </span>
-            </div>
-
-            <div class="border-t border-solar-border-card pt-3 flex items-baseline justify-between text-base">
-              <span class="font-bold text-solar-text-heading">الإجمالي المستحق:</span>
-              <div class="flex items-baseline gap-1">
-                <span class="text-xl font-black text-solar-navy-dark">{{ cartStore.total.toLocaleString() }}</span>
-                <span class="text-xs font-bold text-solar-text-muted">ر.س</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- زر تأكيد الطلب -->
-          <button
-            type="button"
-            @click="handlePlaceOrder"
-            :disabled="isActionLoading || !isFormValid"
-            class="btn-primary w-full h-12 text-sm gap-2 justify-center mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          <div
+            class="mt-5 flex justify-between gap-3 text-sm font-bold text-solar-text-heading"
           >
-            <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
-            <Lock v-else class="size-4" />
-            <span>تأكيد الطلب والشحن الآن</span>
+            <span>إجمالي المنتجات</span>
+
+            <span>
+              {{
+                cartStore.hasCompletePricing
+                  ? formatAmount(cartStore.subtotal)
+                  : 'غير متاح'
+              }}
+            </span>
+          </div>
+
+          <p class="mt-4 text-xs leading-7 text-solar-text-muted">
+            العملة والضريبة ورسوم التوصيل غير محددة في البيانات المتاحة.
+          </p>
+
+          <p
+            v-if="!cartStore.canCheckout && !submitting"
+            class="mt-4 rounded-lg bg-amber-50 p-3 text-xs leading-7 text-amber-900"
+          >
+            راجع صلاحية المنتجات والكميات في السلة قبل المتابعة.
+          </p>
+
+          <p class="mt-4 text-xs leading-7 text-solar-text-muted">
+            عند التأكيد سيُنشأ طلب شراء وتُخصم الكميات المطلوبة من المخزون.
+          </p>
+
+          <button
+            type="submit"
+            :disabled="!canSubmit"
+            class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-solar-yellow px-5 py-3 text-sm font-bold text-solar-navy-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Loader2
+              v-if="submitting"
+              class="size-4 animate-spin"
+              aria-hidden="true"
+            />
+
+            {{ submitting ? 'جارٍ إنشاء الطلب…' : 'تأكيد إنشاء الطلب' }}
           </button>
 
-          <!-- شارات الثقة والأمان -->
-          <div class="flex flex-col gap-2 pt-3 border-t border-solar-border-card text-[11px] text-solar-text-muted">
-            <div class="flex items-center gap-2">
-              <ShieldCheck class="size-4 text-emerald-600 shrink-0" />
-              <span>فواتير ضريبية إلكترونية معتمدة للمعدات</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <Truck class="size-4 text-blue-600 shrink-0" />
-              <span>تغليف ونقل آمن وفق اشتراطات Tier 1</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          <NuxtLink
+            to="/customer/cart"
+            class="mt-4 block text-center text-xs font-bold text-solar-text-heading underline"
+          >
+            مراجعة السلة
+          </NuxtLink>
+        </aside>
+      </form>
 
-    <!-- نافذة نجاح الطلب المنبثقة -->
-    <div v-if="isSuccessModalOpen && createdOrder" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" />
-
-      <div class="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl z-10 text-right">
-        <div class="flex flex-col items-center justify-center py-6 text-center">
-          <div class="flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-4 animate-bounce">
-            <CheckCircle2 class="size-10" />
-          </div>
-
-          <h3 class="text-xl font-black text-solar-text-heading mb-1">تم تأكيد طلبك بنجاح!</h3>
-          <p class="text-xs font-bold text-solar-navy-dark mb-3">
-            رقم الطلب: <span class="text-amber-600">{{ createdOrder.order_number }}</span>
-          </p>
-
-          <p class="text-xs text-solar-text-secondary max-w-xs mb-6 leading-relaxed">
-            تم إرسال تفاصيل الطلب إلى المتاجر المعتمدة لبدء تجهيز المعدات وفحصها قبل التسليم لأسطول الشحن.
-          </p>
-
-          <div class="flex flex-col sm:flex-row gap-3 w-full">
-            <NuxtLink
-              :to="`/customer/orders/${createdOrder.id}/track`"
-              class="btn-primary flex-1 text-xs py-3 justify-center gap-2"
-            >
-              <Truck class="size-4" />
-              <span>تتبع مسار الشحنة الآن</span>
-            </NuxtLink>
-
-            <NuxtLink
-              to="/customer/orders"
-              class="btn-outline flex-1 text-xs py-3 justify-center"
-            >
-              الذهاب إلى سجل طلباتي
-            </NuxtLink>
-          </div>
-        </div>
-      </div>
-    </div>
+      <MapLocationModal
+        :is-open="isMapOpen"
+        :current-location="form.coordinates || form.address"
+        title="تحديد موقع التوصيل"
+        subtitle="اختر نقطة التوصيل ثم أكد الموقع"
+        @select="selectLocation"
+        @close="isMapOpen = false"
+      />
+    </template>
   </div>
 </template>

@@ -1,133 +1,214 @@
 <script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Bell, ChevronDown, Menu, ShoppingCart, User } from 'lucide-vue-next'
-import { useCartStore } from '~~/app/stores/cart.store'
-import { useAuthStore } from '~~/app/stores/auth'
-import ThemeToggle from '~~/app/components/common/ThemeToggle.vue'
+import { useCartStore } from '../../stores/cart.store'
+import { useAuthStore } from '../../stores/auth'
+import { useCustomerNotifications } from '../../composables/useCustomerNotifications'
+import ThemeToggle from '../common/ThemeToggle.vue'
 
-withDefaults(defineProps<{ isMobileOpen?: boolean }>(), { isMobileOpen: false })
+withDefaults(
+  defineProps<{
+    isMobileOpen?: boolean
+  }>(),
+  {
+    isMobileOpen: false,
+  },
+)
+
 const emit = defineEmits<{
-  (e: 'toggleMobileMenu'): void
-  (e: 'unavailable', label: string): void
+  toggleMobileMenu: []
+  unavailable: [label: string]
 }>()
 
 const cartStore = useCartStore()
 const authStore = useAuthStore()
 const { logout } = useAuth()
-const { unreadCount } = useNotificationState()
-const isUserMenuOpen = ref(false)
-const accountMenu = ref<HTMLElement>()
-const accountButton = ref<HTMLButtonElement>()
 const route = useRoute()
 
-const userName = computed(() => {
-  return authStore.user?.name || 'حساب العميل'
+const { unreadCount } = useCustomerNotifications()
+
+const isUserMenuOpen = ref(false)
+const accountMenu = ref<HTMLElement | null>(null)
+const accountButton = ref<HTMLButtonElement | null>(null)
+
+const userName = computed(() =>
+  authStore.user?.name || 'حساب العميل',
+)
+
+const userRole = computed(() =>
+  authStore.user?.role === 'customer'
+    ? 'عميل'
+    : 'حساب SolarHub',
+)
+
+const notificationLabel = computed(() => {
+  if (unreadCount.value === null) {
+    return 'مركز الإشعارات'
+  }
+
+  return `مركز الإشعارات، ${unreadCount.value} غير مقروءة`
 })
 
-const userRole = computed(() => {
-  if (authStore.user?.role === 'customer') return 'عميل معتمد'
-  return 'عميل SolarHub'
-})
+const hasUnreadNotifications = computed(() =>
+  unreadCount.value !== null && unreadCount.value > 0,
+)
 
 function closeAccountMenu(event: PointerEvent) {
-  if (event.target instanceof Node && !accountMenu.value?.contains(event.target)) isUserMenuOpen.value = false
+  if (
+    event.target instanceof Node
+    && !accountMenu.value?.contains(event.target)
+  ) {
+    isUserMenuOpen.value = false
+  }
 }
-function escapeAccountMenu() { isUserMenuOpen.value = false; accountButton.value?.focus() }
+
+function escapeAccountMenu() {
+  isUserMenuOpen.value = false
+  accountButton.value?.focus()
+}
 
 async function handleLogout() {
   isUserMenuOpen.value = false
   await logout()
 }
 
-watch(() => route.fullPath, () => { isUserMenuOpen.value = false })
+watch(
+  () => route.fullPath,
+  () => {
+    isUserMenuOpen.value = false
+  },
+)
+
 onMounted(() => {
   document.addEventListener('pointerdown', closeAccountMenu)
-  // تحميل عناصر السلة مبكراً لتحديث العداد
   cartStore.fetchCart()
 })
-onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMenu))
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', closeAccountMenu)
+})
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 flex w-full shrink-0 items-center justify-between bg-solar-bg-card px-3 sm:px-6 h-16 border-b border-solar-border-card shadow-sm sm:h-20 transition-colors duration-200">
-    <!-- الجانب الأيمن (زر القائمة للشاشات الصغيرة + عنوان ترحيبي متجاوب) -->
+  <header
+    class="sticky top-0 z-30 flex h-16 w-full shrink-0 items-center justify-between border-b border-solar-border-card bg-solar-bg-card px-3 shadow-sm transition-colors duration-200 sm:h-20 sm:px-6"
+  >
     <div class="flex items-center gap-2 sm:gap-4">
       <button
         type="button"
-        @click="emit('toggleMobileMenu')"
-        class="flex size-9 sm:size-10 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-heading lg:hidden hover:bg-solar-bg-subtle active:scale-95 transition-all"
+        class="flex size-9 items-center justify-center rounded-lg border border-solar-border-card text-solar-text-heading transition-all hover:bg-solar-bg-subtle active:scale-95 sm:size-10 lg:hidden"
         aria-label="فتح القائمة"
         aria-controls="customer-mobile-navigation"
         :aria-expanded="isMobileOpen"
+        @click="emit('toggleMobileMenu')"
       >
-        <Menu class="size-5" />
+        <Menu class="size-5" aria-hidden="true" />
       </button>
 
-      <div class="hidden sm:flex flex-col">
-        <p class="text-sm sm:text-base font-bold text-solar-text-heading leading-tight">بوابة العميل | SolarHub</p>
-        <p class="text-[11px] text-solar-text-muted">المنظومات وحلول الطاقة الكهروضوئية المعتمدة</p>
+      <div class="hidden flex-col sm:flex">
+        <p
+          class="text-sm font-bold leading-tight text-solar-text-heading sm:text-base"
+        >
+          بوابة العميل | SolarHub
+        </p>
+
+        <p class="text-[11px] text-solar-text-muted">
+          المنظومات وحلول الطاقة الكهروضوئية
+        </p>
       </div>
 
-      <!-- شعار مبسط في الهواتف الذكية فقط إذا كان العنوان مخفياً -->
-      <span class="text-xs font-black text-solar-navy-dark dark:text-solar-yellow sm:hidden">
+      <span
+        class="text-xs font-black text-solar-navy-dark dark:text-solar-yellow sm:hidden"
+      >
         سولار <span class="text-solar-yellow">هب</span>
       </span>
     </div>
 
-    <!-- الجانب الأيسر (الوضع الداكن، الإشعارات، السلة، الحساب الشخصي) متجاوب بالكامل -->
     <div class="flex items-center gap-2 sm:gap-3.5">
-      <!-- زر تبديل الوضع الداكن / النهاري -->
       <ThemeToggle />
 
-      <!-- زر الإشعارات -->
       <NuxtLink
         to="/customer/notifications"
-        class="relative flex size-9 sm:size-10 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-body transition-colors hover:border-solar-yellow hover:text-solar-text-heading"
-        :aria-label="`مركز الإشعارات، ${unreadCount} غير مقروءة`"
+        class="relative flex size-9 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-body transition-colors hover:border-solar-yellow hover:text-solar-text-heading focus-visible:ring-2 focus-visible:ring-solar-yellow sm:size-10"
+        :aria-label="notificationLabel"
       >
-        <Bell class="size-4 sm:size-5" />
-        <span v-if="unreadCount > 0" class="absolute top-2 left-2 size-2 sm:size-2.5 rounded-full bg-amber-500 ring-2 ring-solar-bg-card" aria-hidden="true" />
+        <Bell class="size-4 sm:size-5" aria-hidden="true" />
+
+        <span
+          v-if="hasUnreadNotifications"
+          class="absolute -left-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-solar-navy-dark ring-2 ring-solar-bg-card"
+          aria-hidden="true"
+        >
+          {{ unreadCount !== null && unreadCount > 99 ? '99+' : unreadCount }}
+        </span>
       </NuxtLink>
 
-      <!-- أيقونة سلة المشتريات التفاعلية مع العداد -->
       <NuxtLink
         to="/customer/cart"
-        class="relative flex size-9 sm:size-10 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-body transition-colors hover:border-solar-yellow hover:text-solar-text-heading"
+        class="relative flex size-9 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-body transition-colors hover:border-solar-yellow hover:text-solar-text-heading focus-visible:ring-2 focus-visible:ring-solar-yellow sm:size-10"
         aria-label="سلة المشتريات"
       >
-        <ShoppingCart class="size-4 sm:size-5" />
+        <ShoppingCart
+          class="size-4 sm:size-5"
+          aria-hidden="true"
+        />
+
         <span
           v-if="cartStore.totalItemsCount > 0"
-          class="absolute -top-1.5 -left-1.5 flex min-w-[18px] sm:min-w-[20px] h-4.5 sm:h-5 items-center justify-center rounded-full bg-solar-yellow px-1 text-[10px] sm:text-xs font-bold text-solar-navy-dark shadow-sm"
+          class="absolute -left-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-solar-yellow px-1 text-[10px] font-bold text-solar-navy-dark shadow-sm"
         >
           {{ cartStore.totalItemsCount }}
         </span>
       </NuxtLink>
 
-      <!-- الملف الشخصي للمستخدم -->
-      <div ref="accountMenu" class="relative" @keydown.esc.stop="escapeAccountMenu">
+      <div
+        ref="accountMenu"
+        class="relative"
+        @keydown.esc.stop="escapeAccountMenu"
+      >
         <button
           ref="accountButton"
           type="button"
-          @click="isUserMenuOpen = !isUserMenuOpen"
-          class="flex items-center gap-1.5 sm:gap-2.5 p-1 pr-2 rounded-xl border border-solar-border-card bg-solar-bg-card transition-colors hover:border-solar-yellow sm:p-1.5 sm:pr-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow"
+          class="flex items-center gap-1.5 rounded-xl border border-solar-border-card bg-solar-bg-card p-1 pr-2 transition-colors hover:border-solar-yellow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow sm:gap-2.5 sm:p-1.5 sm:pr-3"
           :aria-expanded="isUserMenuOpen"
           aria-controls="customer-account-menu"
+          @click="isUserMenuOpen = !isUserMenuOpen"
         >
-          <div class="flex size-7 sm:size-8 items-center justify-center rounded-lg bg-solar-navy text-white">
-            <User class="size-3.5 sm:size-4" />
-          </div>
-          <div class="text-right flex flex-col leading-tight max-w-[120px]">
-            <span class="text-xs font-bold text-solar-text-heading truncate">{{ userName }}</span>
-            <span class="text-[9px] sm:text-[10px] text-solar-text-muted hidden xs:inline">{{ userRole }}</span>
-          </div>
-          <ChevronDown class="size-3.5 sm:size-4 text-solar-text-muted" />
+          <span
+            class="flex size-7 items-center justify-center rounded-lg bg-solar-navy text-white sm:size-8"
+          >
+            <User
+              class="size-3.5 sm:size-4"
+              aria-hidden="true"
+            />
+          </span>
+
+          <span
+            class="flex max-w-[120px] flex-col text-right leading-tight"
+          >
+            <span
+              class="truncate text-xs font-bold text-solar-text-heading"
+            >
+              {{ userName }}
+            </span>
+
+            <span
+              class="hidden text-[9px] text-solar-text-muted xs:inline sm:text-[10px]"
+            >
+              {{ userRole }}
+            </span>
+          </span>
+
+          <ChevronDown
+            class="size-3.5 text-solar-text-muted sm:size-4"
+            aria-hidden="true"
+          />
         </button>
 
-        <!-- القائمة المنسدلة -->
         <div
           v-if="isUserMenuOpen"
           id="customer-account-menu"
-          class="absolute left-0 mt-2 w-48 rounded-xl border border-solar-border-card bg-solar-bg-card p-2 shadow-dropdown z-50 text-right"
+          class="absolute left-0 z-50 mt-2 w-48 rounded-xl border border-solar-border-card bg-solar-bg-card p-2 text-right shadow-dropdown"
         >
           <NuxtLink
             to="/customer/settings"
@@ -136,6 +217,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
           >
             الملف الشخصي وإعدادات الحساب
           </NuxtLink>
+
           <NuxtLink
             to="/customer/orders"
             class="block rounded-lg px-3 py-2 text-xs font-semibold text-solar-text-body hover:bg-solar-bg-subtle"
@@ -143,10 +225,20 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
           >
             طلباتي ومشترياتي
           </NuxtLink>
-          <hr class="my-1 border-solar-border-card" />
+
+          <NuxtLink
+            to="/customer/services/history"
+            class="block rounded-lg px-3 py-2 text-xs font-semibold text-solar-text-body hover:bg-solar-bg-subtle"
+            @click="isUserMenuOpen = false"
+          >
+            طلبات الخدمات الهندسية
+          </NuxtLink>
+
+          <hr class="my-1 border-solar-border-card">
+
           <button
             type="button"
-            class="block w-full rounded-lg px-3 py-2 text-right text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+            class="block w-full rounded-lg px-3 py-2 text-right text-xs font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
             @click="handleLogout"
           >
             تسجيل الخروج

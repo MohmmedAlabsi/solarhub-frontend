@@ -13,6 +13,7 @@ import {
 import { useCustomerProducts, type CustomerProductView } from '~~/app/composables/useCustomerProducts'
 import CustomerEcommerceProductCard from '~/components/customer/ecommerce/ProductCard.vue'
 import CommonMapLocationModal from '~/components/common/MapLocationModal.vue'
+import RfqModal from '~/components/customer/ecommerce/RfqModal.vue'
 
 definePageMeta({
   layout: 'customer',
@@ -28,6 +29,23 @@ const isLoading = ref(true)
 const store = ref<any | null>(null)
 const storeProducts = ref<CustomerProductView[]>([])
 const isMapModalOpen = ref(false)
+const selectedProductForRfq = ref<CustomerProductView | null>(null)
+const isRfqModalOpen = ref(false)
+const quoteNotice = ref('')
+
+function openRfqModal(candidate: { storeProductId?: number | string }) {
+  const product = storeProducts.value.find(
+    item => item.storeProductId === Number(candidate.storeProductId),
+  )
+  if (!product) return
+
+  selectedProductForRfq.value = product
+  isRfqModalOpen.value = true
+}
+
+function handleRfqSubmitted(submission: { id: number }) {
+  quoteNotice.value = `تم حفظ طلب التسعير #${submission.id}.`
+}
 
 useSeoMeta({
   title: () => (store.value ? `${store.value.name} | SolarHub` : 'الملف التعريفي للمتجر | SolarHub'),
@@ -173,6 +191,9 @@ onMounted(async () => {
       </div>
 
       <!-- قسم المنتجات المعروضة من هذا المتجر -->
+      <p v-if="quoteNotice" role="status" class="text-sm text-emerald-700">
+        {{ quoteNotice }}
+      </p>
       <div class="flex flex-col gap-4">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-bold text-solar-text-heading">
@@ -186,6 +207,7 @@ onMounted(async () => {
             v-for="product in storeProducts"
             :key="product.id"
             :product="product"
+            @open-rfq="openRfqModal"
           />
         </div>
 
@@ -203,6 +225,13 @@ onMounted(async () => {
           </NuxtLink>
         </div>
       </div>
+
+      <RfqModal
+        :product="selectedProductForRfq"
+        :is-open="isRfqModalOpen"
+        @close="isRfqModalOpen = false"
+        @submitted="handleRfqSubmitted"
+      />
 
       <!-- نافذة استعراض موقع المتجر والمستودع على الخريطة التفاعلية (للعرض فقط) -->
       <CommonMapLocationModal

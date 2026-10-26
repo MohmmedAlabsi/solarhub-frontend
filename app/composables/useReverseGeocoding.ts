@@ -8,7 +8,7 @@ import {
 
 /**
  * Composable for Reverse Geocoding in Nuxt
- * 
+ *
  * Usable anywhere across the SolarHub project.
  * Automatically handles debouncing, aborting previous in-flight requests,
  * and maintains reactive loading & result states.

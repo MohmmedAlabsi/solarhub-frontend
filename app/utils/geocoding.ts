@@ -1,6 +1,6 @@
 /**
  * Reverse Geocoding Utility for SolarHub
- * 
+ *
  * Provides robust 3-tier translation of coordinates (lat, lng) to precise Arabic addresses:
  * Tier 1: Photon OpenStreetMap (High precision: street, landmark, district, city, governorate)
  * Tier 2: BigDataCloud Geocoding (Secondary fallback: administrative levels, district, city)
