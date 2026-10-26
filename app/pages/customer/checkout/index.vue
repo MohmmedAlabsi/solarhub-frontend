@@ -56,6 +56,7 @@ const deliveryCoordinates = ref<string | null>(null)
 // طريقة الدفع
 const paymentMethod = ref<'wallet' | 'cod' | 'bank_transfer'>('wallet')
 const selectedWalletId = ref<number | null>(null)
+const selectedWallet = computed(() => walletProviders.value.find(p => p.id === selectedWalletId.value))
 
 // نافذة نجاح الطلب
 const isSuccessModalOpen = ref(false)
@@ -322,19 +323,73 @@ onMounted(async () => {
           </div>
 
           <!-- تفاصيل مزود المحفظة عند اختيار المحفظة -->
-          <div v-if="paymentMethod === 'wallet' && walletProviders.length > 0" class="flex flex-col gap-2 pt-2 border-t border-solar-border-card">
-            <span class="text-xs font-bold text-solar-text-heading">اختر مزود المحفظة:</span>
-            <div class="flex flex-wrap gap-2">
+          <div v-if="paymentMethod === 'wallet'" class="flex flex-col gap-3 pt-3 border-t border-solar-border-card">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-solar-text-heading">اختر المحفظة الإلكترونية المعتمدة:</span>
+              <span v-if="walletProviders.length" class="text-[11px] text-solar-text-muted">
+                {{ walletProviders.length }} محافظ إلكترونية متوفرة
+              </span>
+            </div>
+
+            <!-- شبكة بطاقات المحافظ مع الشعارات الرسمية المخزنة بقاعدة البيانات -->
+            <div v-if="walletProviders.length > 0" class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
               <button
                 v-for="provider in walletProviders"
                 :key="provider.id"
                 type="button"
                 @click="selectedWalletId = provider.id"
-                class="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all cursor-pointer"
-                :class="selectedWalletId === provider.id ? 'border-amber-600 bg-amber-100 text-amber-900 font-bold' : 'border-solar-border-card bg-white text-solar-text-body hover:bg-solar-bg-subtle'"
+                class="relative flex flex-col items-center justify-center gap-2 rounded-2xl border p-3.5 transition-all text-center cursor-pointer group"
+                :class="selectedWalletId === provider.id
+                  ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-400/40 shadow-sm'
+                  : 'border-solar-border-card bg-white hover:border-amber-300 hover:bg-solar-bg-subtle/50'"
               >
-                <span>{{ provider.name_ar }}</span>
+                <!-- شارة الاختيار النشط -->
+                <div
+                  v-if="selectedWalletId === provider.id"
+                  class="absolute -top-1.5 -left-1.5 flex size-5 items-center justify-center rounded-full bg-amber-600 text-white shadow-xs"
+                >
+                  <Check class="size-3 stroke-[3]" />
+                </div>
+
+                <!-- الشعار المخصص المخزن في قاعدة البيانات -->
+                <div class="flex h-12 w-full items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 shadow-2xs border border-solar-border-card/60">
+                  <img
+                    v-if="provider.logo_url"
+                    :src="provider.logo_url"
+                    :alt="provider.name_ar"
+                    class="h-full w-full object-contain transition-transform group-hover:scale-105"
+                    loading="lazy"
+                  />
+                  <Wallet v-else class="size-6 text-solar-text-muted" />
+                </div>
+
+                <!-- اسم المحفظة -->
+                <div class="flex flex-col items-center">
+                  <span class="text-xs font-bold text-solar-text-heading line-clamp-1">{{ provider.name_ar }}</span>
+                  <span v-if="provider.name_en" class="text-[10px] text-solar-text-muted font-mono tracking-tight">{{ provider.name_en }}</span>
+                </div>
               </button>
+            </div>
+
+            <!-- تنبيه توضيحي للمحفظة المختارة -->
+            <div
+              v-if="selectedWallet"
+              class="flex items-start gap-3 rounded-xl bg-amber-500/10 border border-amber-500/20 p-3.5 text-xs text-amber-950"
+            >
+              <div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-700">
+                <CheckCircle2 class="size-4" />
+              </div>
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold">الدفع عبر محفظة: {{ selectedWallet.name_ar }}</span>
+                  <span v-if="selectedWallet.code" class="rounded bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-mono font-bold text-amber-900">
+                    {{ selectedWallet.code }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-amber-900/80 leading-relaxed">
+                  سيتم تزويدك برقم حساب المحفظة المعتمد لدى SolarHub فور تأكيد الطلب، مع إمكانية رفع إشعار السداد مباشرة لتجهيز الشحنة والتوصيل دون أي تأخير.
+                </p>
+              </div>
             </div>
           </div>
         </div>

@@ -13,6 +13,7 @@ const emit = defineEmits<{
 const cartStore = useCartStore()
 const authStore = useAuthStore()
 const { logout } = useAuth()
+const { openLogoutModal } = useCustomerLogoutModal()
 const { unreadCount } = useNotificationState()
 const isUserMenuOpen = ref(false)
 const accountMenu = ref<HTMLElement>()
