@@ -12,7 +12,7 @@ export interface Engineer {
   isVerified: boolean
 }
 
-export type EngineerSpecialty = 'photovoltaic' | 'agricultural' | 'storage' | 'maintenance'
+export type EngineerSpecialty = string
 
 export interface EngineerFilters {
   query: string

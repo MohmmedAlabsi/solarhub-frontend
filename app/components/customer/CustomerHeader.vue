@@ -14,7 +14,7 @@ const cartStore = useCartStore()
 const authStore = useAuthStore()
 const { logout } = useAuth()
 const { openLogoutModal } = useCustomerLogoutModal()
-const { unreadCount } = useNotificationState()
+const { unreadCount, fetchNotifications } = useNotificationState()
 const isUserMenuOpen = ref(false)
 const accountMenu = ref<HTMLElement>()
 const accountButton = ref<HTMLButtonElement>()
@@ -44,6 +44,7 @@ onMounted(() => {
   document.addEventListener('pointerdown', closeAccountMenu)
   // تحميل عناصر السلة مبكراً لتحديث العداد
   cartStore.fetchCart()
+  fetchNotifications()
 })
 onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMenu))
 </script>

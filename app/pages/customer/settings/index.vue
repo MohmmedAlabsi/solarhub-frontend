@@ -80,11 +80,11 @@ function handleLocationSelected(loc: { address: string; lat: number; lng: number
         <div class="grid gap-5 md:grid-cols-2">
           <FormField label="البريد الإلكتروني" :error="errors.email" required><input v-model.trim="form.email" type="email" autocomplete="email" dir="ltr" class="solar-input h-11 text-right" :class="errors.email ? 'border-red-400' : ''" /></FormField>
           <FormField label="رقم الجوال" :error="errors.phone" required>
-            <span class="flex" dir="ltr"><span class="flex h-11 items-center rounded-l-lg border border-r-0 border-solar-border-input bg-solar-bg-subtle px-3 text-sm text-solar-text-muted">+966</span><input v-model.trim="form.phone" type="tel" inputmode="numeric" autocomplete="tel" class="solar-input h-11 rounded-l-none text-right" :class="errors.phone ? 'border-red-400' : ''" /></span>
+            <span class="flex" dir="ltr"><span class="flex h-11 items-center rounded-l-lg border border-r-0 border-solar-border-input bg-solar-bg-subtle px-3 text-sm text-solar-text-muted">+967</span><input v-model.trim="form.phone" type="tel" inputmode="numeric" autocomplete="tel" class="solar-input h-11 rounded-l-none text-right" :class="errors.phone ? 'border-red-400' : ''" /></span>
           </FormField>
           <FormField label="العنوان الوطني / موقع التوصيل" :error="errors.address" required class="md:col-span-2">
             <div class="flex gap-2">
-              <input v-model.trim="form.address" type="text" autocomplete="street-address" class="solar-input h-11 flex-1" :class="errors.address ? 'border-red-400' : ''" placeholder="مثال: الرياض - حي الملز - شارع الستين" />
+              <input v-model.trim="form.address" type="text" autocomplete="street-address" class="solar-input h-11 flex-1" :class="errors.address ? 'border-red-400' : ''" placeholder="مثال: صنعاء - حدة - شارع بيروت" />
               <button
                 type="button"
                 @click="isMapModalOpen = true"
