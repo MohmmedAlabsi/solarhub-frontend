@@ -1,8 +1,21 @@
+export type SupplierOrderStatus =
+  | 'pending'
+  | 'accepted'
+  | 'shipped'
+  | 'delivered'
+  | 'completed'
+  | 'rejected'
+  | 'cancelled'
+
 export interface SupplierOrderProductItem {
   id: number
+  storeProductId?: number
   title: string
   referenceNumber: string
+  brand?: string
+  category?: string
   warrantyLabel: string
+  image?: string
   quantity: number
   unitLabel: string
   unitPrice: number
@@ -16,13 +29,18 @@ export interface SupplierOrderItem {
   createdAt: string
   clientName: string
   clientPhone: string
+  clientEmail?: string
   deliveryAddress: string
+  governorate?: string
   itemsSummary: string
   totalItemsCount: number
   unitLabel: string
   subtotal: number
   taxAmount: number
   totalStoreShare: number
-  status: 'pending' | 'accepted' | 'shipped' | 'delivered' | 'completed' | 'rejected' | 'cancelled'
+  status: SupplierOrderStatus
+  notes?: string
+  deliveredAt?: string
+  customerConfirmedAt?: string
   items: SupplierOrderProductItem[]
 }
