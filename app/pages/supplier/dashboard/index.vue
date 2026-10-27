@@ -27,7 +27,6 @@ import ThemeToggle from '~/components/common/ThemeToggle.vue'
 
 definePageMeta({
   layout: 'supplier',
-  middleware: 'auth',
 })
 
 useSeoMeta({
