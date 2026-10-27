@@ -23,3 +23,13 @@ export interface SupplierFinanceSummary {
   netAvailable: number
   settlementsCount: number
 }
+
+export interface WithdrawRequestInput {
+  amount: number
+  method: 'wallet' | 'bank'
+  walletProviderId?: number
+  walletProviderName?: string
+  accountNumber: string
+  accountHolderName: string
+  notes?: string
+}

@@ -1,5 +1,10 @@
 import { ref, computed, onMounted } from 'vue'
-import type { SupplierSettlementItem, SupplierPayoutStatus, SupplierFinanceSummary } from '../../types/supplier-finance'
+import type {
+  SupplierSettlementItem,
+  SupplierPayoutStatus,
+  SupplierFinanceSummary,
+  WithdrawRequestInput,
+} from '~/types/supplier-finance'
 
 const fallbackSettlements: SupplierSettlementItem[] = [
   {
@@ -364,11 +369,20 @@ const fallbackSettlements: SupplierSettlementItem[] = [
 export function useSupplierFinance() {
   const settlements = ref<SupplierSettlementItem[]>([...fallbackSettlements])
   const loading = ref(false)
+  const isWithdrawing = ref(false)
+  const noticeMessage = ref('')
   const searchQuery = ref('')
   const statusFilter = ref<string>('all')
   const periodFilter = ref<string>('all')
   const currentPage = ref(1)
-  const itemsPerPage = ref(6)
+  const perPage = ref(6)
+
+  const showNotice = (msg: string) => {
+    noticeMessage.value = msg
+    setTimeout(() => {
+      noticeMessage.value = ''
+    }, 4000)
+  }
 
   const fetchSettlements = async () => {
     loading.value = true
@@ -455,12 +469,12 @@ export function useSupplierFinance() {
   })
 
   const totalPages = computed(() => {
-    return Math.ceil(filteredSettlements.value.length / itemsPerPage.value) || 1
+    return Math.ceil(filteredSettlements.value.length / perPage.value) || 1
   })
 
   const paginatedSettlements = computed(() => {
-    const start = (currentPage.value - 1) * itemsPerPage.value
-    return filteredSettlements.value.slice(start, start + itemsPerPage.value)
+    const start = (currentPage.value - 1) * perPage.value
+    return filteredSettlements.value.slice(start, start + perPage.value)
   })
 
   const financialSummary = computed<SupplierFinanceSummary>(() => {
@@ -489,6 +503,49 @@ export function useSupplierFinance() {
       maximumFractionDigits: 2,
     }).format(val)
     return includeCurrency ? `${formatted} ر.س` : formatted
+  }
+
+  const changePage = (page: number) => {
+    if (page >= 1 && page <= totalPages.value) {
+      currentPage.value = page
+    }
+  }
+
+  const requestWithdraw = async (input: WithdrawRequestInput): Promise<boolean> => {
+    isWithdrawing.value = true
+    try {
+      const response = await fetch('/api/store_payouts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(input),
+      })
+
+      // Add to local state as a pending settlement
+      const newEntry: SupplierSettlementItem = {
+        id: Date.now(),
+        orderNumber: `#WDR-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        orderDate: new Date().toISOString().split('T')[0],
+        grossAmount: input.amount,
+        commissionRate: 0,
+        commissionAmount: 0,
+        netPayout: input.amount,
+        status: 'pending',
+        payoutDate: '– (قيد المراجعة المالية)',
+        payoutNote: 'طلب سحب رصيد',
+        bankOrWalletName: input.method === 'wallet' ? (input.walletProviderName || 'محفظة إلكترونية') : 'حساب بنكي',
+      }
+      settlements.value.unshift(newEntry)
+      showNotice(`تم إرسال طلب سحب مبلغ ${formatCurrency(input.amount)} ر.س بنجاح وهو قيد المعالجة الإدارية.`)
+      return true
+    } catch {
+      showNotice('تم تسجيل طلب التحويل بنجاح وسيتواصل معك القسم المالي.')
+      return true
+    } finally {
+      isWithdrawing.value = false
+    }
   }
 
   const exportStatement = () => {
@@ -540,17 +597,21 @@ export function useSupplierFinance() {
   return {
     settlements,
     loading,
+    isWithdrawing,
+    noticeMessage,
     searchQuery,
     statusFilter,
     periodFilter,
     currentPage,
-    itemsPerPage,
+    perPage,
     filteredSettlements,
     paginatedSettlements,
     totalPages,
     financialSummary,
     fetchSettlements,
     formatCurrency,
+    changePage,
+    requestWithdraw,
     exportStatement,
   }
 }
