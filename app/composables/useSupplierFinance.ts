@@ -20,18 +20,42 @@ export function useSupplierFinance() {
   const currentPage = ref(1)
   const perPage = ref(6)
 
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined
   const showNotice = (msg: string) => {
     noticeMessage.value = msg
-    setTimeout(() => {
+    if (noticeTimer) clearTimeout(noticeTimer)
+    noticeTimer = setTimeout(() => {
       noticeMessage.value = ''
     }, 4000)
+  }
+
+  function formatArabicDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return '–'
+    try {
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return dateStr
+      return d.toLocaleDateString('ar-YE', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    } catch {
+      return dateStr
+    }
   }
 
   const fetchSettlements = async () => {
     loading.value = true
     errorMessage.value = ''
     try {
-      const res = await $api<any>('/store_payouts')
+      let res: any
+      try {
+        res = await $api<any>('/my/store-payouts')
+      } catch (err: any) {
+        // Fallback to /store_payouts if /my/store-payouts route cache hasn't refreshed
+        res = await $api<any>('/store_payouts')
+      }
+
       const apiData = Array.isArray(res) ? res : res?.data || []
       if (Array.isArray(apiData)) {
         settlements.value = apiData.map((item: any, index: number) => {
@@ -44,14 +68,14 @@ export function useSupplierFinance() {
           if (item.status === 'pending') displayStatus = 'pending'
           else if (item.status === 'failed') displayStatus = 'failed'
 
-          let dateLabel = item.paid_at || item.created_at || '–'
           let note = ''
+          let dateLabel = item.paid_at ? formatArabicDate(item.paid_at) : '–'
           if (displayStatus === 'pending') {
-            note = 'مجدول في الدورة القادمة'
-            dateLabel = `– (${note})`
+            note = 'مجدول في دورة التحويل القادمة'
+            dateLabel = '– (قيد المعالجة)'
           } else if (displayStatus === 'failed') {
             note = 'خطأ في معالجة التحويل'
-            dateLabel = `– (${note})`
+            dateLabel = '– (فشل التحويل)'
           }
 
           const order = item.order_store?.order || item.orderStore?.order || {}
@@ -62,7 +86,11 @@ export function useSupplierFinance() {
             id: item.id || index + 1,
             orderStoreId: item.order_store_id,
             orderNumber: item.order_number || order.order_number || `#ORD-${item.order_store_id || index + 1}`,
-            orderDate: item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : '–',
+            orderDate: item.order_date
+              ? new Date(item.order_date).toISOString().split('T')[0]
+              : item.created_at
+                ? new Date(item.created_at).toISOString().split('T')[0]
+                : '–',
             grossAmount: rawGross,
             commissionRate: rate,
             commissionAmount: -Math.abs(rawComm),
@@ -70,8 +98,12 @@ export function useSupplierFinance() {
             status: displayStatus,
             payoutDate: dateLabel,
             payoutNote: note,
-            transferReference: item.transfer_reference,
-            bankOrWalletName: walletProvider.name_ar || walletProvider.name || 'محفظة معتمدة',
+            transferReference: item.transfer_reference || '–',
+            bankOrWalletName:
+              item.bank_or_wallet ||
+              walletProvider.name_ar ||
+              walletProvider.name ||
+              'محفظة إلكترونية معتمدة',
           }
         })
       } else {
@@ -93,7 +125,8 @@ export function useSupplierFinance() {
         !query ||
         item.orderNumber.toLowerCase().includes(query) ||
         item.payoutDate.toLowerCase().includes(query) ||
-        (item.transferReference && item.transferReference.toLowerCase().includes(query))
+        (item.transferReference && item.transferReference.toLowerCase().includes(query)) ||
+        item.bankOrWalletName.toLowerCase().includes(query)
 
       const matchesStatus =
         statusFilter.value === 'all' || item.status === statusFilter.value
@@ -127,10 +160,10 @@ export function useSupplierFinance() {
     const netAvailable = totalSettled
 
     return {
-      totalSettled,
-      totalPending,
-      totalCommissions,
-      netAvailable,
+      totalSettled: Math.round(totalSettled * 100) / 100,
+      totalPending: Math.round(totalPending * 100) / 100,
+      totalCommissions: Math.round(totalCommissions * 100) / 100,
+      netAvailable: Math.round(netAvailable * 100) / 100,
       settlementsCount: list.length,
     }
   })
@@ -139,7 +172,7 @@ export function useSupplierFinance() {
     const formatted = new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(val)
+    }).format(val || 0)
     return includeCurrency ? `${formatted} ر.س` : formatted
   }
 
@@ -152,15 +185,24 @@ export function useSupplierFinance() {
   const requestWithdraw = async (input: WithdrawRequestInput): Promise<boolean> => {
     isWithdrawing.value = true
     try {
-      await $api<any>('/store_payouts', {
-        method: 'POST',
-        body: {
-          amount: input.amount,
-          user_wallet_id: input.userWalletId || undefined,
-          notes: input.notes || undefined,
-        },
-      })
-      showNotice('تم إرسال طلب سحب المستحقات بنجاح، جاري مراجعة الطلب.')
+      try {
+        await $api<any>('/my/store-payouts/request', {
+          method: 'POST',
+          body: {
+            amount: input.amount,
+            notes: input.notes || undefined,
+          },
+        })
+      } catch (e: any) {
+        await $api<any>('/store_payouts', {
+          method: 'POST',
+          body: {
+            amount: input.amount,
+            notes: input.notes || undefined,
+          },
+        })
+      }
+      showNotice('تم إرسال طلب سحب المستحقات بنجاح، جاري مراجعة الطلب وتحويل المبلغ.')
       await fetchSettlements()
       return true
     } catch (err: any) {
