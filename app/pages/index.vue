@@ -26,8 +26,11 @@ import {
   Wrench,
   Zap,
 } from 'lucide-vue-next'
-import { visitorProducts, visitorEngineers, visitorStores } from '~~/app/data/visitor-mock'
+import { visitorProducts, visitorEngineers, visitorStores, type VisitorProduct } from '~~/app/data/visitor-mock'
 import { useAuthModal } from '~~/app/composables/useAuthModal'
+import { useAuthStore } from '~~/app/stores/auth'
+import ProductQuoteModal from '~~/app/components/common/ProductQuoteModal.vue'
+import AppToast from '~~/app/components/common/AppToast.vue'
 
 useSeoMeta({
   title: 'سولار هب | وجهتك الموثوقة لمنظومات ومنتجات الطاقة الشمسية المتكاملة',
@@ -46,9 +49,10 @@ const topCategories = [
   { label: 'أدوات التحكم', sub: 'Smart Trackers & MPPT', icon: Cpu, query: 'controller' },
 ]
 
-// قائمة تبويبات المنتجات
+const authStore = useAuthStore()
+
+// قائمة تبويبات المنتجات الأربعة
 const productTabs = [
-  { id: 'all', label: 'الكل' },
   { id: 'panel', label: 'ألواح شمسية' },
   { id: 'inverter', label: 'محولات هجينة' },
   { id: 'battery', label: 'بطاريات ليثيوم' },
@@ -57,38 +61,210 @@ const productTabs = [
 
 type ProductTabId = typeof productTabs[number]['id']
 
-// التبويب النشط
-const activeProductTab = ref<ProductTabId>('all')
+// التبويب النشط - الافتراضي هو التبويب الأول (ألواح شمسية)
+const activeProductTab = ref<ProductTabId>('panel')
+
+const config = useRuntimeConfig()
+const apiBase = (config.public.apiBaseUrl as string) || (config.public.apiBase as string) || 'http://127.0.0.1:8000/api'
+
+// خريطة تصنيفات قاعدة البيانات
+const categoryIdMap: Record<ProductTabId, number> = {
+  panel: 1,     // ألواح شمسية
+  inverter: 2,  // محولات هجينة
+  battery: 3,   // بطاريات ليثيوم
+  kit: 4,       // أنظمة متكاملة ومنظمات طاقة
+}
+
+const isLoadingProducts = ref(false)
+const apiProducts = ref<VisitorProduct[]>([])
+const fetchMeta = ref<{ count: number; source: 'api' | 'fallback'; categoryId: number } | null>(null)
+
+// دالة جلب المنتجات الفعلية من الخادم لمتابعتها واختبارها في أدوات المطور (DevTools Network & Console)
+async function fetchProductsForTab(tabId: ProductTabId) {
+  isLoadingProducts.value = true
+  const categoryId = categoryIdMap[tabId]
+  const endpoint = `${apiBase}/store-products?category_id=${categoryId}`
+
+  if (import.meta.client) {
+    console.log(`%c[SolarHub DevTools]%c 🚀 جاري إرسال طلب جلب منتجات التبويبة: [${tabId}] (Category ID: ${categoryId}) عبر الرابط:`, 'color: #F2B705; font-weight: bold;', 'color: inherit;', endpoint)
+  }
+
+  try {
+    const res = await $fetch<{ status: string; message: string; data: any[] }>(endpoint, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (res && Array.isArray(res.data) && res.data.length > 0) {
+      if (import.meta.client) {
+        console.log(`%c[SolarHub DevTools]%c ✅ تم استرجاع (${res.data.length}) منتج بنجاح من الـ API:`, 'color: #10B981; font-weight: bold;', 'color: inherit;', {
+          status: res.status,
+          tabId,
+          categoryId,
+          totalReturned: res.data.length,
+          products: res.data,
+        })
+      }
+
+      fetchMeta.value = { count: res.data.length, source: 'api', categoryId }
+
+      // تحويل بيانات الـ API لنموذج العرض
+      apiProducts.value = res.data.map((item: any, idx: number) => {
+        const mp = item.master_product || {}
+        let img = mp.images?.[0]?.url || mp.images?.[0]?.image_url
+        if (!img) {
+          if (tabId === 'panel') img = '/images/product-panel.png'
+          else if (tabId === 'inverter') img = '/images/product-inverter.png'
+          else if (tabId === 'battery') img = '/images/product-battery.png'
+          else img = '/images/product-kit.png'
+        }
+
+        const fallbackSpecs = visitorProducts.find(p => p.categoryType === tabId)?.specsTable || [
+          { label: 'الضمان المعتمد', value: item.warranty_period || 'ضمان معتمد' },
+          { label: 'الحد الأدنى للطلب', value: `${item.min_order_qty || 1} وحدة` },
+          { label: 'المحافظة', value: item.governorate?.name_ar || 'صنعاء' },
+          { label: 'حالة المنتج', value: item.status === 'active' ? 'نشط ومتوفر' : 'متوفر' },
+        ]
+
+        return {
+          id: String(item.id || mp.id || idx),
+          storeProductId: item.id,
+          name: mp.title || `منتج رقم ${item.id}`,
+          category: mp.category?.name_ar || (tabId === 'panel' ? 'ألواح كهروضوئية' : (tabId === 'inverter' ? 'محولات هجينة' : (tabId === 'battery' ? 'بطاريات ليثيوم' : 'أنظمة متكاملة'))),
+          categoryType: tabId,
+          brand: mp.brand?.name || 'علامة معتمدة',
+          model: mp.model_number || `SH-${item.id}`,
+          sku: `SH-${tabId.toUpperCase()}-${item.id}`,
+          storeName: item.store?.company_name || 'شركة شمس اليمن للمهمات الكهروضوئية',
+          storeId: String(item.store?.id || 'shams-yemen'),
+          storeCity: item.governorate?.name_ar ? `${item.governorate.name_ar} - اليمن` : 'صنعاء - شارع تعز',
+          rating: 4.85,
+          reviewsCount: 20 + ((item.id * 11) % 80),
+          image: img,
+          badge: item.warranty_period ? `ضمان ${item.warranty_period}` : 'Tier 1 Global',
+          tierBadge: 'معتمد رسمياً',
+          warranty: item.warranty_period || 'ضمان معتمد',
+          inStock: (item.stock_quantity ?? 0) > 0,
+          stockCount: item.stock_quantity ?? 50,
+          priceEstimate: item.price ? `${Number(item.price).toLocaleString()} ر.ي` : 'عند طلب العرض',
+          specsTable: fallbackSpecs,
+        } as VisitorProduct
+      })
+    } else {
+      if (import.meta.client) {
+        console.warn(`[SolarHub DevTools] لم يتم العثور على منتجات من الـ API للتبويبة (${tabId})، سيتم استخدام البيانات المحلية المعتمدة.`)
+      }
+      fetchMeta.value = { count: 0, source: 'fallback', categoryId }
+      apiProducts.value = visitorProducts.filter(p => p.categoryType === tabId)
+    }
+  } catch (err: any) {
+    if (import.meta.client) {
+      console.error(`[SolarHub DevTools] ❌ فشل الاتصال بالـ API (${endpoint}):`, err?.message || err)
+    }
+    fetchMeta.value = { count: 0, source: 'fallback', categoryId }
+    apiProducts.value = visitorProducts.filter(p => p.categoryType === tabId)
+  } finally {
+    isLoadingProducts.value = false
+  }
+}
+
+// تشغيل الجلب فور تحميل الصفحة في المتصفح لمشاهدة الطلب في Network Tab
+onMounted(() => {
+  fetchProductsForTab(activeProductTab.value)
+})
+
+watch(activeProductTab, (newTab) => {
+  fetchProductsForTab(newTab)
+})
 
 const filteredProducts = computed(() => {
-  if (activeProductTab.value === 'all') {
-    return visitorProducts.slice(0, 4)
+  if (apiProducts.value.length > 0) {
+    return apiProducts.value.slice(0, 4)
   }
   return visitorProducts.filter(p => p.categoryType === activeProductTab.value).slice(0, 4)
 })
 
-function handleProductQuote(productName: string) {
-  authModal.open({
-    title: 'لإرسال طلب عرض سعر، يرجى تسجيل الدخول',
-    message: `سجّل الدخول إلى حسابك أو أنشئ حساباً جديداً لتتمكن من إرسال طلب عرض سعر لـ (${productName}) ومتابعة عروضك مباشرة.`,
-    actionType: 'quote',
-  })
+// حالة نافذة طلب عرض السعر التفاعلية المتوافقة مع الأدوار
+const isQuoteModalOpen = ref(false)
+const selectedQuoteProduct = ref<VisitorProduct | null>(null)
+
+// حالة المفضلة والإشعارات
+const favoriteProductIds = ref<Set<string>>(new Set())
+const toastMessage = ref('')
+let toastTimeout: any = null
+
+function showToast(msg: string) {
+  toastMessage.value = msg
+  if (toastTimeout) clearTimeout(toastTimeout)
+  toastTimeout = setTimeout(() => {
+    toastMessage.value = ''
+  }, 3500)
+}
+
+function handleProductQuote(product: VisitorProduct) {
+  selectedQuoteProduct.value = product
+  isQuoteModalOpen.value = true
+}
+
+function handleToggleFavorite(product: VisitorProduct) {
+  if (!authStore.isAuthenticated) {
+    authModal.open({
+      title: 'لحفظ المنتج في المفضلة، يرجى تسجيل الدخول',
+      message: `سجّل الدخول إلى حسابك أو أنشئ حساباً لتتمكن من إضافة (${product.name}) إلى قائمة المفضلة والرجوع إليه لاحقاً.`,
+      actionType: 'general',
+    })
+    return
+  }
+
+  if (favoriteProductIds.value.has(product.id)) {
+    favoriteProductIds.value.delete(product.id)
+    showToast(`تمت إزالة "${product.name}" من المفضلة`)
+  } else {
+    favoriteProductIds.value.add(product.id)
+    showToast(`تمت إضافة "${product.name}" إلى قائمة المفضلة بنجاح`)
+  }
 }
 
 function handleEngineerConsult(engineerName: string) {
-  authModal.open({
-    title: 'لطلب استشارة هندسية، يرجى تسجيل الدخول',
-    message: `سجّل الدخول أو أنشئ حساباً لتتمكن من حجز جلسة استشارة فنية مع (${engineerName}) وإرسال تفاصيل مشروعك.`,
-    actionType: 'consultation',
-  })
+  if (!authStore.isAuthenticated) {
+    authModal.open({
+      title: 'لطلب استشارة هندسية، يرجى تسجيل الدخول',
+      message: `سجّل الدخول أو أنشئ حساباً لتتمكن من حجز جلسة استشارة فنية مع (${engineerName}) وإرسال تفاصيل مشروعك.`,
+      actionType: 'consultation',
+    })
+    return
+  }
+
+  if (authStore.userRole === 'customer') {
+    navigateTo('/customer/services')
+  } else if (authStore.userRole === 'engineer') {
+    navigateTo('/engineer/profile')
+  } else {
+    navigateTo('/engineers')
+  }
 }
 
 function handleProjectCta() {
-  authModal.open({
-    title: 'لطرح مشروعك وطلب المناقصات، يرجى تسجيل الدخول',
-    message: 'سجّل الدخول إلى حسابك لطرح مواصفات مشروعك واستقبال عروض الأسعار والدراسات الهندسية المعتمدة.',
-    actionType: 'project',
-  })
+  if (!authStore.isAuthenticated) {
+    authModal.open({
+      title: 'لطرح مشروعك وطلب المناقصات، يرجى تسجيل الدخول',
+      message: 'سجّل الدخول إلى حسابك لطرح مواصفات مشروعك واستقبال عروض الأسعار والدراسات الهندسية المعتمدة.',
+      actionType: 'project',
+    })
+    return
+  }
+
+  if (authStore.userRole === 'customer') {
+    navigateTo('/customer/services')
+  } else if (authStore.userRole === 'engineer') {
+    navigateTo('/engineer/service-requests')
+  } else if (authStore.userRole === 'supplier') {
+    navigateTo('/supplier/dashboard')
+  } else {
+    navigateTo('/customer/services')
+  }
 }
 </script>
 
@@ -128,15 +304,6 @@ function handleProjectCta() {
               <FileText class="size-4.5 text-solar-navy dark:text-solar-yellow" />
               <span>طلب استشارة / طرح مشروع</span>
             </button>
-
-            <NuxtLink
-              to="/admin"
-              class="flex items-center gap-2 h-12 px-5 text-sm font-bold rounded-xl bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md transition-all hover:scale-[1.02] active:scale-95 border border-white/10"
-              title="الانتقال إلى لوحة تحكم الأدمن"
-            >
-              <ShieldCheck class="size-4.5 text-solar-yellow stroke-[2.5]" />
-              <span>لوحة تحكم الأدمن</span>
-            </NuxtLink>
           </div>
         </div>
 
@@ -303,7 +470,17 @@ function handleProjectCta() {
     <section class="container-page">
       <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div>
-          <span class="text-xs font-black text-solar-yellow uppercase tracking-widest">منتجات موثقة ومضمونة</span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-black text-solar-yellow uppercase tracking-widest">منتجات موثقة ومضمونة</span>
+            <span
+              v-if="fetchMeta?.source === 'api'"
+              class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+              title="البيانات مسترجعة مباشرة من Laravel API ويمكن فحص الطلب في Network Tab"
+            >
+              <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>متصل بالـ API ({{ fetchMeta.count }} منتج متوفر)</span>
+            </span>
+          </div>
           <h2 class="text-2xl sm:text-3xl font-black text-solar-text-heading mt-1">أحدث وأبرز المنتجات الشمسية</h2>
         </div>
 
@@ -326,9 +503,29 @@ function handleProjectCta() {
 
       <!-- بطاقات المنتجات الأربعة المطابقة لتصميم visitor_1.png -->
       <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <!-- حالة التحميل عبر الـ API (Skeleton Loader) أثناء الاسترجاع لمتابعتها بأدوات المطور -->
+        <template v-if="isLoadingProducts">
+          <div
+            v-for="i in 4"
+            :key="'skeleton-' + i"
+            class="solar-card p-4 flex flex-col justify-between animate-pulse"
+          >
+            <div>
+              <div class="aspect-[4/3] w-full rounded-xl bg-solar-bg-subtle mb-3"></div>
+              <div class="h-3 w-1/3 bg-solar-bg-subtle rounded mb-2"></div>
+              <div class="h-4 w-4/5 bg-solar-bg-subtle rounded mb-2"></div>
+              <div class="h-3 w-1/2 bg-solar-bg-subtle rounded mb-4"></div>
+            </div>
+            <div class="pt-2 border-t border-solar-border-card/60 flex flex-col gap-2">
+              <div class="h-8 w-full bg-solar-bg-subtle rounded-xl"></div>
+              <div class="h-4 w-1/2 mx-auto bg-solar-bg-subtle rounded"></div>
+            </div>
+          </div>
+        </template>
+
         <!-- حالة عدم وجود منتجات -->
         <div
-          v-if="filteredProducts.length === 0"
+          v-else-if="filteredProducts.length === 0"
           class="col-span-full flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-solar-border-card bg-solar-bg-card"
         >
           <Package class="size-12 text-solar-text-muted mb-3 opacity-60" />
@@ -354,13 +551,20 @@ function handleProjectCta() {
               <span class="absolute bottom-2 left-2 rounded-md bg-solar-bg-card/90 px-2 py-0.5 text-[10px] font-bold text-solar-navy dark:text-solar-yellow border border-solar-border-card/40 shadow-sm">
                 {{ product.brand }}
               </span>
+              <span
+                v-if="product.badge"
+                class="absolute top-2 right-2 rounded-md bg-solar-navy-dark/85 text-solar-yellow px-2 py-0.5 text-[9px] font-bold shadow-sm border border-solar-border-card/30"
+              >
+                {{ product.badge }}
+              </span>
               <button
                 type="button"
-                @click="handleProductQuote(product.name)"
-                class="absolute top-2 left-2 flex size-7 items-center justify-center rounded-full bg-solar-bg-card/90 text-solar-text-muted hover:text-rose-500 border border-solar-border-card/40 shadow-sm"
+                @click.stop="handleToggleFavorite(product)"
+                class="absolute top-2 left-2 flex size-7 items-center justify-center rounded-full bg-solar-bg-card/90 border border-solar-border-card/40 shadow-sm transition-all"
+                :class="favoriteProductIds.has(product.id) ? 'text-rose-500 bg-rose-50/95 dark:bg-rose-950/80 border-rose-300 dark:border-rose-800' : 'text-solar-text-muted hover:text-rose-500'"
                 aria-label="إضافة للمفضلة"
               >
-                <Heart class="size-3.5" />
+                <Heart class="size-3.5" :class="favoriteProductIds.has(product.id) ? 'fill-rose-500' : ''" />
               </button>
             </div>
 
@@ -389,7 +593,7 @@ function handleProjectCta() {
           <div class="flex flex-col gap-2 pt-2 border-t border-solar-border-card/60">
             <button
               type="button"
-              @click="handleProductQuote(product.name)"
+              @click="handleProductQuote(product)"
               class="btn-primary w-full py-2 text-xs font-black gap-1.5 justify-center shadow-sm"
             >
               <FileText class="size-3.5" />
@@ -653,5 +857,15 @@ function handleProjectCta() {
         </div>
       </div>
     </section>
+
+    <!-- نافذة طلب عرض السعر التفاعلية المتوافقة مع الأدوار والصلاحيات -->
+    <ProductQuoteModal
+      :is-open="isQuoteModalOpen"
+      :product="selectedQuoteProduct"
+      @close="isQuoteModalOpen = false"
+    />
+
+    <!-- نافذة التوست السريعة للإشعارات والتأكيدات -->
+    <AppToast :message="toastMessage" />
   </div>
 </template>

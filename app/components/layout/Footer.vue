@@ -20,8 +20,8 @@ const policyLinks = [
 ]
 
 const contacts = [
-  { icon: Mail, label: 'support@solarhub.energy', href: 'mailto:support@solarhub.energy' },
-  { icon: Phone, label: '+967 1 400 000 / +967 777 000 000', href: 'tel:+9671400000' },
+  { icon: Mail, label: 'solar.hob203@gmail.com', href: 'mailto:solar.hob203@gmail.com' },
+  { icon: Phone, label: '+967 776369548', href: 'tel:+967776369548' },
   { icon: MapPin, label: 'الجمهورية اليمنية، صنعاء', href: '#' },
 ]
 </script>

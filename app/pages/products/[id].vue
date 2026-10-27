@@ -13,16 +13,96 @@ import {
 } from 'lucide-vue-next'
 import { visitorProducts } from '~~/app/data/visitor-mock'
 import { useAuthModal } from '~~/app/composables/useAuthModal'
+import { useAuthStore } from '~~/app/stores/auth'
+import ProductQuoteModal from '~~/app/components/common/ProductQuoteModal.vue'
+import AppToast from '~~/app/components/common/AppToast.vue'
 
 const route = useRoute()
 const productId = route.params.id as string
 const authModal = useAuthModal()
+const authStore = useAuthStore()
+
+const isQuoteModalOpen = ref(false)
+const isFavorited = ref(false)
+const toastMessage = ref('')
+let toastTimeout: any = null
+
+function showToast(msg: string) {
+  toastMessage.value = msg
+  if (toastTimeout) clearTimeout(toastTimeout)
+  toastTimeout = setTimeout(() => {
+    toastMessage.value = ''
+  }, 3500)
+}
+
+const config = useRuntimeConfig()
+const apiBase = (config.public.apiBaseUrl as string) || (config.public.apiBase as string) || 'http://127.0.0.1:8000/api'
+
+const apiProduct = ref<any>(null)
+const isLoadingProduct = ref(false)
+
+async function fetchProductDetails() {
+  const localMatch = visitorProducts.find(p => p.id === productId)
+  if (localMatch) {
+    apiProduct.value = localMatch
+    return
+  }
+
+  isLoadingProduct.value = true
+  try {
+    const res = await $fetch<{ status: string; data: any }>(`${apiBase}/store-products/${productId}`)
+    if (res?.data) {
+      const item = res.data
+      const mp = item.master_product || {}
+      const img = mp.images?.[0]?.url || mp.images?.[0]?.image_url || '/images/product-panel.png'
+
+      const specsTable = Array.isArray(mp.specifications) && mp.specifications.length > 0
+        ? mp.specifications.map((s: any) => ({ label: s.spec_name || s.name, value: s.spec_value || s.value }))
+        : [
+            { label: 'فترة الضمان', value: item.warranty_period || 'ضمان سنتين معتمد' },
+            { label: 'الحد الأدنى للطلب', value: `${item.min_order_qty || 1} وحدة` },
+            { label: 'المحافظة والتوفر', value: item.governorate?.name_ar ? `${item.governorate.name_ar} - اليمن` : 'صنعاء' },
+            { label: 'حالة المخزون', value: (item.stock_quantity ?? 0) > 0 ? `متوفر (${item.stock_quantity} وحدة)` : 'غير متوفر' },
+          ]
+
+      apiProduct.value = {
+        id: String(item.id),
+        name: mp.title || `منتج رقم ${item.id}`,
+        category: mp.category?.name_ar || 'ألواح كهروضوئية',
+        categoryType: 'panel',
+        brand: mp.brand?.name || 'علامة معتمدة',
+        model: mp.model_number || `SH-${item.id}`,
+        sku: `SH-PROD-${item.id}`,
+        storeName: item.store?.company_name || 'شركة شمس اليمن للمهمات الكهروضوئية',
+        storeId: String(item.store?.id || 'shams-yemen'),
+        storeCity: item.governorate?.name_ar ? `${item.governorate.name_ar} - اليمن` : 'صنعاء - شارع تعز',
+        rating: 4.85,
+        reviewsCount: 38,
+        image: img,
+        gallery: [img, '/images/product-panel.png', '/images/hero-solar.png'],
+        badge: item.warranty_period ? `ضمان ${item.warranty_period}` : 'Tier 1 Global',
+        tierBadge: 'معتمد رسمياً',
+        warranty: item.warranty_period || 'ضمان سنتين معتمد',
+        inStock: (item.stock_quantity ?? 0) > 0,
+        stockCount: item.stock_quantity ?? 50,
+        priceEstimate: item.price ? `${Number(item.price).toLocaleString()} ر.ي` : 'عند طلب العرض',
+        specsTable,
+      }
+    }
+  } catch (err) {
+    apiProduct.value = visitorProducts[0]
+  } finally {
+    isLoadingProduct.value = false
+  }
+}
+
+onMounted(() => {
+  fetchProductDetails()
+})
 
 // البحث عن المنتج أو استخدام أول منتج كافتراضي
 const product = computed(() => {
-  const match = visitorProducts.find(p => p.id === productId) || visitorProducts[0]
-  if (!match) throw createError({ statusCode: 404, statusMessage: 'Not Found' })
-  return match
+  return apiProduct.value || visitorProducts.find(p => p.id === productId) || visitorProducts[0]
 })
 
 useSeoMeta({
@@ -62,11 +142,25 @@ onUnmounted(() => {
 })
 
 function handleQuote() {
-  authModal.open({
-    title: 'لإرسال طلب عرض سعر، يرجى تسجيل الدخول',
-    message: `سجّل الدخول إلى حسابك أو أنشئ حساباً جديداً لتتمكن من إرسال طلب عرض سعر لـ (${product.value.name}) والتواصل مباشرة مع المورد.`,
-    actionType: 'quote',
-  })
+  isQuoteModalOpen.value = true
+}
+
+function handleToggleFavorite() {
+  if (!authStore.isAuthenticated) {
+    authModal.open({
+      title: 'لحفظ المنتج في المفضلة، يرجى تسجيل الدخول',
+      message: `سجّل الدخول إلى حسابك أو أنشئ حساباً لتتمكن من إضافة (${product.value.name}) إلى قائمة المفضلة والرجوع إليه لاحقاً.`,
+      actionType: 'general',
+    })
+    return
+  }
+
+  isFavorited.value = !isFavorited.value
+  if (isFavorited.value) {
+    showToast(`تمت إضافة "${product.value.name}" إلى قائمة المفضلة بنجاح`)
+  } else {
+    showToast(`تمت إزالة "${product.value.name}" من المفضلة`)
+  }
 }
 
 function handleDownloadDatasheet() {
@@ -92,7 +186,7 @@ function handleDownloadDatasheet() {
       <!-- العمود الأيسر (في RTL هو اليسار، يظهر على اليمين بالإنجليزية): معرض صور المنتج -->
       <div class="flex flex-col gap-4 lg:col-span-6">
         <div
-          class="relative flex aspect-square sm:aspect-[4/3] w-full items-center justify-center rounded-3xl border border-solar-border-card bg-white p-6 shadow-sm overflow-hidden"
+          class="relative flex aspect-square sm:aspect-[4/3] w-full items-center justify-center rounded-3xl border border-solar-border-card bg-solar-bg-card p-6 shadow-sm overflow-hidden"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
@@ -111,11 +205,11 @@ function handleDownloadDatasheet() {
           <!-- زر المفضلة -->
           <button
             type="button"
-            @click="handleQuote"
-            class="absolute top-4 left-4 flex size-10 items-center justify-center rounded-2xl bg-white border border-solar-border-card text-solar-text-muted hover:text-rose-500 shadow-sm transition-all"
+            @click="handleToggleFavorite"
+            class="absolute top-4 left-4 flex size-10 items-center justify-center rounded-2xl bg-solar-bg-card border border-solar-border-card text-solar-text-muted hover:text-rose-500 shadow-sm transition-all" :class="isFavorited ? 'text-rose-500 bg-rose-50/95 dark:bg-rose-950/80' : ''"
             aria-label="إضافة للمفضلة"
           >
-            <Heart class="size-5" />
+            <Heart class="size-5" :class="isFavorited ? 'fill-rose-500 text-rose-500' : ''" />
           </button>
 
           <!-- الصورة المعروضة -->
@@ -133,7 +227,7 @@ function handleDownloadDatasheet() {
             :key="idx"
             type="button"
             @click="selectedImageIndex = idx"
-            class="flex size-20 sm:size-24 items-center justify-center rounded-2xl border-2 bg-white p-2 transition-all overflow-hidden"
+            class="flex size-20 sm:size-24 items-center justify-center rounded-2xl border-2 bg-solar-bg-card p-2 transition-all overflow-hidden"
             :class="selectedImageIndex === idx ? 'border-solar-yellow ring-2 ring-solar-yellow/20 shadow-sm' : 'border-solar-border-card hover:border-solar-navy/30'"
           >
             <img :src="img" :alt="`صورة مصغرة ${idx + 1}`" class="h-full w-full object-contain" />
@@ -204,7 +298,7 @@ function handleDownloadDatasheet() {
         </button>
 
         <!-- بطاقة المتجر المصغرة (مطابقة لـ visitor_3.png) -->
-        <div class="flex items-center justify-between rounded-2xl border border-solar-border-card bg-white p-4 shadow-sm mt-2">
+        <div class="flex items-center justify-between rounded-2xl border border-solar-border-card bg-solar-bg-card p-4 shadow-sm mt-2">
           <NuxtLink :to="`/stores/${product.storeId}`" class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 hover:border-solar-yellow">
             <span>عرض ملف المتجر</span>
             <ArrowLeft class="size-3.5" />
@@ -248,7 +342,7 @@ function handleDownloadDatasheet() {
       </div>
 
       <!-- جدول المواصفات الفنية ذو العمودين المتقابلين (مطابق لـ visitor_3.png) -->
-      <div class="overflow-hidden rounded-2xl border border-solar-border-card bg-white shadow-sm">
+      <div class="overflow-hidden rounded-2xl border border-solar-border-card bg-solar-bg-card shadow-sm">
         <div class="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x sm:divide-x-reverse divide-solar-border-card text-xs">
           <!-- العمود الأيمن من المواصفات -->
           <div class="flex flex-col divide-y divide-solar-border-card">
@@ -286,5 +380,14 @@ function handleDownloadDatasheet() {
         </div>
       </div>
     </div>
+    <!-- نافذة طلب عرض السعر المتوافقة مع الأدوار والصلاحيات -->
+    <ProductQuoteModal
+      :is-open="isQuoteModalOpen"
+      :product="product"
+      @close="isQuoteModalOpen = false"
+    />
+
+    <!-- التوست السريع -->
+    <AppToast :message="toastMessage" />
   </div>
 </template>

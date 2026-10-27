@@ -201,7 +201,7 @@ export interface AdminServiceRequest {
   documents: AdminDocument[]; offers: AdminServiceOffer[]
 }
 export interface AdminReview {
-  id: string; orderId: string; client: string; targetId: string; score: number
+  id: string; orderId: string; client: string; targetId: string; targetName?: string; score: number
   comment: string; approved: boolean
 }
 export interface AdminBroadcast {
