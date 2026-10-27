@@ -1,124 +1,46 @@
 import { ref, computed, onMounted } from 'vue'
-import type { SupplierQuoteItem, RespondQuoteInput } from '../../types/supplier-quote'
+import type {
+  SupplierQuoteItem,
+  RespondQuoteInput,
+  SupplierQuoteStatus,
+} from '~/types/supplier-quote'
 
-const initialFallbackQuotes: SupplierQuoteItem[] = [
-  {
-    id: 1,
-    quoteRequestNumber: '#RFQ-2025-3041',
-    productTitle: 'لوح شمسي مونوكريستالين Jinko Tiger Pro 585W',
-    productCode: 'JKM585M-7RL4-V',
-    productSpecs: 'قدرة 585 واط، خلايا Bifacial',
-    productEfficiency: 'كفاءة 22.6%، كفالة أداء 25 سنة',
-    requestedQuantity: 25,
-    unitLabel: 'لوح',
-    requestDate: '24 أكتوبر 2025',
-    deliveryLocation: 'مستودع العميل - صنعاء / الرياض (حي النرجس)',
-    clientNotes: 'نحتاج شهادة مطابقة معتمدة مع إمكانية توفير النقل المباشر للمشروع خلال 5 أيام عمل.',
-    clientName: 'مؤسسة إمداد الطاقة',
-    status: 'pending',
-  },
-  {
-    id: 2,
-    quoteRequestNumber: '#RFQ-2025-3040',
-    productTitle: 'إنفرتر هجين Deye 8kW ثلاثي الأطوار',
-    productCode: 'SUN-8K-SG04LP3',
-    productSpecs: 'قدرة 8kW، جهد عالي ثلاثي الأطوار 400V',
-    productEfficiency: 'كفاءة 97.6%، ضمان مصنعي 5 سنوات',
-    requestedQuantity: 2,
-    unitLabel: 'جهاز',
-    requestDate: '24 أكتوبر 2025',
-    deliveryLocation: 'موقع المشروع - القصيم (بريدة)',
-    clientNotes: 'يرجى تبيان توفر لوحة المفاتيح والشاشات الذكية وملحقات CT.',
-    clientName: 'م. فهد القحطاني',
-    status: 'pending',
-  },
-  {
-    id: 3,
-    quoteRequestNumber: '#RFQ-2025-3038',
-    productTitle: 'بطارية ليثيوم تخزين Pylontech US5000 4.8kWh',
-    productCode: 'US5000-LV',
-    productSpecs: 'سعة 4.8kWh، جهد 48V، خلايا LiFePO4',
-    productEfficiency: 'دورة تفريغ 6000 دورة @ 95% DoD',
-    requestedQuantity: 4,
-    unitLabel: 'وحدات',
-    requestDate: '23 أكتوبر 2025',
-    deliveryLocation: 'الدمام - المدينة الصناعية الثانية',
-    clientNotes: 'مطلوب كابلات التوصيل البيني الأصلية بين البطاريات.',
-    clientName: 'شركة آفاق التطوير',
-    status: 'responded',
-    quotedUnitPrice: 6450,
-    quotedTotalPrice: 25800,
-    supplierNotes: 'السعر يشمل كابلات الربط الأصلية والتسليم بمستودع الدمام مع ضمان 10 سنوات.',
-  },
-  {
-    id: 4,
-    quoteRequestNumber: '#RFQ-2025-3034',
-    productTitle: 'لوح شمسي Longi Hi-MO 6 Explorer 570W',
-    productCode: 'LR5-72HTH-570M',
-    productSpecs: 'تقنية HPBC، كفاءة عالية 22.1%',
-    productEfficiency: 'معامل حراري منخفض، ضمان إنتاج 25 سنة',
-    requestedQuantity: 40,
-    unitLabel: 'لوح',
-    requestDate: '21 أكتوبر 2025',
-    deliveryLocation: 'الرياض - حي الياسمين',
-    clientNotes: 'طلب كمية لمشروع مجمع تجاري، الدفع نقدي فوري.',
-    clientName: 'شركة البناء الحديث',
-    status: 'accepted',
-    quotedUnitPrice: 460,
-    quotedTotalPrice: 18400,
-    supplierNotes: 'تم قبول العرض واعتماد توريد الشحنة من المستودع المركزي.',
-  },
-  {
-    id: 5,
-    quoteRequestNumber: '#RFQ-2025-3029',
-    productTitle: 'قاطع حماية تيار مستمر DC Isolator Switch 1000V',
-    productCode: 'DC-SW-32A',
-    productSpecs: 'تيار 32A، عزل رباعي 1000V DC مع صندوق حماية IP66',
-    productEfficiency: 'معتمد وفق المواصفة IEC 60947-3',
-    requestedQuantity: 10,
-    unitLabel: 'قطعة',
-    requestDate: '19 أكتوبر 2025',
-    deliveryLocation: 'الخبر - حي العليا',
-    clientNotes: 'مطلوب توفير شهادات الفحص المخبري وتأكيد درجة IP.',
-    clientName: 'مكتب الرؤية للاستشارات',
-    status: 'rejected',
-    quotedUnitPrice: 185,
-    quotedTotalPrice: 1850,
-    supplierNotes: 'المخزون محجوز بالكامل لمشروع قائم حالياً.',
-  },
-  {
-    id: 6,
-    quoteRequestNumber: '#RFQ-2025-3022',
-    productTitle: 'حوامل تثبيت ألمنيوم لقواعد الأسطح القرميدية',
-    productCode: 'MNT-ROOF-TI',
-    productSpecs: 'سبائك ألمنيوم AL6005-T5 مع مثبتات ستانلس ستيل SUS304',
-    productEfficiency: 'مقاومة سرعة رياح حتى 45m/s',
-    requestedQuantity: 15,
-    unitLabel: 'طقم',
-    requestDate: '17 أكتوبر 2025',
-    deliveryLocation: 'جدة - أبحر الشمالية',
-    clientNotes: 'يحتاج العميل إلى مخطط توزيع القواعد المعتمد قبل التوريد.',
-    clientName: 'مقاولات الشرق',
-    status: 'cancelled',
-  },
-]
+export function resolveQuoteProductImage(rawImage: string | null | undefined, category = '', title = ''): string {
+  if (rawImage) {
+    if (rawImage.startsWith('http://') || rawImage.startsWith('https://')) {
+      return rawImage
+    }
+    return `https://rtjrjsgabinwdbrtxakk.supabase.co/storage/v1/object/public/public-media/${rawImage.replace(/^\/+/, '')}`
+  }
+
+  const catLower = category.toLowerCase()
+  const titleLower = title.toLowerCase()
+
+  if (catLower.includes('لوح') || titleLower.includes('لوح') || titleLower.includes('panel')) return '/images/product-panel.png'
+  if (catLower.includes('إنفرتر') || titleLower.includes('انفرتر') || titleLower.includes('inverter')) return '/images/product-inverter.png'
+  if (catLower.includes('بطارية') || titleLower.includes('بطارية') || titleLower.includes('battery')) return '/images/product-battery.png'
+  if (catLower.includes('منظومة') || titleLower.includes('kit')) return '/images/product-kit.png'
+
+  return '/images/hero-solar.png'
+}
 
 export function useSupplierQuotes() {
   const { $api } = useNuxtApp()
 
-  const quotes = ref<SupplierQuoteItem[]>([...initialFallbackQuotes])
+  const quotes = ref<SupplierQuoteItem[]>([])
   const isLoading = ref(false)
   const isResponding = ref(false)
+  const errorMessage = ref('')
   const noticeMessage = ref('')
   let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
   // الفلاتر
   const searchQuery = ref('')
-  const selectedStatus = ref('all')
+  const selectedStatus = ref<string>('all')
 
   // الترقيم
   const currentPage = ref(1)
-  const perPage = ref(6)
+  const perPage = ref(8)
 
   function showNotice(msg: string) {
     noticeMessage.value = msg
@@ -128,42 +50,85 @@ export function useSupplierQuotes() {
     }, 4000)
   }
 
+  function formatArabicDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return '–'
+    try {
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return dateStr
+      return d.toLocaleDateString('ar-YE', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    } catch {
+      return dateStr
+    }
+  }
+
   function mapApiQuote(raw: any): SupplierQuoteItem {
     const sp = raw.store_product || raw.storeProduct || {}
-    const mp = sp.master_product || sp.masterProduct || {}
     const client = raw.customer || raw.user || {}
+    const category = sp.category || ''
+    const title = sp.title || 'منتج طاقة شمسية'
+    const code = sp.sku || sp.model_number || `SKU-${sp.id || raw.id}`
 
     return {
       id: raw.id,
-      quoteRequestNumber: `#RFQ-${new Date(raw.created_at || Date.now()).getFullYear()}-${raw.id}`,
-      productTitle: mp.title || 'منتج طاقة شمسية',
-      productCode: mp.model_number || `SKU-${raw.id}`,
-      productSpecs: mp.description || 'مواصفات قياسية لمنظومات الطاقة',
-      productEfficiency: sp.warranty_period ? `ضمان: ${sp.warranty_period}` : 'كفاءة عالية',
+      quoteRequestNumber: raw.quote_number || `#RFQ-${String(raw.id).padStart(4, '0')}`,
+      customer: {
+        id: client.id || 0,
+        name: client.name || 'عميل مسجل',
+        phone: client.phone || '–',
+        email: client.email || '–',
+      },
+      product: {
+        id: sp.id || 0,
+        title,
+        model_number: sp.model_number || '',
+        sku: sp.sku || '',
+        brand: sp.brand || '',
+        category,
+        image: sp.image || null,
+        warranty_period: sp.warranty_period || '–',
+        governorate: sp.governorate || '–',
+        listed_price: sp.listed_price !== undefined ? Number(sp.listed_price) : null,
+      },
+      productTitle: title,
+      productCode: code,
+      productBrand: sp.brand || 'SolarHub',
+      productCategory: category,
+      productImage: resolveQuoteProductImage(sp.image, category, title),
       requestedQuantity: Number(raw.quantity) || 1,
-      unitLabel: raw.unit_label || 'وحدة',
-      requestDate: raw.created_at ? new Date(raw.created_at).toLocaleDateString('ar-YE', { day: 'numeric', month: 'long', year: 'numeric' }) : 'مؤخراً',
-      deliveryLocation: raw.delivery_location || 'صنعاء / اليمن',
-      clientNotes: raw.notes || raw.client_notes || 'لا توجد ملاحظات إضافية.',
-      clientName: client.name || 'عميل معتمد',
-      status: raw.status || 'pending',
-      quotedUnitPrice: raw.offered_price ? Number(raw.offered_price) : undefined,
-      quotedTotalPrice: raw.offered_price && raw.quantity ? Number(raw.offered_price) * Number(raw.quantity) : undefined,
-      supplierNotes: raw.supplier_notes,
-      validUntil: raw.valid_until,
+      unitLabel: 'قطعة',
+      governorate: sp.governorate || '–',
+      customerTargetPrice: raw.customer_target_price !== null && raw.customer_target_price !== undefined ? Number(raw.customer_target_price) : null,
+      offeredUnitPrice: raw.offered_unit_price !== null && raw.offered_unit_price !== undefined ? Number(raw.offered_unit_price) : null,
+      totalPrice: raw.total_price !== null && raw.total_price !== undefined ? Number(raw.total_price) : null,
+      status: (raw.status as SupplierQuoteStatus) || 'pending',
+      customerNotes: raw.customer_notes || 'لا توجد ملاحظات إضافية من العميل.',
+      storeNotes: raw.store_notes || null,
+      requestDate: formatArabicDate(raw.created_at),
+      respondedAt: raw.responded_at ? formatArabicDate(raw.responded_at) : null,
+      acceptedAt: raw.accepted_at ? formatArabicDate(raw.accepted_at) : null,
+      rawCreatedAt: raw.created_at || '',
     }
   }
 
   async function fetchQuotes() {
     isLoading.value = true
+    errorMessage.value = ''
     try {
       const res = await $api<any>('/my/store-quote-requests')
       const raw = res?.data || res
-      if (Array.isArray(raw) && raw.length > 0) {
+      if (Array.isArray(raw)) {
         quotes.value = raw.map(mapApiQuote)
+      } else {
+        quotes.value = []
       }
-    } catch (err) {
-      console.warn('Could not fetch store quote requests, using initial fallback list:', err)
+    } catch (err: any) {
+      console.error('Failed to load store quote requests:', err)
+      quotes.value = []
+      errorMessage.value = err?.data?.message || 'تعذر الاتصال بالخادم لجلب طلبات عروض الأسعار.'
     } finally {
       isLoading.value = false
     }
@@ -179,7 +144,8 @@ export function useSupplierQuotes() {
           item.quoteRequestNumber.toLowerCase().includes(q) ||
           item.productTitle.toLowerCase().includes(q) ||
           item.productCode.toLowerCase().includes(q) ||
-          (item.clientName && item.clientName.toLowerCase().includes(q))
+          item.customer.name.toLowerCase().includes(q) ||
+          (item.customer.phone && item.customer.phone.includes(q))
       )
     }
 
@@ -205,57 +171,70 @@ export function useSupplierQuotes() {
     }
   }
 
-  async function respondToQuote(input: RespondQuoteInput) {
+  async function respondToQuote(input: RespondQuoteInput): Promise<boolean> {
     isResponding.value = true
     try {
-      await $api<any>(`/quote-requests/${input.quoteId}/respond`, {
+      const res = await $api<any>(`/quote-requests/${input.quoteId}/respond`, {
         method: 'PATCH',
         body: {
-          proposed_price: input.unitPrice,
-          notes: input.supplierNotes,
-          valid_days: input.validityDays || 14,
+          offered_unit_price: input.offeredUnitPrice,
+          store_notes: input.storeNotes || null,
         },
       })
 
       const target = quotes.value.find(q => q.id === input.quoteId)
       if (target) {
         target.status = 'responded'
-        target.quotedUnitPrice = input.unitPrice
-        target.quotedTotalPrice = input.totalPrice
-        target.supplierNotes = input.supplierNotes
+        target.offeredUnitPrice = input.offeredUnitPrice
+        target.totalPrice = Math.round(input.offeredUnitPrice * target.requestedQuantity * 100) / 100
+        target.storeNotes = input.storeNotes || null
+        target.respondedAt = 'اليوم'
       }
 
-      showNotice('تم إرسال عرض السعر الفعلي للعميل بنجاح.')
+      showNotice('تم إرسال عرض السعر للعميل بنجاح.')
       return true
-    } catch (err) {
-      console.warn('API error submitting quote response, updating locally:', err)
-      const target = quotes.value.find(q => q.id === input.quoteId)
-      if (target) {
-        target.status = 'responded'
-        target.quotedUnitPrice = input.unitPrice
-        target.quotedTotalPrice = input.totalPrice
-        target.supplierNotes = input.supplierNotes
-      }
-      showNotice('تم تسجيل وإرسال عرض السعر للعميل.')
-      return true
+    } catch (err: any) {
+      console.error('Failed to respond to quote request:', err)
+      const msg = err?.data?.message || 'حدث خطأ أثناء إرسال عرض السعر. يرجى المحاولة لاحقاً.'
+      showNotice(msg)
+      return false
     } finally {
       isResponding.value = false
     }
   }
 
   function exportQuotes() {
-    const csvContent = 'data:text/csv;charset=utf-8,' +
-      ['رقم الطلب,المنتج,الكود,الكمية,التاريخ,الحالة']
-        .concat(quotes.value.map(q => `"${q.quoteRequestNumber}","${q.productTitle}","${q.productCode}",${q.requestedQuantity},"${q.requestDate}","${q.status}"`))
-        .join('\n')
+    if (quotes.value.length === 0) {
+      showNotice('لا توجد بيانات متاحة للتصدير.')
+      return
+    }
 
-    const encodedUri = encodeURI(csvContent)
+    const headers = ['رقم الطلب', 'المنتج', 'الكود', 'العميل', 'رقم الهاتف', 'الكمية', 'سعر العميل المستهدف', 'السعر المعروض', 'الإجمالي', 'الحالة', 'تاريخ الطلب']
+    const rows = quotes.value.map(q => [
+      `"${q.quoteRequestNumber}"`,
+      `"${q.productTitle.replace(/"/g, '""')}"`,
+      `"${q.productCode}"`,
+      `"${q.customer.name}"`,
+      `"${q.customer.phone || '–'}"`,
+      q.requestedQuantity,
+      q.customerTargetPrice !== null ? q.customerTargetPrice : '–',
+      q.offeredUnitPrice !== null ? q.offeredUnitPrice : '–',
+      q.totalPrice !== null ? q.totalPrice : '–',
+      `"${q.status}"`,
+      `"${q.requestDate}"`,
+    ])
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `عروض_أسعار_المتجر_${new Date().toISOString().slice(0, 10)}.csv`)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `طلبات_عروض_الأسعار_${new Date().toISOString().slice(0, 10)}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
     showNotice('تم تصدير كشف طلبات عروض الأسعار بنجاح.')
   }
 
@@ -267,6 +246,7 @@ export function useSupplierQuotes() {
     quotes,
     isLoading,
     isResponding,
+    errorMessage,
     noticeMessage,
     searchQuery,
     selectedStatus,
@@ -275,6 +255,7 @@ export function useSupplierQuotes() {
     perPage,
     filteredQuotes,
     paginatedQuotes,
+    fetchQuotes,
     changePage,
     respondToQuote,
     exportQuotes,

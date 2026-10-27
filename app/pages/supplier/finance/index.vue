@@ -10,6 +10,8 @@ import {
   ChevronRight,
   Clock,
   Download,
+  Loader2,
+  RefreshCw,
   Search,
   SlidersHorizontal,
   TrendingUp,
@@ -32,6 +34,7 @@ const {
   settlements,
   loading,
   isWithdrawing,
+  errorMessage,
   noticeMessage,
   searchQuery,
   statusFilter,
@@ -42,6 +45,7 @@ const {
   paginatedSettlements,
   totalPages,
   financialSummary,
+  fetchSettlements,
   formatCurrency,
   changePage,
   requestWithdraw,
@@ -89,6 +93,16 @@ async function handleWithdrawSubmit(data: WithdrawRequestInput) {
       <div class="flex items-center gap-2.5 shrink-0">
         <button
           type="button"
+          @click="fetchSettlements"
+          :disabled="loading"
+          title="تحديث البيانات"
+          class="flex size-11 items-center justify-center rounded-xl border border-solar-border-card bg-white dark:bg-solar-bg-card text-solar-text-heading hover:bg-solar-bg-subtle active:scale-95 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+        >
+          <RefreshCw class="size-4 text-solar-text-muted" :class="{ 'animate-spin': loading }" />
+        </button>
+
+        <button
+          type="button"
           @click="exportStatement"
           class="flex items-center gap-2 rounded-xl border border-solar-border-card bg-white dark:bg-solar-bg-card px-4 py-2.5 text-xs font-bold text-solar-text-heading shadow-xs hover:bg-solar-bg-subtle active:scale-95 transition-all cursor-pointer"
         >
@@ -106,6 +120,24 @@ async function handleWithdrawSubmit(data: WithdrawRequestInput) {
         </button>
       </div>
     </header>
+
+    <!-- تنبيه الخطأ أو عدم الاتصال -->
+    <div
+      v-if="errorMessage"
+      class="solar-card border-rose-200 bg-rose-50/70 dark:bg-rose-950/30 p-4 flex items-center justify-between gap-3 text-xs text-rose-800 dark:text-rose-200 rounded-2xl"
+    >
+      <div class="flex items-center gap-2.5">
+        <AlertCircle class="size-5 shrink-0 text-rose-600 dark:text-rose-400" />
+        <span class="font-bold">{{ errorMessage }}</span>
+      </div>
+      <button
+        type="button"
+        @click="fetchSettlements"
+        class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition-colors shrink-0 cursor-pointer"
+      >
+        إعادة المحاولة
+      </button>
+    </div>
 
     <!-- بطاقات المؤشرات المالية السريعة (Financial KPI Cards) -->
     <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-label="ملخص الأرصدة والمستحقات">

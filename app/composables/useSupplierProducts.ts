@@ -120,30 +120,17 @@ export function useSupplierProducts() {
     errorMessage.value = null
 
     try {
-      // نحاول أولاً جلب منتجات المتجر المسجل للمورد الحالي
-      let rawData: any[] = []
-      try {
-        const res = await $api<any>('/my/store-products?per_page=100')
-        rawData = Array.isArray(res) ? res : res?.data || []
-      } catch (e: any) {
-        // إذا كان المستخدم غير مسجل كـ store owner بعد أو في بيئة تجربة، نجلب قائمة منتجات المتاجر العامة من DB
-        const publicRes = await $api<any>('/store-products?per_page=100')
-        rawData = Array.isArray(publicRes) ? publicRes : publicRes?.data || []
-      }
-
-      if (Array.isArray(rawData) && rawData.length > 0) {
+      const res = await $api<any>('/my/store-products?per_page=100')
+      const rawData = Array.isArray(res) ? res : res?.data || []
+      if (Array.isArray(rawData)) {
         products.value = rawData.map(mapApiListing)
       } else {
-        // إذا لم تكن هناك بيانات بعد، نجلب من قائمة الكتالوج العام
-        const publicRes = await $api<any>('/store-products?per_page=100')
-        const items = Array.isArray(publicRes) ? publicRes : publicRes?.data || []
-        if (items.length > 0) {
-          products.value = items.map(mapApiListing)
-        }
+        products.value = []
       }
     } catch (err: any) {
-      console.warn('API error fetching products, will keep current list:', err)
-      errorMessage.value = err?.message || 'تعذر جلب المنتجات من الخادم'
+      console.error('API error fetching store products:', err)
+      products.value = []
+      errorMessage.value = err?.data?.message || 'تعذر جلب منتجات المتجر من الخادم.'
     } finally {
       isLoading.value = false
       extractFilterOptions()

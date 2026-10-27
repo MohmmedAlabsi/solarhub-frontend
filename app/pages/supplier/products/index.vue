@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  AlertCircle,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -43,6 +44,7 @@ const {
   isLoading,
   isActionLoading,
   isCatalogLoading,
+  errorMessage,
   noticeMessage,
   searchQuery,
   selectedCategory,
@@ -157,6 +159,24 @@ function handleImageError(e: Event, product: SupplierProductItem) {
           <span>إضافة منتج للمتجر</span>
         </button>
       </div>
+    </div>
+
+    <!-- تنبيه الخطأ أو عدم الاتصال -->
+    <div
+      v-if="errorMessage"
+      class="solar-card border-rose-200 bg-rose-50/70 dark:bg-rose-950/30 p-4 flex items-center justify-between gap-3 text-xs text-rose-800 dark:text-rose-200 rounded-2xl"
+    >
+      <div class="flex items-center gap-2.5">
+        <AlertCircle class="size-5 shrink-0 text-rose-600 dark:text-rose-400" />
+        <span class="font-bold">{{ errorMessage }}</span>
+      </div>
+      <button
+        type="button"
+        @click="fetchMyProducts"
+        class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition-colors shrink-0 cursor-pointer"
+      >
+        إعادة المحاولة
+      </button>
     </div>
 
     <!-- شريط البحث والفلترة متعدد المعايير -->

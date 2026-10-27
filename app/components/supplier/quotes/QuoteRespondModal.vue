@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Loader2, Send, SunMedium, X } from 'lucide-vue-next'
-import type { SupplierQuoteItem, RespondQuoteInput } from '../../../types/supplier-quote'
+import { Loader2, Send, Tag, X } from 'lucide-vue-next'
+import type { SupplierQuoteItem, RespondQuoteInput } from '~/types/supplier-quote'
 
 const props = defineProps<{
   isOpen: boolean
@@ -13,39 +13,41 @@ const emit = defineEmits<{
   (e: 'submit', data: RespondQuoteInput): void
 }>()
 
-const unitPrice = ref<number>(0)
-const supplierNotes = ref('')
-const validityDays = ref(14)
+const offeredUnitPrice = ref<number | ''>('')
+const storeNotes = ref('')
 const errorMessage = ref('')
 
-watch(() => props.quote, (q) => {
-  if (q) {
-    unitPrice.value = q.quotedUnitPrice || 0
-    supplierNotes.value = q.supplierNotes || ''
-    errorMessage.value = ''
-  }
-}, { immediate: true })
+watch(
+  () => props.quote,
+  (q) => {
+    if (q) {
+      offeredUnitPrice.value = q.offeredUnitPrice || q.customerTargetPrice || ''
+      storeNotes.value = q.storeNotes || ''
+      errorMessage.value = ''
+    }
+  },
+  { immediate: true }
+)
 
-const totalPrice = computed(() => {
-  if (!props.quote || !unitPrice.value || unitPrice.value <= 0) return 0
-  return unitPrice.value * props.quote.requestedQuantity
+const calculatedTotalPrice = computed(() => {
+  if (!props.quote || !offeredUnitPrice.value || Number(offeredUnitPrice.value) <= 0) return 0
+  return Math.round(Number(offeredUnitPrice.value) * props.quote.requestedQuantity * 100) / 100
 })
 
 function handleSubmit() {
   errorMessage.value = ''
   if (!props.quote) return
 
-  if (unitPrice.value <= 0) {
-    errorMessage.value = 'يرجى إدخال سعر بيع صحيح أكبر من 0.'
+  const price = Number(offeredUnitPrice.value)
+  if (!price || price <= 0) {
+    errorMessage.value = 'يرجى إدخال سعر بيع صحيح للوحدة أكبر من صفر.'
     return
   }
 
   emit('submit', {
     quoteId: props.quote.id,
-    unitPrice: Number(unitPrice.value),
-    totalPrice: Number(totalPrice.value),
-    supplierNotes: supplierNotes.value.trim(),
-    validityDays: validityDays.value,
+    offeredUnitPrice: price,
+    storeNotes: storeNotes.value.trim() || undefined,
   })
 }
 </script>
@@ -65,12 +67,12 @@ function handleSubmit() {
       />
 
       <!-- Dialog Card -->
-      <div class="relative w-full max-w-lg rounded-2xl bg-white p-5 sm:p-7 shadow-2xl transition-all border border-slate-100 z-10 text-right max-h-[90vh] overflow-y-auto">
+      <div class="relative w-full max-w-lg rounded-2xl bg-white dark:bg-solar-bg-card p-5 sm:p-7 shadow-2xl transition-all border border-solar-border-card z-10 text-right max-h-[90vh] overflow-y-auto">
         <!-- Close Button -->
         <button
           type="button"
           @click="emit('close')"
-          class="absolute left-5 top-5 p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+          class="absolute left-5 top-5 p-1 rounded-lg text-solar-text-muted hover:text-solar-text-heading hover:bg-solar-bg-subtle transition-colors cursor-pointer"
           aria-label="إغلاق"
         >
           <X class="size-5" />
@@ -78,43 +80,72 @@ function handleSubmit() {
 
         <!-- Header -->
         <div class="mb-5">
-          <h2 class="text-lg font-black text-slate-900 leading-tight">
-            تقديم تسعير لطلب عرض السعر
-          </h2>
-          <p class="mt-1 text-xs text-slate-500 leading-relaxed">
-            إدخال السعر وملاحظات المورد الخاصة بالطلب ({{ quote.quoteRequestNumber }})
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-black text-solar-text-heading leading-tight">
+              تقديم تسعير لطلب عرض السعر
+            </h2>
+            <span class="font-mono text-xs font-bold text-solar-yellow bg-solar-navy-dark px-2 py-0.5 rounded-md">
+              {{ quote.quoteRequestNumber }}
+            </span>
+          </div>
+          <p class="mt-1 text-xs text-solar-text-muted leading-relaxed">
+            العميل: <span class="font-bold text-solar-text-heading">{{ quote.customer.name }}</span>
+            <span v-if="quote.customer.phone && quote.customer.phone !== '–'" class="mr-1 font-mono">({{ quote.customer.phone }})</span>
           </p>
         </div>
 
         <!-- Product Summary Card -->
-        <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5 mb-4 flex items-center justify-between gap-3">
-          <div class="flex items-center gap-2.5">
-            <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-100/80 text-solar-navy border border-amber-200/50">
-              <SunMedium class="size-4 text-solar-yellow stroke-[2.5]" />
-            </span>
-            <div>
-              <div class="text-[10px] text-slate-400 font-semibold">المنتج المطلوب:</div>
-              <div class="text-xs font-black text-slate-900 line-clamp-1">
+        <div class="rounded-xl border border-solar-border-card bg-solar-bg-subtle/60 p-3.5 mb-4 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <img
+              v-if="quote.productImage"
+              :src="quote.productImage"
+              :alt="quote.productTitle"
+              class="size-12 rounded-lg object-contain bg-white dark:bg-solar-bg-card border border-solar-border-card shrink-0 p-1"
+              @error="(e) => ((e.target as HTMLImageElement).src = '/images/hero-solar.png')"
+            />
+            <div class="min-w-0">
+              <div class="text-[10px] text-solar-text-muted font-semibold">المنتج المطلوب:</div>
+              <div class="text-xs font-black text-solar-text-heading truncate">
                 {{ quote.productTitle }}
+              </div>
+              <div class="text-[10px] font-mono text-solar-text-muted">
+                {{ quote.productCode }}
               </div>
             </div>
           </div>
 
           <div class="shrink-0 text-left">
-            <div class="text-[10px] text-slate-400 font-semibold">الكمية المطلوبة</div>
-            <div class="text-xs font-black text-slate-900">
+            <div class="text-[10px] text-solar-text-muted font-semibold">الكمية المطلوبة</div>
+            <div class="text-sm font-black text-solar-text-heading font-mono">
               {{ quote.requestedQuantity }} {{ quote.unitLabel }}
             </div>
           </div>
         </div>
 
-        <!-- Client Note Alert -->
-        <div class="rounded-xl border border-blue-100 bg-blue-50/50 p-3 mb-5 text-xs text-slate-700">
-          <div class="font-bold text-slate-900 mb-1 flex items-center gap-1">
-            <span>ملاحظة العميل الواردة:</span>
+        <!-- Target Price Notice if available -->
+        <div
+          v-if="quote.customerTargetPrice"
+          class="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/60 dark:bg-amber-950/20 p-3 mb-4 text-xs"
+        >
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-800 dark:text-amber-300">السعر المستهدف المقترح من العميل:</span>
+            <span class="font-black font-mono text-amber-900 dark:text-amber-200">
+              {{ quote.customerTargetPrice.toLocaleString('en-US') }} ر.س
+            </span>
           </div>
-          <p class="text-slate-600 leading-relaxed font-medium italic">
-            "{{ quote.clientNotes }}"
+        </div>
+
+        <!-- Client Note Alert if available -->
+        <div
+          v-if="quote.customerNotes"
+          class="rounded-xl border border-blue-100 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 p-3 mb-5 text-xs text-solar-text-body"
+        >
+          <div class="font-bold text-solar-text-heading mb-1">
+            ملاحظة العميل:
+          </div>
+          <p class="text-solar-text-muted leading-relaxed font-medium italic">
+            "{{ quote.customerNotes }}"
           </p>
         </div>
 
@@ -123,32 +154,33 @@ function handleSubmit() {
           <!-- أسعار الوحدة والإجمالي -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label class="block text-xs font-bold text-slate-800 mb-1.5">
+              <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
                 سعر الوحدة المعروض (ر.س) <span class="text-red-500">*</span>
               </label>
               <div class="relative flex items-center">
                 <input
-                  v-model.number="unitPrice"
+                  v-model="offeredUnitPrice"
                   type="number"
-                  min="0"
-                  step="any"
-                  placeholder="أدخل سعر اللوح الواحد بدون ضريبة..."
-                  class="solar-input h-11 w-full pr-3 pl-12 text-sm font-bold"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="مثال: 450"
+                  class="solar-input h-11 w-full pr-3 pl-12 text-sm font-bold font-mono"
                   :class="errorMessage ? 'border-red-400' : ''"
+                  required
                 />
-                <span class="pointer-events-none absolute left-3 text-xs font-bold text-slate-400">
+                <span class="pointer-events-none absolute left-3 text-xs font-bold text-solar-text-muted">
                   ر.س
                 </span>
               </div>
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-slate-800 mb-1.5">
-                إجمالي السعر المعروض ({{ quote.requestedQuantity }} {{ quote.unitLabel }})
+              <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
+                إجمالي السعر للكمية ({{ quote.requestedQuantity }})
               </label>
-              <div class="h-11 rounded-xl border border-slate-200 bg-blue-50/50 px-3.5 flex items-center justify-between text-xs font-mono font-bold text-blue-950">
-                <span>{{ totalPrice ? totalPrice.toLocaleString('en-US') : 'يُحسب تلقائياً...' }}</span>
-                <span class="text-slate-500">ر.س</span>
+              <div class="h-11 rounded-xl border border-solar-border-card bg-blue-50/50 dark:bg-blue-950/40 px-3.5 flex items-center justify-between text-xs font-mono font-black text-solar-navy-dark dark:text-solar-yellow">
+                <span>{{ calculatedTotalPrice ? calculatedTotalPrice.toLocaleString('en-US') : 'يُحسب تلقائياً...' }}</span>
+                <span class="text-solar-text-muted text-[11px]">ر.س</span>
               </div>
             </div>
           </div>
@@ -159,19 +191,20 @@ function handleSubmit() {
 
           <!-- ملاحظات المورد على العرض -->
           <div>
-            <label class="block text-xs font-bold text-slate-800 mb-1.5">
-              ملاحظات المورد على العرض
+            <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
+              ملاحظات المتجر للعميل (اختياري)
             </label>
             <textarea
-              v-model.trim="supplierNotes"
+              v-model.trim="storeNotes"
               rows="3"
-              placeholder="السعر يشمل شهادة المطابقة وشهادة الضمان المصنعي والتوصيل للموقع المذكور..."
+              placeholder="اكتب تفاصيل التوريد، مدة صلاحية العرض، أو شروط الضمان الإضافية..."
               class="solar-input w-full p-3 text-xs font-medium leading-relaxed resize-none"
+              maxlength="1000"
             />
           </div>
 
           <!-- الأزرار السفلية -->
-          <div class="flex items-center gap-3 pt-4 mt-1 border-t border-slate-100">
+          <div class="flex items-center gap-3 pt-4 mt-1 border-t border-solar-border-card">
             <button
               type="submit"
               :disabled="isSubmitting"
@@ -179,13 +212,13 @@ function handleSubmit() {
             >
               <Loader2 v-if="isSubmitting" class="size-4 animate-spin" />
               <Send v-else class="size-4 stroke-[2.5]" />
-              <span>إرسال عرض السعر للعميل</span>
+              <span>إرسال وتثبيت عرض السعر</span>
             </button>
 
             <button
               type="button"
               @click="emit('close')"
-              class="px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              class="px-4 py-2.5 text-xs font-bold text-solar-text-muted hover:text-solar-text-heading transition-colors cursor-pointer"
             >
               إلغاء
             </button>

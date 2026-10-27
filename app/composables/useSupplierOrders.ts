@@ -13,227 +13,20 @@ function resolveOrderItemImage(it: any): string {
   const cat = (it?.category || '').toLowerCase()
 
   if (title.includes('لوح') || cat.includes('لوح') || title.includes('panel')) return '/images/product-panel.png'
-  if (title.includes('إنفرتر') || title.includes('محول') || cat.includes('إنفرتر') || title.includes('inverter')) return '/images/product-inverter.png'
+  if (title.includes('إنفرتر') || title.includes('انفرتر') || cat.includes('انفرتر') || title.includes('inverter')) return '/images/product-inverter.png'
   if (title.includes('بطارية') || cat.includes('بطارية') || title.includes('battery')) return '/images/product-battery.png'
   if (title.includes('منظومة') || cat.includes('kit')) return '/images/product-kit.png'
 
   return '/images/hero-solar.png'
 }
 
-const fallbackOrders: SupplierOrderItem[] = [
-  {
-    id: 1,
-    order_id: 1048,
-    orderNumber: '#ORD-2025-1048',
-    createdAt: '24 أكتوبر 2025',
-    clientName: 'وجدان السبيعي',
-    clientPhone: '050****789',
-    deliveryAddress: 'الرياض - حي النرجس - شارع الأمير فيصل',
-    governorate: 'الرياض',
-    itemsSummary: 'لوح شمسي Jinko 585W + قواعد',
-    totalItemsCount: 12,
-    unitLabel: 'لوح',
-    subtotal: 6420,
-    taxAmount: 963,
-    totalStoreShare: 7383,
-    status: 'pending',
-    items: [
-      {
-        id: 101,
-        title: 'لوح شمسي مونوكريستالين Jinko Tiger Pro 585W',
-        referenceNumber: 'JNK-585-TP',
-        brand: 'Jinko Solar',
-        category: 'ألواح شمسية',
-        warrantyLabel: 'كفالة أداء 25 سنة',
-        image: '/images/product-panel.png',
-        quantity: 12,
-        unitLabel: 'لوح',
-        unitPrice: 485,
-        totalPrice: 5820,
-      },
-      {
-        id: 102,
-        title: 'هيكل تثبيت ألمنيوم لمسطح (مجموعة تثبيت 12 لوح)',
-        referenceNumber: 'MNT-ALU-12',
-        brand: 'SolarFix',
-        category: 'ملحقات وهياكل',
-        warrantyLabel: 'مقاوم للرياح',
-        image: '/images/product-kit.png',
-        quantity: 1,
-        unitLabel: 'طقم',
-        unitPrice: 600,
-        totalPrice: 600,
-      },
-    ],
-  },
-  {
-    id: 2,
-    order_id: 1042,
-    orderNumber: '#ORD-2025-1042',
-    createdAt: '23 أكتوبر 2025',
-    clientName: 'م. فهد القحطاني',
-    clientPhone: '055****321',
-    deliveryAddress: 'القصيم - بريدة - حي الصفراء',
-    governorate: 'القصيم',
-    itemsSummary: 'إنفرتر هجين Deye 8kW ثلاثي الأطوار',
-    totalItemsCount: 1,
-    unitLabel: 'جهاز',
-    subtotal: 8950,
-    taxAmount: 1342.5,
-    totalStoreShare: 10292.5,
-    status: 'accepted',
-    items: [
-      {
-        id: 103,
-        title: 'إنفرتر هجين Deye Hybrid 8kW ثلاثي الأطوار',
-        referenceNumber: 'SUN-8K-SG04LP3',
-        brand: 'Deye',
-        category: 'إنفرترات ومحولات',
-        warrantyLabel: 'ضمان 5 سنوات',
-        image: '/images/product-inverter.png',
-        quantity: 1,
-        unitLabel: 'جهاز',
-        unitPrice: 8950,
-        totalPrice: 8950,
-      },
-    ],
-  },
-  {
-    id: 3,
-    order_id: 1039,
-    orderNumber: '#ORD-2025-1039',
-    createdAt: '21 أكتوبر 2025',
-    clientName: 'شركة اليمامة للمقاولات',
-    clientPhone: '056****112',
-    deliveryAddress: 'جدة - المنطقة الصناعية الثالثة',
-    governorate: 'مكة المكرمة',
-    itemsSummary: 'بطاريات Pylontech US5000 (4 وحدات)',
-    totalItemsCount: 4,
-    unitLabel: 'وحدة',
-    subtotal: 25800,
-    taxAmount: 3870,
-    totalStoreShare: 29670,
-    status: 'shipped',
-    items: [
-      {
-        id: 104,
-        title: 'بطارية ليثيوم Pylontech US5000 4.8kWh',
-        referenceNumber: 'PYLON-US5000',
-        brand: 'Pylontech',
-        category: 'بطاريات وتخزين طاقة',
-        warrantyLabel: 'ضمان 10 سنوات',
-        image: '/images/product-battery.png',
-        quantity: 4,
-        unitLabel: 'وحدة',
-        unitPrice: 6450,
-        totalPrice: 25800,
-      },
-    ],
-  },
-  {
-    id: 4,
-    order_id: 1033,
-    orderNumber: '#ORD-2025-1033',
-    createdAt: '18 أكتوبر 2025',
-    clientName: 'عبدالرحمن الدوسري',
-    clientPhone: '054****987',
-    deliveryAddress: 'الدمام - حي الشاطئ',
-    governorate: 'المنطقة الشرقية',
-    itemsSummary: 'منظم شحن Victron 150/70',
-    totalItemsCount: 1,
-    unitLabel: 'جهاز',
-    subtotal: 2350,
-    taxAmount: 352.5,
-    totalStoreShare: 2702.5,
-    status: 'delivered',
-    items: [
-      {
-        id: 105,
-        title: 'منظم شحن MPPT Victron SmartSolar 150/70',
-        referenceNumber: 'SCC115070210',
-        brand: 'Victron Energy',
-        category: 'منظمات شحن ومحولات',
-        warrantyLabel: 'ضمان 5 سنوات',
-        image: '/images/product-inverter.png',
-        quantity: 1,
-        unitLabel: 'جهاز',
-        unitPrice: 2350,
-        totalPrice: 2350,
-      },
-    ],
-  },
-  {
-    id: 5,
-    order_id: 1027,
-    orderNumber: '#ORD-2025-1027',
-    createdAt: '15 أكتوبر 2025',
-    clientName: 'سارة المطيري',
-    clientPhone: '053****444',
-    deliveryAddress: 'المدينة المنورة - حي سلطانة',
-    governorate: 'المدينة المنورة',
-    itemsSummary: 'ألواح Longi 570W (20 لوح)',
-    totalItemsCount: 20,
-    unitLabel: 'لوح',
-    subtotal: 9400,
-    taxAmount: 1410,
-    totalStoreShare: 10810,
-    status: 'completed',
-    items: [
-      {
-        id: 106,
-        title: 'لوح شمسي Longi Hi-MO 6 Explorer 570W',
-        referenceNumber: 'LR5-72HTH-570M',
-        brand: 'Longi',
-        category: 'ألواح شمسية',
-        warrantyLabel: 'كفالة أداء 25 سنة',
-        image: '/images/product-panel.png',
-        quantity: 20,
-        unitLabel: 'لوح',
-        unitPrice: 470,
-        totalPrice: 9400,
-      },
-    ],
-  },
-  {
-    id: 6,
-    order_id: 1020,
-    orderNumber: '#ORD-2025-1020',
-    createdAt: '14 أكتوبر 2025',
-    clientName: 'خالد الزهراني',
-    clientPhone: '057****888',
-    deliveryAddress: 'الطائف - حي الشهداء الجنوبية',
-    governorate: 'مكة المكرمة',
-    itemsSummary: 'إنفرتر Growatt 10kW',
-    totalItemsCount: 1,
-    unitLabel: 'جهاز',
-    subtotal: 5800,
-    taxAmount: 870,
-    totalStoreShare: 6670,
-    status: 'rejected',
-    items: [
-      {
-        id: 107,
-        title: 'إنفرتر متصل بالشبكة Growatt MOD 10KTL3-X',
-        referenceNumber: 'MOD-10KTL3-X',
-        brand: 'Growatt',
-        category: 'إنفرترات ومحولات',
-        warrantyLabel: 'ضمان 5 سنوات',
-        image: '/images/product-inverter.png',
-        quantity: 1,
-        unitLabel: 'جهاز',
-        unitPrice: 5800,
-        totalPrice: 5800,
-      },
-    ],
-  },
-]
-
 export function useSupplierOrders() {
   const { $api } = useNuxtApp()
 
-  const orders = ref<SupplierOrderItem[]>([...fallbackOrders])
+  const orders = ref<SupplierOrderItem[]>([])
   const isLoading = ref(false)
   const isUpdating = ref(false)
+  const errorMessage = ref('')
   const noticeMessage = ref('')
   let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -244,79 +37,76 @@ export function useSupplierOrders() {
 
   // الترقيم
   const currentPage = ref(1)
-  const perPage = ref(8)
+  const perPage = ref(6)
 
   function showNotice(msg: string) {
     noticeMessage.value = msg
     if (noticeTimer) clearTimeout(noticeTimer)
     noticeTimer = setTimeout(() => {
       noticeMessage.value = ''
-    }, 4500)
+    }, 4000)
+  }
+
+  function formatArabicDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return '–'
+    try {
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return dateStr
+      return d.toLocaleDateString('ar-YE', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    } catch {
+      return dateStr
+    }
   }
 
   function mapApiOrder(os: any): SupplierOrderItem {
-    const rawItems = os.items || []
-    const subtotal = Number(os.subtotal) || 0
-    const tax = subtotal * 0.15
-    const total = subtotal + tax
+    const parentOrder = os.order || {}
+    const customer = parentOrder.customer || {}
+    const itemsRaw = Array.isArray(os.items) ? os.items : []
 
-    const mappedItems: SupplierOrderProductItem[] = rawItems.map((it: any) => {
-      const q = Number(it.quantity) || 1
-      const price = Number(it.unit_price) || 0
-      const title = it.product_title || 'منتج طاقة شمسية'
-      const model = it.product_model || `SKU-${it.id}`
-      const warranty = it.warranty_period || 'ضمان معتمد'
-      const img = resolveOrderItemImage(it)
+    const mappedItems: SupplierOrderProductItem[] = itemsRaw.map((it: any) => {
+      const sp = it.store_product || it.storeProduct || {}
+      const mp = sp.master_product || sp.masterProduct || {}
+      const unitPrice = Number(it.unit_price) || 0
+      const qty = Number(it.quantity) || 1
+      const total = Number(it.total_price) || unitPrice * qty
 
       return {
         id: it.id,
-        storeProductId: it.store_product_id,
-        title,
-        referenceNumber: model,
-        brand: it.brand || '',
-        category: it.category || '',
-        warrantyLabel: warranty,
-        image: img,
-        quantity: q,
-        unitLabel: title.includes('لوح') ? 'لوح' : title.includes('إنفرتر') ? 'جهاز' : title.includes('بطارية') ? 'وحدة' : 'قطعة',
-        unitPrice: price,
-        totalPrice: Number(it.total_price) || price * q,
+        title: it.product_title || mp.title || 'منتج طاقة شمسية',
+        referenceNumber: it.product_model || mp.model_number || sp.sku || `SKU-${it.id}`,
+        brand: it.brand || mp.brand?.name || 'SolarHub',
+        category: it.category || mp.category?.name_ar || 'طاقة شمسية',
+        warrantyLabel: it.warranty_period || sp.warranty_period || '–',
+        image: resolveOrderItemImage(it),
+        quantity: qty,
+        unitLabel: 'قطعة',
+        unitPrice,
+        totalPrice: total,
       }
     })
 
-    const parentOrder = os.order || {}
-    const client = parentOrder.customer || {}
+    const subtotal = Number(os.subtotal) || mappedItems.reduce((acc, it) => acc + it.totalPrice, 0)
+    const tax = Math.round(subtotal * 0.15 * 100) / 100
+    const total = subtotal + tax
 
-    let formattedDate = 'مؤخراً'
-    if (os.created_at) {
-      try {
-        formattedDate = new Date(os.created_at).toLocaleDateString('ar-YE', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        })
-      } catch {
-        formattedDate = os.created_at.split('T')[0]
-      }
-    }
-
-    const orderNum = parentOrder.order_number || `#ORD-${os.id}`
-    const fullAddress = parentOrder.delivery_address || 'صنعاء - حدة'
+    const itemsSummary = mappedItems.length > 0
+      ? mappedItems.map((i) => `${i.title} (${i.quantity})`).join(' + ')
+      : 'عناصر طلب الشراء'
 
     return {
       id: os.id,
-      order_id: os.order_id || os.id,
-      orderNumber: orderNum,
-      createdAt: formattedDate,
-      clientName: client.name || 'عميل SolarHub',
-      clientPhone: client.phone || '050****000',
-      clientEmail: client.email || '',
-      deliveryAddress: fullAddress,
-      governorate: parentOrder.governorate || 'صنعاء',
-      itemsSummary:
-        mappedItems[0]?.title
-          ? `${mappedItems[0].title}${mappedItems.length > 1 ? ` + ${mappedItems.length - 1} منتجات أخرى` : ''}`
-          : 'منتجات طاقة شمسية',
+      order_id: parentOrder.id || os.order_id || os.id,
+      orderNumber: parentOrder.order_number || `#ORD-${os.id}`,
+      createdAt: formatArabicDate(parentOrder.created_at || os.created_at),
+      clientName: customer.name || 'عميل مسجل',
+      clientPhone: customer.phone || '–',
+      deliveryAddress: parentOrder.delivery_address || 'عنوان العميل المحدد',
+      governorate: parentOrder.governorate?.name || '–',
+      itemsSummary,
       totalItemsCount: mappedItems.reduce((acc, it) => acc + it.quantity, 0) || 1,
       unitLabel: mappedItems[0]?.unitLabel || 'قطعة',
       subtotal,
@@ -332,14 +122,19 @@ export function useSupplierOrders() {
 
   async function fetchOrders() {
     isLoading.value = true
+    errorMessage.value = ''
     try {
       const res = await $api<any>('/my/store-orders')
       const raw = Array.isArray(res) ? res : res?.data || []
-      if (Array.isArray(raw) && raw.length > 0) {
+      if (Array.isArray(raw)) {
         orders.value = raw.map(mapApiOrder)
+      } else {
+        orders.value = []
       }
-    } catch (err) {
-      console.warn('Could not fetch store orders from API, keeping current list:', err)
+    } catch (err: any) {
+      console.error('Could not fetch store orders from API:', err)
+      orders.value = []
+      errorMessage.value = err?.data?.message || 'تعذر الاتصال بالخادم لجلب طلبات الشراء.'
     } finally {
       isLoading.value = false
     }
@@ -355,19 +150,13 @@ export function useSupplierOrders() {
           o.orderNumber.toLowerCase().includes(q) ||
           o.clientName.toLowerCase().includes(q) ||
           o.itemsSummary.toLowerCase().includes(q) ||
-          o.deliveryAddress.toLowerCase().includes(q)
+          o.deliveryAddress.toLowerCase().includes(q) ||
+          (o.clientPhone && o.clientPhone.includes(q))
       )
     }
 
     if (selectedStatus.value !== 'all') {
       result = result.filter((o) => o.status === selectedStatus.value)
-    }
-
-    if (selectedPeriod.value !== 'all') {
-      const days = Number(selectedPeriod.value)
-      if (!isNaN(days) && days > 0) {
-        // filter by days if available
-      }
     }
 
     return result
@@ -419,70 +208,53 @@ export function useSupplierOrders() {
         cancelled: 'تم إلغاء طلب الشراء واستعادة المخزون.',
       }
 
-      showNotice(statusLabels[newStatus] || `تم تحديث حالة الطلب إلى ${newStatus}`)
+      showNotice(statusLabels[newStatus] || 'تم تحديث حالة طلب الشراء بنجاح.')
       return true
     } catch (err: any) {
-      console.warn('API error updating order status:', err)
-      // إذا كان الخطأ من الخادم نعرض رسالة مناسبة
-      const msg = err?.data?.userMessage || err?.data?.message || 'تم تحديث حالة الطلب محلياً.'
+      // استعادة الحالة السابقة عند الفشل
+      if (target && prevStatus) {
+        target.status = prevStatus
+      }
+      console.error('Failed to update order store status:', err)
+      const msg = err?.data?.message || 'حدث خطأ أثناء تحديث حالة الطلب. يرجى المحاولة لاحقاً.'
       showNotice(msg)
-      return true
+      return false
     } finally {
       isUpdating.value = false
     }
   }
 
   function exportOrders() {
-    const list = filteredOrders.value
-    const headers = [
-      'رقم الطلب',
-      'تاريخ الطلب',
-      'اسم العميل',
-      'رقم الهاتف',
-      'عنوان التوصيل',
-      'تفاصيل المنتجات',
-      'الكمية الإجمالية',
-      'المبلغ الإجمالي (ر.س)',
-      'الضريبة (15%)',
-      'حصة المتجر الكلية (ر.س)',
-      'حالة الطلب',
-    ]
-
-    const statusMap: Record<SupplierOrderStatus, string> = {
-      pending: 'بانتظار المعالجة',
-      accepted: 'مقبول وقيد التجهيز',
-      shipped: 'تم الشحن',
-      delivered: 'تم التسليم',
-      completed: 'مكتمل',
-      rejected: 'مرفوض',
-      cancelled: 'ملغي',
+    if (orders.value.length === 0) {
+      showNotice('لا توجد بيانات متاحة للتصدير.')
+      return
     }
 
-    const rows = list.map((o) => [
+    const headers = ['رقم الطلب', 'اسم العميل', 'رقم الهاتف', 'العنوان', 'المحافظة', 'عدد العناصر', 'الإجمالي', 'الحالة', 'تاريخ الإنشاء']
+    const rows = orders.value.map((o) => [
       `"${o.orderNumber}"`,
-      `"${o.createdAt}"`,
-      `"${o.clientName}"`,
+      `"${o.clientName.replace(/"/g, '""')}"`,
       `"${o.clientPhone}"`,
-      `"${o.deliveryAddress}"`,
-      `"${o.itemsSummary}"`,
-      `"${o.totalItemsCount}"`,
-      `"${o.subtotal.toFixed(2)}"`,
-      `"${o.taxAmount.toFixed(2)}"`,
-      `"${o.totalStoreShare.toFixed(2)}"`,
-      `"${statusMap[o.status] || o.status}"`,
+      `"${o.deliveryAddress.replace(/"/g, '""')}"`,
+      `"${o.governorate}"`,
+      o.totalItemsCount,
+      o.totalStoreShare,
+      `"${o.status}"`,
+      `"${o.createdAt}"`,
     ])
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n')
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
     link.setAttribute('href', url)
-    link.setAttribute('download', `طلبات_الشراء_${new Date().toISOString().split('T')[0]}.csv`)
+    link.setAttribute('download', `طلبات_شراء_المتجر_${new Date().toISOString().slice(0, 10)}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
-    showNotice('تم تصدير كشف طلبات الشراء بصيغة CSV بنجاح.')
+
+    showNotice('تم تصدير كشف طلبات الشراء بنجاح.')
   }
 
   onMounted(() => {
@@ -493,6 +265,7 @@ export function useSupplierOrders() {
     orders,
     isLoading,
     isUpdating,
+    errorMessage,
     noticeMessage,
     searchQuery,
     selectedStatus,
