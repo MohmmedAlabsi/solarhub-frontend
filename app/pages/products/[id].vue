@@ -12,7 +12,6 @@ import {
   Star,
   Store,
 } from 'lucide-vue-next'
-import { visitorProducts } from '~~/app/data/visitor-mock'
 import { useAuthModal } from '~~/app/composables/useAuthModal'
 import { useAuthStore } from '~~/app/stores/auth'
 import ProductQuoteModal from '~~/app/components/common/ProductQuoteModal.vue'
@@ -110,13 +109,7 @@ async function fetchProductDetails() {
       }
     }
   } catch (err) {
-    const localMatch = visitorProducts.find(p => p.id === productId)
-    if (localMatch) {
-      apiProduct.value = {
-        ...localMatch,
-        gallery: [localMatch.image, '/images/hero-solar.png', '/images/product-panel.png'],
-      }
-    }
+    console.error('[SolarHub] تعذر جلب تفاصيل المنتج من API:', err)
   } finally {
     isLoadingProduct.value = false
   }
