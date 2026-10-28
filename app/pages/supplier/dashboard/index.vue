@@ -27,6 +27,7 @@ import ThemeToggle from '~/components/common/ThemeToggle.vue'
 
 definePageMeta({
   layout: 'default',
+  layout: 'supplier',
 })
 
 useSeoMeta({
