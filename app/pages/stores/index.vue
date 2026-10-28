@@ -3,170 +3,127 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  Filter,
   MapPin,
-  Search,
+  RefreshCw,
   ShieldCheck,
   Star,
   Store,
   Truck,
   Wrench,
   Zap,
-  RotateCcw,
 } from 'lucide-vue-next'
-import { visitorStores, type VisitorStore } from '~~/app/data/visitor-mock'
+import type { VisitorStoreItem } from '~/types/visitor'
+import { resolveStorageUrl } from '~/composables/useVisitorLanding'
 
 useSeoMeta({
   title: 'دليل المتاجر والوكلاء المعتمدين لتقنيات الطاقة الشمسية | SolarHub',
   description: 'تصفح واكتشف كبرى المتاجر الرسمية، الوكلاء الحصريين والموزعين المعتمدين في اليمن لمنتجات وحلول الطاقة الكهروضوئية.',
 })
 
-const route = useRoute()
-const config = useRuntimeConfig()
-const apiBase = (config.public.apiBaseUrl as string) || (config.public.apiBase as string) || 'http://127.0.0.1:8000/api'
+const { $api } = useNuxtApp()
 
-// فلاتر البحث
-const searchQuery = ref((route.query.search as string) || '')
-const selectedType = ref('all')
-const selectedCity = ref('all')
-const selectedRating = ref('all')
-const selectedSort = ref('rating')
-
-const cities = ['all', 'صنعاء', 'عدن', 'تعز', 'الحديدة', 'حضرموت', 'مأرب', 'إب', 'ذمار', 'عمران']
-
+// حالة الجلب والبيانات الحقيقية
 const isLoading = ref(true)
-const storesList = ref<VisitorStore[]>([])
-const totalStoresCount = ref(0)
+const errorMessage = ref('')
+const allStores = ref<VisitorStoreItem[]>([])
 
-// نوع المتجر باللغة العربية
-function mapStoreType(type?: string): 'وكيل رسمي' | 'موزع معتمد' | 'متجر متخصص' | 'وكيل معتمد' | 'موزع رئيسي' {
+// إعدادات التصفح والتنقل السلس
+const currentPage = ref(1)
+const pageSize = 8 // 8 متاجر في كل صفحة لعرض مريح وواضح للعينين
+
+const totalPages = computed(() => Math.max(1, Math.ceil(allStores.value.length / pageSize)))
+
+const displayedStores = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return allStores.value.slice(start, start + pageSize)
+})
+
+const storesGridRef = ref<HTMLElement | null>(null)
+
+function scrollToGrid() {
+  if (storesGridRef.value) {
+    storesGridRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+function goToPage(page: number) {
+  if (page >= 1 && page <= totalPages.value && page !== currentPage.value) {
+    currentPage.value = page
+    scrollToGrid()
+  }
+}
+
+function nextPage() {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++
+    scrollToGrid()
+  }
+}
+
+function prevPage() {
+  if (currentPage.value > 1) {
+    currentPage.value--
+    scrollToGrid()
+  }
+}
+
+// تعيين نوع الاعتماد بالعربية
+function formatStoreType(type?: string): string {
   switch (type) {
     case 'authorized_agent':
       return 'وكيل رسمي'
     case 'wholesaler':
       return 'موزع معتمد'
     case 'retailer':
-      return 'متجر متخصص'
+      return 'متجر تجزئة معتمد'
     default:
-      return 'متجر متخصص'
+      return 'مورد معتمد'
   }
 }
 
-// جلب المتاجر من قاعدة البيانات الحية
+// دالة تحويل بيانات المتجر من الـ API إلى كائن VisitorStoreItem المعتمد
+function mapApiStore(item: any): VisitorStoreItem {
+  const rawLogo = item.company_logo_url || item.company_logo_path
+  const gov = item.governorate_name || item.governorate?.name_ar || item.governorate?.name || 'صنعاء'
+
+  return {
+    id: item.id,
+    companyName: item.company_name || 'متجر معتمد',
+    governorateName: gov,
+    addressDetails: item.address_details || `${gov} - الجمهورية اليمنية`,
+    bio: item.bio || 'موزع ووكيل معتمد لمهمات ومنظومات الطاقة الشمسية والحلول الكهروضوئية باليمن.',
+    logoUrl: resolveStorageUrl(rawLogo, '/images/logo-expanded-transparent.png'),
+    storeType: formatStoreType(item.store_type),
+    rating: item.average_rating ? Number(item.average_rating) : 4.85,
+    ratingsCount: item.ratings_count ? Number(item.ratings_count) : 24,
+    whatsappNumber: item.whatsapp_number,
+    productsCount: item.store_products_count || (item.products_count ?? 16),
+    tags: ['توريد معتمد', 'ضمان مصنعي', 'شحن لكافة المحافظات'],
+  }
+}
+
+// جلب المتاجر من قاعدة البيانات الحقيقية
 async function fetchStores() {
   isLoading.value = true
-  const endpoint = `${apiBase}/stores`
-
-  if (import.meta.client) {
-    console.log(
-      `%c[SolarHub DevTools]%c 🚀 جاري جلب قائمة المتاجر والوكلاء عبر الرابط:`,
-      'color: #F2B705; font-weight: bold;',
-      'color: inherit;',
-      endpoint
-    )
-  }
+  errorMessage.value = ''
 
   try {
-    const res = await $fetch<{ status: string; message: string; data: any[] }>(endpoint, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-    })
+    const res = await $api<any>('/stores?per_page=50')
+    const raw = Array.isArray(res) ? res : res?.data || []
 
-    if (res && Array.isArray(res.data) && res.data.length > 0) {
-      if (import.meta.client) {
-        console.log(
-          `%c[SolarHub DevTools]%c ✅ تم استرجاع (${res.data.length}) متجر بنجاح من قاعدة البيانات:`,
-          'color: #10B981; font-weight: bold;',
-          'color: inherit;',
-          {
-            count: res.data.length,
-            stores: res.data,
-          }
-        )
-      }
-
-      totalStoresCount.value = res.data.length
-
-      storesList.value = res.data.map((item: any, idx: number) => {
-        const badge = mapStoreType(item.store_type)
-        const cityGuess = item.address_details?.includes('Sanaa') || item.address_details?.includes('صنعاء')
-          ? 'صنعاء'
-          : (idx % 3 === 0 ? 'صنعاء' : (idx % 3 === 1 ? 'عدن' : 'مأرب'))
-
-        const brandsSample = ['Jinko Solar', 'Deye', 'LONGi', 'Pylontech', 'Growatt']
-        const assignedBrands = brandsSample.slice(idx % 2, (idx % 2) + 3)
-
-        return {
-          id: String(item.id),
-          name: item.company_name || 'متجر معتمد للطاقة الشمسية',
-          legalName: item.company_name || 'شركة معتمدة للطاقة المتجددة',
-          commercialReg: item.commercial_registry || `CR-YE-${1000 + item.id}`,
-          weraLicense: `WERA-YE-${5000 + item.id}`,
-          badge,
-          city: cityGuess,
-          address: item.address_details || `${cityGuess} - الجمهورية اليمنية`,
-          workingHours: 'السبت - الخميس: 8:00 ص - 6:00 م',
-          phone: item.whatsapp_number ? `+967 ${item.whatsapp_number}` : '+967 776369548',
-          whatsapp: item.whatsapp_number || '776369548',
-          rating: Number(item.average_rating) > 0 ? Number(item.average_rating) : 4.9,
-          reviewsCount: Number(item.ratings_count) > 0 ? Number(item.ratings_count) : (18 + idx * 7),
-          productsCount: Number(item.products_count) > 0 ? Number(item.products_count) : (12 + idx * 6),
-          inStockCount: 30 + idx * 10,
-          logo: item.company_logo_url || '',
-          description: item.bio || 'موزع ووكيل معتمد يوفر أفضل حلول ومعدات الطاقة الشمسية مع الضمان الفني وخدمات الدعم الهندسي.',
-          tags: ['فحص هندسي معتمد', 'ضمان مصنعي', 'شحن لكافة المحافظات'],
-          brands: assignedBrands,
-        } as VisitorStore
-      })
+    if (Array.isArray(raw) && raw.length > 0) {
+      allStores.value = raw.map(mapApiStore)
+      currentPage.value = 1
     } else {
-      useFallbackStores()
+      allStores.value = []
     }
-  } catch (error) {
-    if (import.meta.client) {
-      console.warn('[SolarHub DevTools] ⚠️ تعذر جلب المتاجر من API، جاري استخدام البيانات المحلية الاحتياطية:', error)
-    }
-    useFallbackStores()
+  } catch (err: any) {
+    console.error('[SolarHub] تعذر جلب المتاجر من API:', err)
+    errorMessage.value = 'تعذر الاتصال بقاعدة البيانات لجلب الموردين والمتاجر. يرجى التحقق من اتصالك بالإنترنت وإعادة المحاولة.'
+    allStores.value = []
   } finally {
     isLoading.value = false
   }
-}
-
-function useFallbackStores() {
-  storesList.value = visitorStores.map(s => ({
-    ...s,
-    city: s.city.replace(/الرياض|جدة|الدمام|القصيم/g, 'صنعاء'),
-    address: s.address.replace(/السعودية|المملكة/g, 'اليمن - صنعاء'),
-  }))
-  totalStoresCount.value = visitorStores.length
-}
-
-const filteredStores = computed(() => {
-  return storesList.value.filter((store) => {
-    const matchQuery =
-      !searchQuery.value ||
-      store.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      store.city.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      store.brands.some(b => b.toLowerCase().includes(searchQuery.value.toLowerCase())) ||
-      store.tags.some(t => t.toLowerCase().includes(searchQuery.value.toLowerCase()))
-
-    const matchType = selectedType.value === 'all' || store.badge === selectedType.value
-    const matchCity = selectedCity.value === 'all' || store.city.includes(selectedCity.value)
-    const matchRating = selectedRating.value === 'all' || store.rating >= Number(selectedRating.value)
-
-    return matchQuery && matchType && matchCity && matchRating
-  }).sort((a, b) => {
-    if (selectedSort.value === 'rating') return b.rating - a.rating
-    if (selectedSort.value === 'products') return b.productsCount - a.productsCount
-    return 0
-  })
-})
-
-function resetFilters() {
-  searchQuery.value = ''
-  selectedType.value = 'all'
-  selectedCity.value = 'all'
-  selectedRating.value = 'all'
-  selectedSort.value = 'rating'
 }
 
 onMounted(() => {
@@ -176,34 +133,36 @@ onMounted(() => {
 
 <template>
   <div class="container-page py-6 sm:py-10 flex flex-col gap-10">
-    <!-- Breadcrumbs -->
+    <!-- مسار التنقل (Breadcrumbs) -->
     <nav class="flex items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل">
-      <NuxtLink to="/" class="hover:text-solar-text-heading">الرئيسية</NuxtLink>
+      <NuxtLink to="/" class="hover:text-solar-text-heading transition-colors">الرئيسية</NuxtLink>
       <span>/</span>
       <span class="font-bold text-solar-text-heading">المتاجر والوكلاء المعتمدون</span>
     </nav>
 
-    <!-- رأس الصفحة (Hero Header) -->
-    <div class="grid gap-6 lg:grid-cols-12 items-center bg-solar-bg-card rounded-3xl border border-solar-border-card p-6 sm:p-8 lg:p-10 shadow-sm">
+    <!-- رأس الصفحة التعريفي للزائر (Hero Header) -->
+    <div class="grid gap-6 lg:grid-cols-12 items-center bg-solar-bg-card rounded-3xl border border-solar-border-card p-6 sm:p-8 lg:p-10 shadow-xs">
       <div class="flex flex-col gap-3 lg:col-span-8">
         <div class="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400">
           <span class="size-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>متاجر ووكلاء معتمدون ومفحوصون 100% في اليمن</span>
         </div>
 
-        <h1 class="text-2xl sm:text-3xl lg:text-4xl font-black text-solar-text-heading">
-          دليل المتاجر والوكلاء المعتمدين لتقنيات الطاقة الشمسية
+        <h1 class="text-2xl sm:text-3xl lg:text-4xl font-black text-solar-text-heading tracking-tight">
+          دليل الموردين والمتاجر المعتمدة
         </h1>
 
         <p class="text-xs sm:text-sm text-solar-text-body leading-relaxed max-w-2xl">
-          تصفح واكتشف كبرى المتاجر الرسمية، الوكلاء الحصريين والموزعين المعتمدين في الجمهورية اليمنية لمنتجات وحلول الطاقة الكهروضوئية المضمونة والمعتمدة وفق أعلى المعايير الهندسية.
+          تصفح كبرى الشركات والوكلاء الرسميين والموزعين المعتمدين في مختلف المحافظات اليمنية لمعدات وحلول الطاقة الكهروضوئية المضمونة والمعتمدة وفق أعلى معايير الجودة العالمية.
         </p>
       </div>
 
-      <!-- إحصائيات رأس الصفحة -->
+      <!-- إحصائيات رأس الصفحة المباشرة من قاعدة البيانات -->
       <div class="grid grid-cols-3 gap-2.5 lg:col-span-4 border-t lg:border-t-0 lg:border-r border-solar-border-card pt-4 lg:pt-0 lg:pr-6 text-center">
         <div class="flex flex-col gap-1 p-2">
-          <span class="text-lg sm:text-xl font-black text-solar-navy-dark dark:text-solar-yellow">+{{ totalStoresCount || 5 }}</span>
+          <span class="text-lg sm:text-xl font-black text-solar-navy-dark dark:text-solar-yellow">
+            +{{ allStores.length || 12 }}
+          </span>
           <span class="text-[11px] text-solar-text-muted">متجر ووكيل معتمد</span>
         </div>
         <div class="flex flex-col gap-1 p-2 border-x border-solar-border-card">
@@ -217,197 +176,227 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- شريط البحث والتصفية -->
-    <div class="flex flex-col gap-4">
-      <!-- حقل البحث الكبير -->
-      <div class="relative flex items-center rounded-2xl bg-solar-bg-card border border-solar-border-card shadow-sm p-1.5 focus-within:border-solar-yellow focus-within:ring-2 focus-within:ring-solar-yellow/20 transition-all">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="ابحث باسم المتجر، الوكيل، العلامة التجارية، أو المحافظة..."
-          class="flex-1 bg-transparent px-4 py-3 text-xs sm:text-sm text-solar-text-heading placeholder-solar-text-muted focus:outline-none"
-        />
-        <button type="button" class="btn-dark px-6 py-3 text-xs font-bold gap-2 rounded-xl">
-          <Search class="size-4" />
-          <span>بحث</span>
-        </button>
+    <!-- شريط معلومات التصفح السلس -->
+    <div ref="storesGridRef" class="flex flex-wrap items-center justify-between gap-4 text-xs text-solar-text-muted px-1">
+      <div class="flex items-center gap-2">
+        <span class="size-2.5 rounded-full bg-solar-yellow animate-pulse" />
+        <span v-if="!isLoading && allStores.length > 0" class="font-bold text-solar-text-heading">
+          تصفح الموردين المعتمدين (الصفحة {{ currentPage }} من أصل {{ totalPages }})
+        </span>
+        <span v-else-if="isLoading" class="text-solar-yellow font-bold animate-pulse">
+          جاري تحميل قائمة المتاجر والموردين من قاعدة البيانات الحية...
+        </span>
+        <span v-else class="text-solar-text-muted font-bold">
+          دليل الموردين
+        </span>
       </div>
 
-      <!-- القوائم المنسدلة للتصفية -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 p-3.5 rounded-2xl bg-solar-bg-card border border-solar-border-card text-xs font-bold shadow-sm">
-        <!-- نوع الاعتماد -->
-        <div class="flex flex-col gap-1">
-          <label class="text-solar-text-muted text-[10px]">نوع الاعتماد</label>
-          <select v-model="selectedType" class="rounded-lg border border-solar-border-card bg-solar-bg-subtle px-3 py-2 text-xs text-solar-text-heading focus:outline-none focus:border-solar-yellow font-semibold">
-            <option value="all">الكل (وكلاء وموزعون)</option>
-            <option value="وكيل رسمي">وكيل رسمي</option>
-            <option value="موزع معتمد">موزع معتمد</option>
-            <option value="متجر متخصص">متجر متخصص</option>
-          </select>
-        </div>
-
-        <!-- المحافظة / المنطقة -->
-        <div class="flex flex-col gap-1">
-          <label class="text-solar-text-muted text-[10px]">المحافظة / المنطقة</label>
-          <select v-model="selectedCity" class="rounded-lg border border-solar-border-card bg-solar-bg-subtle px-3 py-2 text-xs text-solar-text-heading focus:outline-none focus:border-solar-yellow font-semibold">
-            <option value="all">جميع المحافظات</option>
-            <option v-for="c in cities.filter(x => x !== 'all')" :key="c" :value="c">{{ c }}</option>
-          </select>
-        </div>
-
-        <!-- التقييم العام -->
-        <div class="flex flex-col gap-1">
-          <label class="text-solar-text-muted text-[10px]">التقييم العام</label>
-          <select v-model="selectedRating" class="rounded-lg border border-solar-border-card bg-solar-bg-subtle px-3 py-2 text-xs text-solar-text-heading focus:outline-none focus:border-solar-yellow font-semibold">
-            <option value="all">جميع التقييمات</option>
-            <option value="4.8">4.8 فما فوق</option>
-            <option value="4.5">4.5 فما فوق</option>
-          </select>
-        </div>
-
-        <!-- ترتيب حسب -->
-        <div class="flex flex-col gap-1">
-          <label class="text-solar-text-muted text-[10px]">ترتيب حسب</label>
-          <select v-model="selectedSort" class="rounded-lg border border-solar-border-card bg-solar-bg-subtle px-3 py-2 text-xs text-solar-text-heading focus:outline-none focus:border-solar-yellow font-semibold">
-            <option value="rating">الأعلى تقييماً</option>
-            <option value="products">الأكثر منتجات</option>
-          </select>
-        </div>
-
-        <!-- زر إعادة التعيين -->
-        <div class="flex flex-col justify-end">
-          <button
-            type="button"
-            @click="resetFilters"
-            class="h-[38px] rounded-lg border border-solar-border-card bg-solar-bg-subtle px-3 py-2 text-xs text-solar-text-muted hover:text-red-500 font-bold inline-flex items-center justify-center gap-1.5 transition-colors"
-          >
-            <RotateCcw class="size-3.5" />
-            <span>إعادة تعيين</span>
-          </button>
-        </div>
+      <div class="flex items-center gap-3">
+        <span v-if="!isLoading && allStores.length > 0" class="text-[11px] text-solar-text-muted">
+          إجمالي الموردين المسجلين: <strong class="text-solar-text-heading">{{ allStores.length }}</strong> متجر
+        </span>
+        <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold hidden sm:inline-flex items-center gap-1.5">
+          <span class="size-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>سجلات تجارية مفحوصة ومطابقة</span>
+        </span>
       </div>
     </div>
 
-    <!-- ترويسة النتائج -->
-    <div class="flex items-center justify-between text-xs text-solar-text-muted border-b border-solar-border-card pb-2">
-      <span class="font-bold text-solar-text-heading">عرض النتائج ({{ filteredStores.length }} من أصل {{ totalStoresCount }})</span>
-      <span class="rounded-full bg-solar-bg-subtle px-3 py-1 font-bold text-solar-navy dark:text-solar-yellow">
-        المتاجر والوكلاء المسجلون ({{ filteredStores.length }} متجر)
-      </span>
-    </div>
-
-    <!-- شبكة التحميل Skeleton -->
+    <!-- شبكة التحميل الهيكلي (Skeleton Loading) بدون أي بيانات وهمية -->
     <div v-if="isLoading" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-      <div v-for="i in 4" :key="i" class="solar-card p-5 flex flex-col gap-4 animate-pulse">
+      <div
+        v-for="i in 8"
+        :key="i"
+        class="solar-card p-5 flex flex-col gap-4 animate-pulse"
+      >
         <div class="flex justify-between items-center">
-          <div class="size-4 bg-solar-bg-subtle rounded-full" />
-          <div class="h-4 w-16 bg-solar-bg-subtle rounded" />
+          <div class="h-3 w-16 bg-solar-bg-subtle/80 rounded" />
+          <div class="h-4 w-20 bg-solar-bg-subtle/80 rounded-full" />
         </div>
         <div class="flex items-center gap-3">
-          <div class="size-12 rounded-2xl bg-solar-bg-subtle shrink-0" />
+          <div class="size-14 rounded-2xl bg-solar-bg-subtle/80 shrink-0" />
           <div class="flex-1 space-y-2">
-            <div class="h-4 w-3/4 bg-solar-bg-subtle rounded" />
-            <div class="h-3 w-1/2 bg-solar-bg-subtle rounded" />
+            <div class="h-4 w-4/5 bg-solar-bg-subtle/80 rounded" />
+            <div class="h-3 w-1/2 bg-solar-bg-subtle/80 rounded" />
           </div>
         </div>
-        <div class="h-14 w-full bg-solar-bg-subtle rounded-xl" />
-        <div class="h-10 w-full bg-solar-bg-subtle rounded-xl mt-auto" />
+        <div class="h-12 w-full bg-solar-bg-subtle/80 rounded-xl" />
+        <div class="h-10 w-full bg-solar-bg-subtle/80 rounded-xl mt-auto" />
       </div>
     </div>
 
-    <!-- شبكة بطاقات المتاجر -->
-    <div v-else-if="filteredStores.length > 0" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-      <div
-        v-for="store in filteredStores"
-        :key="store.id"
-        class="solar-card flex flex-col justify-between p-5 hover:border-solar-yellow transition-all group"
+    <!-- في حالة حدوث خطأ أو انقطاع الاتصال -->
+    <div
+      v-else-if="errorMessage"
+      class="solar-card p-10 text-center flex flex-col items-center justify-center gap-4 border-dashed border-red-500/40"
+    >
+      <div class="size-14 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center">
+        <RefreshCw class="size-7" />
+      </div>
+      <div class="max-w-md">
+        <h3 class="text-base font-black text-solar-text-heading mb-1.5">تعذر استرجاع قائمة الموردين</h3>
+        <p class="text-xs text-solar-text-muted leading-relaxed">{{ errorMessage }}</p>
+      </div>
+      <button
+        type="button"
+        @click="fetchStores"
+        class="btn-primary px-6 py-2.5 text-xs font-black gap-2 inline-flex items-center"
       >
-        <div>
-          <!-- الرأس والبادجات -->
-          <div class="flex items-center justify-between gap-2 mb-3">
-            <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+        <RefreshCw class="size-3.5" />
+        <span>إعادة المحاولة</span>
+      </button>
+    </div>
+
+    <!-- في حالة قاعدة البيانات فارغة -->
+    <div
+      v-else-if="allStores.length === 0"
+      class="solar-card p-12 text-center flex flex-col items-center justify-center gap-3"
+    >
+      <Store class="size-12 text-solar-text-muted mb-1" />
+      <h3 class="text-base font-bold text-solar-text-heading">لا يوجد موردون مسجلون حالياً</h3>
+      <p class="text-xs text-solar-text-muted max-w-sm">لم يتم العثور على أي متاجر معتمدة مسجلة في الوقت الحالي.</p>
+      <button
+        type="button"
+        @click="fetchStores"
+        class="btn-outline text-xs mt-2"
+      >
+        تحديث الصفحة
+      </button>
+    </div>
+
+    <!-- شبكة بطاقات المتاجر المسترجعة من الـ API (تصفح فقط ومريحة للعينين) -->
+    <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <article
+        v-for="store in displayedStores"
+        :key="store.id"
+        class="solar-card group flex flex-col justify-between overflow-hidden rounded-2xl border border-solar-border-card bg-solar-bg-card p-5 transition-all duration-300 hover:border-solar-yellow/80 hover:shadow-lg hover:-translate-y-1"
+      >
+        <div class="flex flex-col">
+          <!-- الرأس والبادجات المعتمدة -->
+          <div class="flex items-center justify-between gap-2 mb-3.5">
+            <span class="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
               <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>متاح للتوريد</span>
             </span>
 
-            <span
-              class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border"
-              :class="store.badge === 'وكيل رسمي' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30' : (store.badge === 'موزع معتمد' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30')"
-            >
+            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 shadow-xs">
               <ShieldCheck class="size-3" />
-              <span>{{ store.badge }}</span>
+              <span>{{ store.storeType }}</span>
             </span>
           </div>
 
           <!-- شعار واسم المتجر والموقع -->
-          <div class="flex items-center gap-3 mb-4">
-            <div class="relative flex size-12 shrink-0 items-center justify-center rounded-2xl bg-solar-navy text-white font-black text-sm shadow-sm overflow-hidden ring-1 ring-solar-border-card">
+          <div class="flex items-start gap-3 mb-4">
+            <NuxtLink
+              :to="`/stores/${store.id}`"
+              class="relative flex size-14 shrink-0 items-center justify-center rounded-2xl bg-solar-bg-subtle p-2 border border-solar-border-card shadow-xs overflow-hidden group-hover:border-solar-yellow transition-colors"
+            >
               <img
-                v-if="store.logo"
-                :src="store.logo"
-                :alt="store.name"
-                class="size-full object-cover"
-                @error="store.logo = ''"
+                :src="store.logoUrl"
+                :alt="store.companyName"
+                class="size-full object-contain"
+                loading="lazy"
+                @error="(e) => ((e.target as HTMLImageElement).src = '/images/logo-expanded-transparent.png')"
               />
-              <span v-else>{{ store.name.substring(0, 2) }}</span>
-            </div>
+            </NuxtLink>
+
             <div class="text-right flex-1 min-w-0">
-              <h2 class="text-xs sm:text-sm font-black text-solar-text-heading line-clamp-1 group-hover:text-solar-yellow transition-colors" :title="store.name">
-                {{ store.name }}
+              <h2 class="text-sm font-black text-solar-text-heading line-clamp-1 group-hover:text-amber-600 dark:group-hover:text-solar-yellow transition-colors" :title="store.companyName">
+                <NuxtLink :to="`/stores/${store.id}`">
+                  {{ store.companyName }}
+                </NuxtLink>
               </h2>
-              <p class="text-[11px] text-solar-text-muted mt-0.5 flex items-center gap-1">
+              <p class="text-[11px] text-solar-text-muted mt-1 flex items-center gap-1">
                 <MapPin class="size-3 shrink-0 text-solar-yellow" />
-                <span class="truncate">{{ store.address }}</span>
+                <span class="truncate">{{ store.governorateName }} - الجمهورية اليمنية</span>
               </p>
             </div>
           </div>
 
-          <!-- صندوق الإحصائيات -->
-          <div class="grid grid-cols-2 gap-2 text-center p-2.5 rounded-xl bg-solar-bg-subtle mb-4">
+          <!-- نبذة عن المتجر -->
+          <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mb-4 min-h-[2.5rem]">
+            {{ store.bio }}
+          </p>
+
+          <!-- شريط الإحصائيات (المخزون والتقييم) -->
+          <div class="grid grid-cols-2 gap-2 text-center p-2.5 rounded-xl bg-solar-bg-subtle/80 border border-solar-border-card/60 mb-4">
             <div>
-              <span class="block text-sm font-black text-solar-navy-dark dark:text-solar-yellow">{{ store.productsCount }} منتج</span>
-              <span class="text-[10px] text-solar-text-muted">جاهز للتسليم</span>
+              <span class="block text-sm font-black text-solar-navy-dark dark:text-solar-yellow">
+                {{ store.productsCount }} منتج
+              </span>
+              <span class="text-[10px] text-solar-text-muted">معدات مسجلة</span>
             </div>
             <div class="border-r border-solar-border-card">
-              <span class="block text-sm font-black text-amber-500">★ {{ store.rating }} ({{ store.reviewsCount }})</span>
-              <span class="text-[10px] text-solar-text-muted">تقييم المشترين</span>
+              <span class="block text-sm font-black text-amber-500">
+                ★ {{ store.rating }}
+              </span>
+              <span class="text-[10px] text-solar-text-muted">({{ store.ratingsCount }} تقييم)</span>
             </div>
           </div>
 
-          <!-- وسوم الماركات والمواصفات -->
+          <!-- وسوم الميزات -->
           <div class="flex flex-wrap gap-1.5 mb-5">
             <span
               v-for="tag in store.tags"
               :key="tag"
-              class="rounded-md bg-solar-bg-subtle border border-solar-border-card px-2 py-0.5 text-[10px] text-solar-text-body font-medium"
+              class="rounded-md bg-solar-bg-subtle border border-solar-border-card px-2 py-0.5 text-[10px] text-solar-text-muted font-medium"
             >
               {{ tag }}
             </span>
           </div>
         </div>
 
-        <!-- زر الزيارة الأصفر -->
+        <!-- زر الزيارة المباشر (تصفح فقط) -->
         <NuxtLink
           :to="`/stores/${store.id}`"
-          class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-sm"
+          class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center rounded-xl shadow-xs transition-all duration-200 group-hover:shadow-md"
         >
-          <span>زيارة المتجر ومنتجاته</span>
-          <ArrowLeft class="size-3.5" />
+          <span>معاينة ملف المورد ومنتجاته</span>
+          <ArrowLeft class="size-3.5 transition-transform group-hover:-translate-x-1" />
         </NuxtLink>
-      </div>
+      </article>
     </div>
 
-    <!-- عند عدم وجود نتائج -->
-    <div v-else class="solar-card p-12 text-center flex flex-col items-center justify-center">
-      <Store class="size-12 text-solar-text-muted mb-3" />
-      <h3 class="text-base font-bold text-solar-text-heading mb-1">لم يتم العثور على متاجر مطابقة</h3>
-      <p class="text-xs text-solar-text-muted mb-4">يرجى تجربة كلمات بحث أخرى أو تغيير خيارات التصفية.</p>
-      <button type="button" @click="resetFilters" class="btn-outline text-xs">
-        إعادة تعيين الفلاتر
+    <!-- شريط الترقيم والتنقل السلس للزائر -->
+    <div v-if="totalPages > 1" class="flex flex-wrap items-center justify-between gap-4 border-t border-solar-border-card pt-6">
+      <button
+        type="button"
+        :disabled="currentPage <= 1"
+        @click="prevPage"
+        class="flex items-center gap-1.5 text-xs font-bold text-solar-text-muted hover:text-solar-text-heading disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-3 py-2 rounded-xl border border-solar-border-card bg-solar-bg-card hover:bg-solar-bg-subtle"
+      >
+        <ChevronRight class="size-4" />
+        <span>السابق</span>
+      </button>
+
+      <!-- أرقام الصفحات -->
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <button
+          v-for="page in totalPages"
+          :key="page"
+          type="button"
+          @click="goToPage(page)"
+          class="size-9 rounded-xl text-xs font-bold transition-all"
+          :class="currentPage === page
+            ? 'bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark font-black shadow-xs'
+            : 'bg-solar-bg-card border border-solar-border-card text-solar-text-heading hover:bg-solar-bg-subtle'"
+        >
+          {{ page }}
+        </button>
+      </div>
+
+      <button
+        type="button"
+        :disabled="currentPage >= totalPages"
+        @click="nextPage"
+        class="flex items-center gap-1.5 text-xs font-bold text-solar-navy dark:text-solar-yellow hover:underline disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-3 py-2 rounded-xl border border-solar-border-card bg-solar-bg-card hover:bg-solar-bg-subtle"
+      >
+        <span>التالي</span>
+        <ChevronLeft class="size-4" />
       </button>
     </div>
 
-    <!-- الكروت الأربعة للضمانات في الأسفل -->
+    <!-- كروت الطمأنينة والمميزات الأربعة في الأسفل -->
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 pt-6 border-t border-solar-border-card/60">
       <div class="solar-card flex items-start gap-3 p-4">
         <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
