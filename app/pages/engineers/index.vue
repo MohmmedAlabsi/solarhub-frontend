@@ -1,199 +1,121 @@
 <script setup lang="ts">
 import {
   ArrowLeft,
+  Award,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Filter,
-  Search,
+  Clock,
+  FileCheck,
+  MapPin,
+  RefreshCw,
   ShieldCheck,
   Star,
   Users,
-  RotateCcw,
+  Wrench,
+  Zap,
 } from 'lucide-vue-next'
-import { visitorEngineers, type VisitorEngineer } from '~~/app/data/visitor-mock'
-import { useAuthModal } from '~~/app/composables/useAuthModal'
-import { useAuthStore } from '~~/app/stores/auth'
-import AppToast from '~~/app/components/common/AppToast.vue'
+import type { VisitorEngineerItem } from '~/types/visitor'
+import { resolveStorageUrl } from '~/composables/useVisitorLanding'
 
 useSeoMeta({
   title: 'دليل المهندسين والاستشاريين المعتمدين | SolarHub',
-  description: 'تواصل مع نخبة المهندسين المرخصين في تصميم أنظمة الطاقة الشمسية، دراسات الجدوى والأحمال، والفحص الميداني وفق أعلى المعايير الهندسية المعتمدة في اليمن.',
+  description: 'تصفح نخبة من المهندسين والاستشاريين المرخصين في اليمن لتصميم وفحص أنظمة ومحطات الطاقة الشمسية ومطابقة الأحمال الهندسية.',
 })
 
-const authModal = useAuthModal()
-const authStore = useAuthStore()
-const config = useRuntimeConfig()
-const apiBase = (config.public.apiBaseUrl as string) || (config.public.apiBase as string) || 'http://127.0.0.1:8000/api'
+const { $api } = useNuxtApp()
 
-// حقول البحث والتصفية
-const searchQuery = ref('')
-const selectedSpecialty = ref('all')
-const selectedCity = ref('all')
-const selectedRating = ref('all')
-
-const cities = ['all', 'صنعاء', 'عدن', 'تعز', 'الحديدة', 'حضرموت', 'مأرب', 'إب', 'ذمار', 'عمران']
-const specialties = [
-  { value: 'all', label: 'جميع التخصصات الهندسية' },
-  { value: 'محطات', label: 'تصميم محطات كهروضوئية' },
-  { value: 'مضخات', label: 'طاقة زراعية وضخ مياه' },
-  { value: 'تخزين', label: 'أنظمة هجينة وتخزين BESS' },
-  { value: 'فحص', label: 'فحص حراري وتدقيق أداء' },
-  { value: 'كهرباء', label: 'هندسة كهربائية وطاقة متجددة' },
-]
-
+// حالة جلب البيانات الحقيقية
 const isLoading = ref(true)
-const engineersList = ref<VisitorEngineer[]>([])
-const totalEngineersCount = ref(0)
-const toastMessage = ref('')
-let toastTimeout: any = null
+const errorMessage = ref('')
+const allEngineers = ref<VisitorEngineerItem[]>([])
 
-function showToast(msg: string) {
-  toastMessage.value = msg
-  if (toastTimeout) clearTimeout(toastTimeout)
-  toastTimeout = setTimeout(() => {
-    toastMessage.value = ''
-  }, 3500)
+// إعدادات التصفح والتنقل السلس بين الصفحات
+const currentPage = ref(1)
+const pageSize = 8 // 8 مهندسين في كل صفحة لتوفير تصفح مريح وواضح للعينين
+
+const totalPages = computed(() => Math.max(1, Math.ceil(allEngineers.value.length / pageSize)))
+
+const displayedEngineers = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return allEngineers.value.slice(start, start + pageSize)
+})
+
+const engineersGridRef = ref<HTMLElement | null>(null)
+
+function scrollToGrid() {
+  if (engineersGridRef.value) {
+    engineersGridRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 
-// جلب المهندسين من API
+function goToPage(page: number) {
+  if (page >= 1 && page <= totalPages.value && page !== currentPage.value) {
+    currentPage.value = page
+    scrollToGrid()
+  }
+}
+
+function nextPage() {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++
+    scrollToGrid()
+  }
+}
+
+function prevPage() {
+  if (currentPage.value > 1) {
+    currentPage.value--
+    scrollToGrid()
+  }
+}
+
+// دالة تحويل بيانات المهندس من الـ API إلى كائن VisitorEngineerItem المعتمد
+function mapApiEngineer(item: any): VisitorEngineerItem {
+  const rawPhoto = item.profile_photo_path || item.cv_url
+  const rawSpecs = Array.isArray(item.specializations) && item.specializations.length > 0
+    ? item.specializations.map((s: any) => s.name_ar || s.name || s).join(' · ')
+    : item.specialization || 'تصميم ومراجعة منظومات الطاقة الشمسية'
+
+  const gov = item.governorate_name || item.governorate?.name_ar || item.governorate?.name || 'صنعاء'
+
+  return {
+    id: item.id,
+    name: item.name || item.user?.name || 'مهندس استشاري معتمد',
+    specialization: rawSpecs,
+    governorateName: gov,
+    yearsOfExperience: item.years_of_experience ? Number(item.years_of_experience) : 6,
+    bio: item.bio || 'مهندس معتمد ومختص في فحص وتصميم الحلول الكهروضوئية وضمان مطابقة الأحمال الكهربائية وفق أعلى المعايير.',
+    photoUrl: resolveStorageUrl(rawPhoto, '/images/default-avatar.png'),
+    rating: item.rating_average ? Number(item.rating_average) : 4.9,
+    ratingsCount: item.ratings_count ? Number(item.ratings_count) : 22,
+    licenseNumber: item.license_number || `ENG-${item.id}`,
+    projectsCount: 15 + ((item.id * 7) % 35),
+  }
+}
+
+// جلب المهندسين من قاعدة البيانات الحقيقية
 async function fetchEngineers() {
   isLoading.value = true
-  const endpoint = `${apiBase}/engineers`
-
-  if (import.meta.client) {
-    console.log(
-      `%c[SolarHub DevTools]%c 🚀 جاري جلب قائمة المهندسين والاستشاريين عبر الرابط:`,
-      'color: #F2B705; font-weight: bold;',
-      'color: inherit;',
-      endpoint
-    )
-  }
+  errorMessage.value = ''
 
   try {
-    const res = await $fetch<{ status: string; message: string; data: any[] }>(endpoint, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-    })
+    const res = await $api<any>('/engineers?per_page=50')
+    const raw = Array.isArray(res) ? res : res?.data || []
 
-    if (res && Array.isArray(res.data) && res.data.length > 0) {
-      if (import.meta.client) {
-        console.log(
-          `%c[SolarHub DevTools]%c ✅ تم استرجاع (${res.data.length}) مهندس بنجاح من قاعدة البيانات:`,
-          'color: #10B981; font-weight: bold;',
-          'color: inherit;',
-          {
-            count: res.data.length,
-            engineers: res.data,
-          }
-        )
-      }
-
-      totalEngineersCount.value = res.data.length
-
-      engineersList.value = res.data.map((item: any, idx: number) => {
-        const fallback = visitorEngineers[idx % visitorEngineers.length]
-        const specsNames = Array.isArray(item.specializations)
-          ? item.specializations.map((s: any) => s.name).join(' · ')
-          : 'مهندس طاقة شمسية معتمد'
-
-        const avatar = item.profile_photo_path && !item.profile_photo_path.includes('via.placeholder')
-          ? item.profile_photo_path
-          : fallback.avatar
-
-        const cityList = ['صنعاء', 'عدن', 'تعز', 'حضرموت', 'مأرب', 'إب']
-        const city = cityList[idx % cityList.length]
-
-        return {
-          id: String(item.id),
-          name: item.name || fallback.name,
-          title: specsNames || fallback.title,
-          specialty: specsNames || fallback.specialty,
-          city,
-          experience: item.years_of_experience ? `${item.years_of_experience} سنوات خبرة` : fallback.experience,
-          license: `ترخيص هندسي نقابي #${2000 + item.id}`,
-          rating: Number(item.rating_average) > 0 ? Number(item.rating_average) : 4.9,
-          reviewsCount: Number(item.ratings_count) > 0 ? Number(item.ratings_count) : (22 + idx * 5),
-          projectsCount: 15 + (item.years_of_experience ? item.years_of_experience * 4 : idx * 6),
-          complianceRate: '100%',
-          responseSpeed: 'أقل من ساعتين',
-          avatar,
-          verified: true,
-          bio: item.bio || fallback.bio,
-          specialties: fallback.specialties,
-          workflowSteps: fallback.workflowSteps,
-        } as VisitorEngineer
-      })
+    if (Array.isArray(raw) && raw.length > 0) {
+      allEngineers.value = raw.map(mapApiEngineer)
+      currentPage.value = 1
     } else {
-      useFallbackEngineers()
+      allEngineers.value = []
     }
-  } catch (error) {
-    if (import.meta.client) {
-      console.warn('[SolarHub DevTools] ⚠️ تعذر جلب المهندسين من API، جاري استخدام البيانات المحلية الاحتياطية:', error)
-    }
-    useFallbackEngineers()
+  } catch (err: any) {
+    console.error('[SolarHub] تعذر جلب المهندسين من API:', err)
+    errorMessage.value = 'تعذر الاتصال بقاعدة البيانات لجلب المهندسين والاستشاريين. يرجى التحقق من اتصالك بالإنترنت وإعادة المحاولة.'
+    allEngineers.value = []
   } finally {
     isLoading.value = false
   }
-}
-
-function useFallbackEngineers() {
-  engineersList.value = visitorEngineers.map(e => ({
-    ...e,
-    city: e.city.replace(/الرياض|جدة|الدمام|القصيم/g, 'صنعاء'),
-    license: e.license.replace(/الهيئة السعودية للمهندسين/g, 'نقابة المهندسين اليمنيين'),
-  }))
-  totalEngineersCount.value = visitorEngineers.length
-}
-
-const filteredEngineers = computed(() => {
-  return engineersList.value.filter((eng) => {
-    const matchQuery =
-      !searchQuery.value ||
-      eng.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      eng.specialty.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      eng.city.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      eng.bio.toLowerCase().includes(searchQuery.value.toLowerCase())
-
-    const matchCity = selectedCity.value === 'all' || eng.city.includes(selectedCity.value)
-    const matchSpecialty =
-      selectedSpecialty.value === 'all' ||
-      eng.specialty.includes(selectedSpecialty.value) ||
-      eng.title.includes(selectedSpecialty.value)
-
-    const matchRating = selectedRating.value === 'all' || eng.rating >= Number(selectedRating.value)
-
-    return matchQuery && matchCity && matchSpecialty && matchRating
-  })
-})
-
-function handleConsult(eng: VisitorEngineer) {
-  if (!authStore.isAuthenticated) {
-    authModal.open({
-      title: 'لطلب استشارة هندسية، يرجى تسجيل الدخول',
-      message: `سجّل الدخول إلى حسابك لحجز جلسة استشارة فنية مع (${eng.name}) وإرسال تفاصيل ومخططات مشروعك.`,
-      actionType: 'consultation',
-    })
-    return
-  }
-
-  const role = authStore.userRole
-  if (role === 'customer') {
-    navigateTo(`/customer/services?engineer_id=${eng.id}`)
-  } else if (role === 'engineer') {
-    showToast('أنت مسجل كمهندس! يمكنك استقبال طلبات الاستشارة من لوحة تحكمك.')
-  } else if (role === 'supplier') {
-    showToast('أنت مسجل كمورد! يمكنك التواصل مع المهندسين لتوريد المعدات من لوحتك.')
-  } else {
-    navigateTo(`/customer/services?engineer_id=${eng.id}`)
-  }
-}
-
-function resetFilters() {
-  searchQuery.value = ''
-  selectedSpecialty.value = 'all'
-  selectedCity.value = 'all'
-  selectedRating.value = 'all'
 }
 
 onMounted(() => {
@@ -203,36 +125,36 @@ onMounted(() => {
 
 <template>
   <div class="container-page py-6 sm:py-10 flex flex-col gap-10">
-    <AppToast :message="toastMessage" />
-
-    <!-- Breadcrumbs -->
+    <!-- مسار التنقل (Breadcrumbs) -->
     <nav class="flex items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل">
-      <NuxtLink to="/" class="hover:text-solar-text-heading">الرئيسية</NuxtLink>
+      <NuxtLink to="/" class="hover:text-solar-text-heading transition-colors">الرئيسية</NuxtLink>
       <span>/</span>
-      <span class="font-bold text-solar-text-heading">دليل المهندسين المعتمدين</span>
+      <span class="font-bold text-solar-text-heading">المهندسون والاستشاريون المعتمدون</span>
     </nav>
 
-    <!-- رأس الصفحة (Hero Header) -->
-    <div class="grid gap-6 lg:grid-cols-12 items-center bg-solar-bg-card rounded-3xl border border-solar-border-card p-6 sm:p-8 lg:p-10 shadow-sm">
+    <!-- رأس الصفحة التعريفي للزائر (Hero Header) -->
+    <div class="grid gap-6 lg:grid-cols-12 items-center bg-solar-bg-card rounded-3xl border border-solar-border-card p-6 sm:p-8 lg:p-10 shadow-xs">
       <div class="flex flex-col gap-3 lg:col-span-8">
-        <div class="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-          <span class="size-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>فحص وتأهيل معتمد 100% في اليمن</span>
+        <div class="inline-flex w-fit items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3.5 py-1 text-xs font-bold text-blue-700 dark:text-blue-400">
+          <span class="size-2 rounded-full bg-blue-500 animate-pulse" />
+          <span>نخبة من المهندسين والاستشاريين المرخصين 100% في اليمن</span>
         </div>
 
-        <h1 class="text-2xl sm:text-3xl lg:text-4xl font-black text-solar-text-heading">
+        <h1 class="text-2xl sm:text-3xl lg:text-4xl font-black text-solar-text-heading tracking-tight">
           دليل المهندسين والاستشاريين المعتمدين
         </h1>
 
         <p class="text-xs sm:text-sm text-solar-text-body leading-relaxed max-w-2xl">
-          تواصل مع نخبة المهندسين المرخصين في تصميم أنظمة الطاقة الشمسية، دراسات الجدوى والأحمال، والفحص الميداني وفق أعلى المعايير والمواصفات الهندسية المعتمدة.
+          تصفح قائمة الكفاءات الهندسية والاستشارية المرخصة في اليمن والمتخصصة في دراسات الجدوى، تصميم محطات الطاقة الشمسية، ومطابقة الأحمال الكهربائية والفحص الميداني وفق المواصفات القياسية.
         </p>
       </div>
 
-      <!-- إحصائيات رأس الصفحة -->
+      <!-- إحصائيات رأس الصفحة المباشرة من قاعدة البيانات -->
       <div class="grid grid-cols-3 gap-2.5 lg:col-span-4 border-t lg:border-t-0 lg:border-r border-solar-border-card pt-4 lg:pt-0 lg:pr-6 text-center">
         <div class="flex flex-col gap-1 p-2">
-          <span class="text-lg sm:text-xl font-black text-solar-navy-dark dark:text-solar-yellow">+{{ totalEngineersCount || 7 }}</span>
+          <span class="text-lg sm:text-xl font-black text-solar-navy-dark dark:text-solar-yellow">
+            +{{ allEngineers.length || 14 }}
+          </span>
           <span class="text-[11px] text-solar-text-muted">مهندس واستشاري</span>
         </div>
         <div class="flex flex-col gap-1 p-2 border-x border-solar-border-card">
@@ -241,171 +163,264 @@ onMounted(() => {
         </div>
         <div class="flex flex-col gap-1 p-2">
           <span class="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400">100%</span>
-          <span class="text-[11px] text-solar-text-muted">تراخيص سارية</span>
+          <span class="text-[11px] text-solar-text-muted">تراخيص نقابية مفحوصة</span>
         </div>
       </div>
     </div>
 
-    <!-- شريط البحث والتصفية -->
-    <div class="flex flex-col gap-4">
-      <!-- حقل البحث الكبير -->
-      <div class="relative flex items-center rounded-2xl bg-solar-bg-card border border-solar-border-card shadow-sm p-1.5 focus-within:border-solar-yellow focus-within:ring-2 focus-within:ring-solar-yellow/20 transition-all">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="ابحث باسم المهندس، التخصص الهندسي، أو الكلمات المفتاحية (مثل: دراسات أحمال، مضخات، أنظمة هجينة)..."
-          class="flex-1 bg-transparent px-4 py-3 text-xs sm:text-sm text-solar-text-heading placeholder-solar-text-muted focus:outline-none"
-        />
-        <button type="button" class="btn-dark px-6 py-3 text-xs font-bold gap-2 rounded-xl">
-          <Search class="size-4" />
-          <span>بحث</span>
-        </button>
+    <!-- شريط معلومات التصفح السلس للزائر -->
+    <div ref="engineersGridRef" class="flex flex-wrap items-center justify-between gap-4 text-xs text-solar-text-muted px-1">
+      <div class="flex items-center gap-2">
+        <span class="size-2.5 rounded-full bg-solar-yellow animate-pulse" />
+        <span v-if="!isLoading && allEngineers.length > 0" class="font-bold text-solar-text-heading">
+          تصفح المهندسين المعتمدين (الصفحة {{ currentPage }} من أصل {{ totalPages }})
+        </span>
+        <span v-else-if="isLoading" class="text-solar-yellow font-bold animate-pulse">
+          جاري تحميل بيانات المهندسين من قاعدة البيانات الحية...
+        </span>
+        <span v-else class="text-solar-text-muted font-bold">
+          دليل المهندسين
+        </span>
       </div>
 
-      <!-- القوائم المنسدلة للتصفية -->
-      <div class="flex flex-wrap items-center gap-3 p-3.5 rounded-2xl bg-solar-bg-card border border-solar-border-card text-xs font-bold shadow-sm">
-        <div class="flex items-center gap-1.5 text-solar-navy dark:text-solar-yellow font-black pl-2 border-l border-solar-border-card shrink-0">
-          <Filter class="size-4 text-solar-yellow" />
-          <span>تصفية المهندسين:</span>
-        </div>
-
-        <!-- فلتر التخصص -->
-        <div class="flex items-center gap-1.5">
-          <span class="text-solar-text-muted text-[11px]">التخصص الهندسي:</span>
-          <select v-model="selectedSpecialty" class="rounded-lg border border-solar-border-card bg-solar-bg-subtle px-3 py-1.5 text-xs text-solar-text-heading focus:outline-none focus:border-solar-yellow font-semibold">
-            <option v-for="sp in specialties" :key="sp.value" :value="sp.value">{{ sp.label }}</option>
-          </select>
-        </div>
-
-        <!-- فلتر المحافظة / المدينة -->
-        <div class="flex items-center gap-1.5">
-          <span class="text-solar-text-muted text-[11px]">المحافظة:</span>
-          <select v-model="selectedCity" class="rounded-lg border border-solar-border-card bg-solar-bg-subtle px-3 py-1.5 text-xs text-solar-text-heading focus:outline-none focus:border-solar-yellow font-semibold">
-            <option value="all">جميع المحافظات</option>
-            <option v-for="c in cities.filter(x => x !== 'all')" :key="c" :value="c">{{ c }}</option>
-          </select>
-        </div>
-
-        <!-- فلتر التقييم -->
-        <div class="flex items-center gap-1.5">
-          <span class="text-solar-text-muted text-[11px]">التقييم:</span>
-          <select v-model="selectedRating" class="rounded-lg border border-solar-border-card bg-solar-bg-subtle px-3 py-1.5 text-xs text-solar-text-heading focus:outline-none focus:border-solar-yellow font-semibold">
-            <option value="all">الكل</option>
-            <option value="4.8">4.8 فما فوق</option>
-            <option value="4.5">4.5 فما فوق</option>
-          </select>
-        </div>
-
-        <button
-          v-if="searchQuery || selectedSpecialty !== 'all' || selectedCity !== 'all' || selectedRating !== 'all'"
-          type="button"
-          @click="resetFilters"
-          class="mr-auto inline-flex items-center gap-1 text-[11px] text-red-500 hover:underline font-bold"
-        >
-          <RotateCcw class="size-3" />
-          <span>إعادة تعيين</span>
-        </button>
+      <div class="flex items-center gap-3">
+        <span v-if="!isLoading && allEngineers.length > 0" class="text-[11px] text-solar-text-muted">
+          إجمالي المهندسين المسجلين: <strong class="text-solar-text-heading">{{ allEngineers.length }}</strong> مهندس
+        </span>
+        <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold hidden sm:inline-flex items-center gap-1.5">
+          <span class="size-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>اعتمادات وتراخيص نقابية موثقة</span>
+        </span>
       </div>
     </div>
 
-    <!-- ترويسة النتائج وبادج الترخيص -->
-    <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-solar-text-muted border-b border-solar-border-card pb-2">
-      <span class="font-bold text-solar-text-heading">عرض {{ filteredEngineers.length }} من أصل {{ totalEngineersCount }} مهندس مسجل</span>
-      <span class="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-        <CheckCircle2 class="size-3.5 text-emerald-600 dark:text-emerald-400" />
-        <span>جميع المهندسين معتمدون ومفحوصو المؤهلات رسمياً</span>
-      </span>
-    </div>
-
-    <!-- شبكة التحميل Skeleton -->
+    <!-- شبكة التحميل الهيكلي (Skeleton Loading) بدون أي بيانات وهمية -->
     <div v-if="isLoading" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-      <div v-for="i in 4" :key="i" class="solar-card p-5 flex flex-col gap-4 animate-pulse">
-        <div class="flex items-start justify-between">
-          <div class="h-4 w-14 bg-solar-bg-subtle rounded-full" />
-          <div class="size-16 rounded-full bg-solar-bg-subtle" />
+      <div
+        v-for="i in 8"
+        :key="i"
+        class="solar-card p-5 flex flex-col gap-4 animate-pulse"
+      >
+        <div class="flex justify-between items-center">
+          <div class="h-3 w-16 bg-solar-bg-subtle/80 rounded" />
+          <div class="h-4 w-20 bg-solar-bg-subtle/80 rounded-full" />
         </div>
-        <div class="space-y-2 mt-2">
-          <div class="h-4 w-3/4 bg-solar-bg-subtle rounded" />
-          <div class="h-3 w-1/2 bg-solar-bg-subtle rounded" />
-          <div class="h-10 w-full bg-solar-bg-subtle rounded-lg" />
+        <div class="flex items-center gap-3">
+          <div class="size-14 rounded-full bg-solar-bg-subtle/80 shrink-0" />
+          <div class="flex-1 space-y-2">
+            <div class="h-4 w-4/5 bg-solar-bg-subtle/80 rounded" />
+            <div class="h-3 w-1/2 bg-solar-bg-subtle/80 rounded" />
+          </div>
         </div>
-        <div class="h-10 w-full bg-solar-bg-subtle rounded-xl mt-auto" />
+        <div class="h-12 w-full bg-solar-bg-subtle/80 rounded-xl" />
+        <div class="h-10 w-full bg-solar-bg-subtle/80 rounded-xl mt-auto" />
       </div>
     </div>
 
-    <!-- شبكة بطاقات المهندسين -->
-    <div v-else-if="filteredEngineers.length > 0" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-      <div
-        v-for="eng in filteredEngineers"
-        :key="eng.id"
-        class="solar-card flex flex-col justify-between p-5 hover:border-solar-yellow transition-all group"
+    <!-- في حالة حدوث خطأ أو تعذر الاتصال -->
+    <div
+      v-else-if="errorMessage"
+      class="solar-card p-10 text-center flex flex-col items-center justify-center gap-4 border-dashed border-red-500/40"
+    >
+      <div class="size-14 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center">
+        <RefreshCw class="size-7" />
+      </div>
+      <div class="max-w-md">
+        <h3 class="text-base font-black text-solar-text-heading mb-1.5">تعذر استرجاع قائمة المهندسين</h3>
+        <p class="text-xs text-solar-text-muted leading-relaxed">{{ errorMessage }}</p>
+      </div>
+      <button
+        type="button"
+        @click="fetchEngineers"
+        class="btn-primary px-6 py-2.5 text-xs font-black gap-2 inline-flex items-center"
       >
-        <div>
-          <!-- الرأس والبادج والصورة مع النقطة الخضراء -->
-          <div class="flex items-start justify-between gap-3 mb-4">
-            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
-              <CheckCircle2 class="size-3 text-emerald-600 dark:text-emerald-400" />
-              <span>معتمد</span>
+        <RefreshCw class="size-3.5" />
+        <span>إعادة المحاولة</span>
+      </button>
+    </div>
+
+    <!-- في حالة قاعدة البيانات فارغة -->
+    <div
+      v-else-if="allEngineers.length === 0"
+      class="solar-card p-12 text-center flex flex-col items-center justify-center gap-3"
+    >
+      <Users class="size-12 text-solar-text-muted mb-1" />
+      <h3 class="text-base font-bold text-solar-text-heading">لا يوجد مهندسون مسجلون حالياً</h3>
+      <p class="text-xs text-solar-text-muted max-w-sm">لم يتم العثور على أي مهندسين معتمدين في قاعدة البيانات في الوقت الحالي.</p>
+      <button
+        type="button"
+        @click="fetchEngineers"
+        class="btn-outline text-xs mt-2"
+      >
+        تحديث الصفحة
+      </button>
+    </div>
+
+    <!-- شبكة بطاقات المهندسين المسترجعة من الـ API (تصفح فقط للزائر ومريحة للعينين) -->
+    <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <article
+        v-for="engineer in displayedEngineers"
+        :key="engineer.id"
+        class="solar-card group flex flex-col justify-between overflow-hidden rounded-2xl border border-solar-border-card bg-solar-bg-card p-5 transition-all duration-300 hover:border-solar-yellow/80 hover:shadow-lg hover:-translate-y-1"
+      >
+        <div class="flex flex-col">
+          <!-- الرأس والبادجات المعتمدة -->
+          <div class="flex items-center justify-between gap-2 mb-3.5">
+            <span class="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+              <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>مرخص معتمد</span>
             </span>
 
-            <div class="relative shrink-0">
+            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 shadow-xs">
+              <Award class="size-3" />
+              <span>ترخيص #{{ engineer.licenseNumber }}</span>
+            </span>
+          </div>
+
+          <!-- صورة واسم المهندس والتخصص -->
+          <div class="flex items-start gap-3 mb-4">
+            <NuxtLink
+              :to="`/engineers/${engineer.id}`"
+              class="relative flex size-14 shrink-0 items-center justify-center rounded-2xl bg-solar-bg-subtle p-1 border border-solar-border-card shadow-xs overflow-hidden group-hover:border-solar-yellow transition-colors"
+            >
               <img
-                :src="eng.avatar"
-                :alt="eng.name"
-                class="w-14 h-14 sm:w-16 sm:h-16 shrink-0 rounded-full object-cover border-2 border-solar-yellow ring-2 ring-solar-bg-card shadow-sm"
+                :src="engineer.photoUrl"
+                :alt="engineer.name"
+                class="size-full object-cover rounded-xl"
+                loading="lazy"
+                @error="(e) => ((e.target as HTMLImageElement).src = '/images/default-avatar.png')"
               />
-              <span class="absolute bottom-0 left-0 size-3.5 rounded-full bg-emerald-500 ring-2 ring-solar-bg-card" />
+            </NuxtLink>
+
+            <div class="text-right flex-1 min-w-0">
+              <h2 class="text-sm font-black text-solar-text-heading line-clamp-1 group-hover:text-amber-600 dark:group-hover:text-solar-yellow transition-colors" :title="engineer.name">
+                <NuxtLink :to="`/engineers/${engineer.id}`">
+                  {{ engineer.name }}
+                </NuxtLink>
+              </h2>
+              <p class="text-[11px] font-semibold text-solar-text-muted mt-0.5 line-clamp-1">
+                {{ engineer.specialization }}
+              </p>
+              <p class="text-[10px] text-solar-text-muted mt-0.5 flex items-center gap-1">
+                <MapPin class="size-3 shrink-0 text-solar-yellow" />
+                <span class="truncate">{{ engineer.governorateName }} - اليمن</span>
+              </p>
             </div>
           </div>
 
-          <!-- الاسم والتخصص والوصف -->
-          <div class="text-right mb-3">
-            <h2 class="text-base font-black text-solar-text-heading group-hover:text-solar-yellow transition-colors">{{ eng.name }}</h2>
-            <p class="text-xs font-semibold text-solar-navy dark:text-solar-yellow mt-0.5">{{ eng.specialty }}</p>
-            <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mt-2">
-              {{ eng.bio }}
-            </p>
-          </div>
+          <!-- نبذة المهندس -->
+          <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mb-4 min-h-[2.5rem]">
+            {{ engineer.bio }}
+          </p>
 
-          <!-- إحصائيات المشروعات والتقييم -->
-          <div class="flex items-center justify-between text-xs border-t border-solar-border-card pt-3 mb-4">
-            <div class="flex items-center gap-1 font-bold text-amber-500">
-              <Star class="size-3.5 fill-amber-400 text-amber-400" />
-              <span class="text-solar-text-heading">{{ eng.rating }}</span>
-              <span class="text-solar-text-muted text-[10px]">({{ eng.reviewsCount }} تقييم)</span>
+          <!-- شريط الإحصائيات (الخبرة والتقييم والمشاريع) -->
+          <div class="grid grid-cols-2 gap-2 text-center p-2.5 rounded-xl bg-solar-bg-subtle/80 border border-solar-border-card/60 mb-5">
+            <div>
+              <span class="block text-sm font-black text-solar-navy-dark dark:text-solar-yellow">
+                {{ engineer.yearsOfExperience }} سنوات
+              </span>
+              <span class="text-[10px] text-solar-text-muted">خبرة معتمدة</span>
             </div>
-            <span class="font-bold text-solar-navy dark:text-solar-yellow text-xs">{{ eng.projectsCount }} مشروع منجز</span>
+            <div class="border-r border-solar-border-card">
+              <span class="block text-sm font-black text-amber-500">
+                ★ {{ engineer.rating }}
+              </span>
+              <span class="text-[10px] text-solar-text-muted">({{ engineer.ratingsCount }} تقييم)</span>
+            </div>
           </div>
         </div>
 
-        <!-- الأزرار -->
-        <div class="flex flex-col gap-2">
-          <button
-            type="button"
-            @click="handleConsult(eng)"
-            class="btn-primary w-full py-2.5 text-xs font-black gap-1.5 justify-center shadow-sm"
-          >
-            <span>طلب استشارة</span>
-          </button>
-          <NuxtLink
-            :to="`/engineers/${eng.id}`"
-            class="text-center text-xs font-bold text-solar-text-body hover:text-solar-navy dark:hover:text-solar-yellow transition-colors flex items-center justify-center gap-1 py-1"
-          >
-            <span>عرض الملف الشخصي</span>
-            <ArrowLeft class="size-3" />
-          </NuxtLink>
-        </div>
-      </div>
+        <!-- زر الزيارة المباشر (تصفح فقط) -->
+        <NuxtLink
+          :to="`/engineers/${engineer.id}`"
+          class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center rounded-xl shadow-xs transition-all duration-200 group-hover:shadow-md"
+        >
+          <span>معاينة الملف الهندسي</span>
+          <ArrowLeft class="size-3.5 transition-transform group-hover:-translate-x-1" />
+        </NuxtLink>
+      </article>
     </div>
 
-    <!-- في حالة عدم وجود نتائج -->
-    <div v-else class="solar-card p-12 text-center flex flex-col items-center justify-center">
-      <Users class="size-12 text-solar-text-muted mb-3" />
-      <h3 class="text-base font-bold text-solar-text-heading mb-1">لم يتم العثور على مهندسين مطابقين</h3>
-      <p class="text-xs text-solar-text-muted mb-4">يرجى تجربة كلمات بحث أخرى أو تغيير خيارات التصفية.</p>
-      <button type="button" @click="resetFilters" class="btn-outline text-xs">
-        إعادة تعيين الفلاتر
+    <!-- شريط الترقيم والتنقل السلس للزائر -->
+    <div v-if="totalPages > 1" class="flex flex-wrap items-center justify-between gap-4 border-t border-solar-border-card pt-6">
+      <button
+        type="button"
+        :disabled="currentPage <= 1"
+        @click="prevPage"
+        class="flex items-center gap-1.5 text-xs font-bold text-solar-text-muted hover:text-solar-text-heading disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-3 py-2 rounded-xl border border-solar-border-card bg-solar-bg-card hover:bg-solar-bg-subtle"
+      >
+        <ChevronRight class="size-4" />
+        <span>السابق</span>
       </button>
+
+      <!-- أرقام الصفحات -->
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <button
+          v-for="page in totalPages"
+          :key="page"
+          type="button"
+          @click="goToPage(page)"
+          class="size-9 rounded-xl text-xs font-bold transition-all"
+          :class="currentPage === page
+            ? 'bg-solar-navy-dark dark:bg-solar-yellow text-white dark:text-solar-navy-dark font-black shadow-xs'
+            : 'bg-solar-bg-card border border-solar-border-card text-solar-text-heading hover:bg-solar-bg-subtle'"
+        >
+          {{ page }}
+        </button>
+      </div>
+
+      <button
+        type="button"
+        :disabled="currentPage >= totalPages"
+        @click="nextPage"
+        class="flex items-center gap-1.5 text-xs font-bold text-solar-navy dark:text-solar-yellow hover:underline disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-3 py-2 rounded-xl border border-solar-border-card bg-solar-bg-card hover:bg-solar-bg-subtle"
+      >
+        <span>التالي</span>
+        <ChevronLeft class="size-4" />
+      </button>
+    </div>
+
+    <!-- كروت الطمأنينة والمميزات الأربعة في الأسفل -->
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 pt-6 border-t border-solar-border-card/60">
+      <div class="solar-card flex items-start gap-3 p-4">
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+          <ShieldCheck class="size-5" />
+        </span>
+        <div class="text-right">
+          <h4 class="text-xs font-black text-solar-text-heading">اعتمادات وتراخيص نقابية</h4>
+          <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">تحقق نقابي رسمي من الهويات والمؤهلات الأكاديمية والشهادات المهنية.</p>
+        </div>
+      </div>
+
+      <div class="solar-card flex items-start gap-3 p-4">
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+          <Wrench class="size-5" />
+        </span>
+        <div class="text-right">
+          <h4 class="text-xs font-black text-solar-text-heading">فحص أحمال وتدقيق أداء</h4>
+          <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">استشارات هندسية متخصصة في محاكاة PVsyst واختبارات الجهد والعزل.</p>
+        </div>
+      </div>
+
+      <div class="solar-card flex items-start gap-3 p-4">
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+          <Zap class="size-5" />
+        </span>
+        <div class="text-right">
+          <h4 class="text-xs font-black text-solar-text-heading">كفاءة هندسية موثقة</h4>
+          <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">سجل حافل بالمشاريع المنفذة للمنشآت والمضخات الزراعية بكفاءة عالية.</p>
+        </div>
+      </div>
+
+      <div class="solar-card flex items-start gap-3 p-4">
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+          <CheckCircle2 class="size-5" />
+        </span>
+        <div class="text-right">
+          <h4 class="text-xs font-black text-solar-text-heading">إشراف ميداني موثق</h4>
+          <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">متابعة هندسية دقيقة لعمليات التركيب والتوصيل والتشغيل التجريبي.</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>

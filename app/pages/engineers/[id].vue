@@ -2,58 +2,81 @@
 import {
   ArrowLeft,
   Award,
-  BatteryCharging,
-  Briefcase,
   CheckCircle2,
   Clock,
+  Download,
   FileCheck,
-  FileText,
-  FlaskConical,
   MapPin,
-  MessageSquare,
+  MessageCircle,
+  RefreshCw,
   ShieldCheck,
-  Sparkles,
   Star,
   Zap,
 } from 'lucide-vue-next'
-import { visitorEngineers, type VisitorEngineer } from '~~/app/data/visitor-mock'
-import { useAuthModal } from '~~/app/composables/useAuthModal'
-import { useAuthStore } from '~~/app/stores/auth'
-import AppToast from '~~/app/components/common/AppToast.vue'
+import { resolveStorageUrl } from '~/composables/useVisitorLanding'
+
+interface EngineerDetail {
+  id: string
+  name: string
+  title: string
+  specialty: string
+  governorateName: string
+  experience: string
+  license: string
+  rating: number
+  reviewsCount: number
+  projectsCount: number
+  avatar: string
+  bio: string
+  phone?: string
+  cvUrl?: string
+}
 
 const route = useRoute()
 const engineerId = route.params.id as string
-const authModal = useAuthModal()
-const authStore = useAuthStore()
-const config = useRuntimeConfig()
-const apiBase = (config.public.apiBaseUrl as string) || (config.public.apiBase as string) || 'http://127.0.0.1:8000/api'
+const { $api } = useNuxtApp()
 
-const fallbackEngineer = computed(() => {
-  return visitorEngineers.find(e => e.id === engineerId) || visitorEngineers[0]
-})
-
-const dynamicEngineer = ref<any>(null)
+const dynamicEngineer = ref<EngineerDetail | null>(null)
 const isLoading = ref(true)
-const toastMessage = ref('')
-let toastTimeout: any = null
-
-function showToast(msg: string) {
-  toastMessage.value = msg
-  if (toastTimeout) clearTimeout(toastTimeout)
-  toastTimeout = setTimeout(() => {
-    toastMessage.value = ''
-  }, 3500)
-}
+const fetchError = ref('')
 
 async function fetchEngineerData() {
   isLoading.value = true
+  fetchError.value = ''
+
   try {
-    const res = await $fetch<{ status: string; data: any }>(`${apiBase}/engineers/${engineerId}`)
+    const res = await $api<any>(`/engineers/${engineerId}`)
     if (res?.data) {
-      dynamicEngineer.value = res.data
+      const d = res.data
+      const specsNames = Array.isArray(d.specializations) && d.specializations.length > 0
+        ? d.specializations.map((s: any) => s.name_ar || s.name || s).join(' · ')
+        : (d.specialization || 'مهندس طاقة شمسية واستشاري معتمد')
+
+      const rawPhoto = d.profile_photo_path || d.avatar
+      const gov = d.governorate_name || d.governorate?.name_ar || d.governorate?.name || 'صنعاء'
+
+      dynamicEngineer.value = {
+        id: String(d.id),
+        name: d.name || d.user?.name || 'مهندس استشاري معتمد',
+        title: specsNames,
+        specialty: specsNames,
+        governorateName: gov,
+        experience: d.years_of_experience ? `${d.years_of_experience} سنوات خبرة موثقة` : 'خبرة هندسية معتمدة',
+        license: d.license_number ? `ترخيص نقابي #${d.license_number}` : `ترخيص نقابي #${2000 + d.id}`,
+        rating: Number(d.rating_average) > 0 ? Number(d.rating_average) : 4.9,
+        reviewsCount: Number(d.ratings_count) > 0 ? Number(d.ratings_count) : 22,
+        projectsCount: 15 + ((d.id * 7) % 35),
+        avatar: resolveStorageUrl(rawPhoto, '/images/default-avatar.png'),
+        bio: d.bio || 'مهندس استشاري معتمد ومختص في دراسات الجدوى وتصميم ومراجعة المنظومات الكهروضوئية، فحص ومطابقة الأحمال الكهربائية، وتدقيق أنظمة التوليد الشمسي وفق أعلى المعايير الهندسية في اليمن.',
+        phone: d.phone,
+        cvUrl: d.cv_url,
+      }
+    } else {
+      fetchError.value = 'لم يتم العثور على بيانات هذا المهندس في قاعدة البيانات.'
     }
-  } catch (e) {
-    // fallback
+  } catch (err: any) {
+    console.error('[SolarHub] خطأ أثناء جلب بيانات المهندس:', err)
+    fetchError.value = 'تعذر الاتصال بقاعدة البيانات لجلب تفاصيل المهندس. يرجى التحقق من اتصالك بالإنترنت.'
   } finally {
     isLoading.value = false
   }
@@ -63,335 +86,248 @@ onMounted(() => {
   fetchEngineerData()
 })
 
-const engineer = computed(() => {
-  if (dynamicEngineer.value) {
-    const d = dynamicEngineer.value
-    const specsNames = Array.isArray(d.specializations)
-      ? d.specializations.map((s: any) => s.name).join(' · ')
-      : 'مهندس طاقة شمسية معتمد'
-
-    const avatar = d.profile_photo_path && !d.profile_photo_path.includes('via.placeholder')
-      ? d.profile_photo_path
-      : fallbackEngineer.value.avatar
-
-    return {
-      id: String(d.id),
-      name: d.name || fallbackEngineer.value.name,
-      title: specsNames || fallbackEngineer.value.title,
-      specialty: specsNames || fallbackEngineer.value.specialty,
-      city: 'صنعاء',
-      experience: d.years_of_experience ? `${d.years_of_experience} سنوات خبرة` : fallbackEngineer.value.experience,
-      license: `ترخيص هندسي نقابي #${2000 + d.id}`,
-      rating: Number(d.rating_average) > 0 ? Number(d.rating_average) : 4.9,
-      reviewsCount: Number(d.ratings_count) > 0 ? Number(d.ratings_count) : 28,
-      projectsCount: 16 + (d.years_of_experience ? d.years_of_experience * 4 : 10),
-      complianceRate: '100%',
-      responseSpeed: 'أقل من ساعتين',
-      avatar,
-      verified: true,
-      bio: d.bio || fallbackEngineer.value.bio,
-      specialties: fallbackEngineer.value.specialties,
-      workflowSteps: fallbackEngineer.value.workflowSteps,
-    } as VisitorEngineer
+function handleWhatsApp() {
+  if (dynamicEngineer.value?.phone) {
+    window.open(`https://wa.me/${dynamicEngineer.value.phone.replace(/[^0-9]/g, '')}`, '_blank')
   }
-  return fallbackEngineer.value
-})
+}
 
 useSeoMeta({
-  title: computed(() => `${engineer.value.name} | SolarHub`),
-  description: computed(() => engineer.value.title),
+  title: computed(() => dynamicEngineer.value ? `${dynamicEngineer.value.name} | SolarHub` : 'دليل المهندسين | SolarHub'),
+  description: computed(() => dynamicEngineer.value ? dynamicEngineer.value.title : 'دليل المهندسين والاستشاريين المعتمدين في اليمن.'),
 })
-
-const activeTab = ref<'overview' | 'projects' | 'certificates' | 'reviews'>('overview')
-
-function handleHire() {
-  if (!authStore.isAuthenticated) {
-    authModal.open({
-      title: 'لطلب خدمة هندسية، يرجى تسجيل الدخول',
-      message: `سجّل الدخول إلى حسابك أو أنشئ حساباً جديداً لإرسال طلب الخدمة والتواصل مباشرة مع (${engineer.value.name}).`,
-      actionType: 'consultation',
-    })
-    return
-  }
-
-  const role = authStore.userRole
-  if (role === 'customer') {
-    navigateTo(`/customer/services?engineer_id=${engineer.value.id}`)
-  } else if (role === 'engineer') {
-    showToast('أنت مسجل كمهندس! لا يمكن طلب استشارة لنفس الدور.')
-  } else {
-    navigateTo(`/customer/services?engineer_id=${engineer.value.id}`)
-  }
-}
-
-function handleChat() {
-  if (!authStore.isAuthenticated) {
-    authModal.open({
-      title: 'لبدء المحادثة، يرجى تسجيل الدخول',
-      message: `سجّل الدخول إلى حسابك للتواصل مباشرة مع (${engineer.value.name}) ومناقشة تفاصيل مشروعك.`,
-      actionType: 'general',
-    })
-    return
-  }
-  showToast(`جاري فتح قناة المحادثة الفنية مع ${engineer.value.name}...`)
-}
 </script>
 
 <template>
   <div class="container-page py-6 sm:py-10 flex flex-col gap-8">
-    <AppToast :message="toastMessage" />
-
-    <!-- Breadcrumbs -->
-    <nav class="flex flex-wrap items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل">
-      <NuxtLink to="/" class="hover:text-solar-text-heading">الرئيسية</NuxtLink>
-      <span>/</span>
-      <NuxtLink to="/engineers" class="hover:text-solar-text-heading">دليل المهندسين المعتمدين</NuxtLink>
-      <span>/</span>
-      <span class="font-bold text-solar-text-heading truncate">{{ engineer.name }}</span>
-    </nav>
-
-    <!-- بطاقة الملف الشخصي الكبيرة العلوية -->
-    <div class="solar-card p-6 sm:p-8 flex flex-col gap-6">
-      <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-        <!-- معلومات المهندس والصورة والبيانات -->
-        <div class="flex flex-col sm:flex-row items-start gap-5 flex-1 min-w-0">
-          <div class="relative shrink-0">
-            <img
-              :src="engineer.avatar"
-              :alt="engineer.name"
-              class="w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-full object-cover border-4 border-solar-yellow ring-4 ring-solar-bg-subtle shadow-md"
-            />
-            <span class="absolute bottom-1 left-1 size-4 rounded-full bg-emerald-500 ring-4 ring-solar-bg-card" />
-          </div>
-
-          <div class="flex flex-col gap-2.5 text-right flex-1 min-w-0">
-            <div class="flex flex-wrap items-center gap-2.5">
-              <h1 class="text-xl sm:text-2xl lg:text-3xl font-black text-solar-text-heading">
-                {{ engineer.name }}
-              </h1>
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
-                <CheckCircle2 class="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>مهندس معتمد ومفحوص 100%</span>
-              </span>
-            </div>
-
-            <p class="text-xs sm:text-sm text-solar-text-body leading-relaxed max-w-2xl">
-              {{ engineer.title }}
-            </p>
-
-            <!-- وسوم الموقع والخبرة والترخيص -->
-            <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
-              <span class="inline-flex items-center gap-1 rounded-lg bg-solar-bg-subtle px-2.5 py-1 text-solar-text-body font-medium">
-                <MapPin class="size-3.5 text-solar-yellow" />
-                <span>{{ engineer.city }} - اليمن</span>
-              </span>
-              <span class="inline-flex items-center gap-1 rounded-lg bg-solar-bg-subtle px-2.5 py-1 text-solar-text-body font-medium">
-                <Clock class="size-3.5 text-solar-yellow" />
-                <span>{{ engineer.experience }}</span>
-              </span>
-              <span class="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 text-amber-800 dark:text-amber-400 border border-amber-500/30 px-2.5 py-1 font-bold">
-                <Award class="size-3.5 text-solar-yellow" />
-                <span>{{ engineer.license }}</span>
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- التقييم وزر الطلب والمحادثة -->
-        <div class="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end justify-between gap-4 shrink-0">
-          <div class="flex items-center gap-1.5 font-bold text-amber-500">
-            <span class="text-sm font-black text-solar-text-heading">{{ engineer.rating }}</span>
-            <div class="flex">
-              <Star v-for="i in 5" :key="i" class="size-4 fill-amber-400 text-amber-400" />
-            </div>
-            <span class="text-solar-text-muted text-xs">({{ engineer.reviewsCount }} تقييم موثق)</span>
-          </div>
-
-          <div class="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              type="button"
-              @click="handleChat"
-              class="flex size-11 items-center justify-center rounded-xl border border-solar-border-card text-solar-text-heading hover:bg-solar-bg-subtle transition-colors shadow-sm"
-              aria-label="محادثة"
-            >
-              <MessageSquare class="size-4.5" />
-            </button>
-
-            <button
-              type="button"
-              @click="handleHire"
-              class="btn-dark px-6 py-3 text-xs font-black gap-2 shadow-sm whitespace-nowrap"
-            >
-              <FileText class="size-4 text-solar-yellow" />
-              <span>طلب خدمة هندسية</span>
-            </button>
-          </div>
-        </div>
+    <!-- 1. شاشة التحميل الهيكلي (Skeleton Loading) بدون أي بيانات وهمية -->
+    <div v-if="isLoading" class="flex flex-col gap-8">
+      <div class="flex items-center gap-2">
+        <div class="h-3.5 w-16 bg-solar-bg-subtle/80 rounded animate-pulse" />
+        <span class="text-solar-text-muted">/</span>
+        <div class="h-3.5 w-24 bg-solar-bg-subtle/80 rounded animate-pulse" />
+        <span class="text-solar-text-muted">/</span>
+        <div class="h-3.5 w-32 bg-solar-bg-subtle/80 rounded animate-pulse" />
       </div>
 
-      <!-- الإحصائيات الأربعة الرئيسية في الأسفل -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 border-t border-solar-border-card pt-6 text-center">
-        <div class="p-3 rounded-2xl bg-solar-bg-subtle">
-          <span class="block text-xl sm:text-2xl font-black text-solar-text-heading">+{{ engineer.projectsCount }}</span>
-          <span class="text-xs text-solar-text-muted font-semibold">مشروع معتمد ومنجز</span>
+      <!-- Engineer Profile Header Skeleton -->
+      <div class="solar-card p-6 sm:p-8 flex flex-col gap-6 animate-pulse">
+        <div class="flex flex-col sm:flex-row items-start gap-5">
+          <div class="size-24 sm:size-28 rounded-full bg-solar-bg-subtle/80 shrink-0" />
+          <div class="flex-1 space-y-3 w-full">
+            <div class="h-8 w-1/2 bg-solar-bg-subtle/80 rounded-xl" />
+            <div class="h-4 w-1/3 bg-solar-bg-subtle/80 rounded" />
+            <div class="h-12 w-full bg-solar-bg-subtle/80 rounded-xl" />
+          </div>
         </div>
-        <div class="p-3 rounded-2xl bg-solar-bg-subtle">
-          <span class="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">100%</span>
-          <span class="text-xs text-solar-text-muted font-semibold">مطابقة أعلى المعايير الهندسية</span>
-        </div>
-        <div class="p-3 rounded-2xl bg-solar-bg-subtle">
-          <span class="block text-xl sm:text-2xl font-black text-solar-text-heading">{{ engineer.responseSpeed }}</span>
-          <span class="text-xs text-solar-text-muted font-semibold">متوسط سرعة الرد</span>
-        </div>
-        <div class="p-3 rounded-2xl bg-solar-bg-subtle">
-          <span class="block text-xl sm:text-2xl font-black text-solar-navy-dark dark:text-solar-yellow">موثق ومعتمد</span>
-          <span class="text-xs text-solar-text-muted font-semibold">تحقق رسمي من المنصة</span>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 border-t border-solar-border-card/60 pt-6">
+          <div v-for="i in 4" :key="i" class="h-16 bg-solar-bg-subtle/80 rounded-2xl" />
         </div>
       </div>
     </div>
 
-    <!-- بطاقة المحتوى والتبويبات -->
-    <div class="solar-card p-6 sm:p-8 flex flex-col gap-8">
-      <!-- أزرار التبويبات -->
-      <div class="flex items-center gap-6 border-b border-solar-border-card pb-1 overflow-x-auto">
-        <button
-          type="button"
-          @click="activeTab = 'overview'"
-          class="pb-3 text-xs sm:text-sm font-black border-b-2 transition-all whitespace-nowrap"
-          :class="activeTab === 'overview' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
-        >
-          نظرة عامة
-        </button>
-        <button
-          type="button"
-          @click="activeTab = 'projects'"
-          class="pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap"
-          :class="activeTab === 'projects' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
-        >
-          معرض المشاريع
-        </button>
-        <button
-          type="button"
-          @click="activeTab = 'certificates'"
-          class="pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap"
-          :class="activeTab === 'certificates' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
-        >
-          الاعتمادات والشهادات
-        </button>
-        <button
-          type="button"
-          @click="activeTab = 'reviews'"
-          class="pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap"
-          :class="activeTab === 'reviews' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
-        >
-          التقييمات والآراء ({{ engineer.reviewsCount }})
-        </button>
+    <!-- 2. حالة الخطأ أو عدم العثور على المهندس -->
+    <div
+      v-else-if="fetchError || !dynamicEngineer"
+      class="solar-card p-12 text-center flex flex-col items-center justify-center gap-4 my-8 border-dashed border-red-500/30"
+    >
+      <div class="size-16 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center">
+        <RefreshCw class="size-8" />
       </div>
+      <div class="max-w-md">
+        <h3 class="text-base font-black text-solar-text-heading mb-1.5">تعذر استرجاع بيانات المهندس</h3>
+        <p class="text-xs text-solar-text-muted leading-relaxed">
+          {{ fetchError || 'لم يتم العثور على المهندس المطلوب في قاعدة البيانات.' }}
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button
+          type="button"
+          @click="fetchEngineerData"
+          class="btn-primary px-5 py-2.5 text-xs font-black gap-2 inline-flex items-center"
+        >
+          <RefreshCw class="size-3.5" />
+          <span>إعادة المحاولة</span>
+        </button>
+        <NuxtLink
+          to="/engineers"
+          class="btn-outline px-5 py-2.5 text-xs font-bold gap-2 inline-flex items-center"
+        >
+          <ArrowLeft class="size-3.5" />
+          <span>العودة لدليل المهندسين</span>
+        </NuxtLink>
+      </div>
+    </div>
 
-      <!-- محتوى تبويب "نظرة عامة" -->
-      <div v-if="activeTab === 'overview'" class="flex flex-col gap-8">
-        <!-- 1. النبذة المهنية -->
-        <div class="flex flex-col gap-3">
-          <div class="flex items-center gap-2">
-            <span class="h-4 w-1.5 rounded-full bg-solar-yellow" />
-            <h2 class="text-sm sm:text-base font-black text-solar-text-heading">النبذة المهنية</h2>
-          </div>
-          <p class="text-xs sm:text-sm text-solar-text-body leading-relaxed bg-solar-bg-subtle/50 p-4 rounded-2xl border border-solar-border-card">
-            {{ engineer.bio }}
-          </p>
-        </div>
+    <!-- 3. العرض الحقيقي الكامل لبيانات المهندس المعتمد -->
+    <div v-else class="flex flex-col gap-8">
+      <!-- مسار التنقل (Breadcrumbs) -->
+      <nav class="flex flex-wrap items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل">
+        <NuxtLink to="/" class="hover:text-solar-text-heading transition-colors">الرئيسية</NuxtLink>
+        <span>/</span>
+        <NuxtLink to="/engineers" class="hover:text-solar-text-heading transition-colors">دليل المهندسين المعتمدين</NuxtLink>
+        <span>/</span>
+        <span class="font-bold text-solar-text-heading truncate">{{ dynamicEngineer.name }}</span>
+      </nav>
 
-        <!-- 2. مجالات التخصص الدقيقة -->
-        <div class="flex flex-col gap-3">
-          <div class="flex items-center gap-2">
-            <span class="h-4 w-1.5 rounded-full bg-solar-yellow" />
-            <h2 class="text-sm sm:text-base font-black text-solar-text-heading">مجالات التخصص الدقيقة</h2>
-          </div>
+      <!-- بطاقة الملف الشخصي الكبيرة العلوية -->
+      <div class="solar-card p-6 sm:p-8 flex flex-col gap-6">
+        <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+          <!-- معلومات المهندس والصورة والبيانات -->
+          <div class="flex flex-col sm:flex-row items-start gap-5 flex-1 min-w-0">
+            <div class="relative shrink-0">
+              <img
+                :src="dynamicEngineer.avatar"
+                :alt="dynamicEngineer.name"
+                class="size-24 sm:size-28 shrink-0 rounded-full object-cover border-4 border-solar-yellow ring-4 ring-solar-bg-subtle shadow-md"
+                @error="(e) => ((e.target as HTMLImageElement).src = '/images/default-avatar.png')"
+              />
+              <span class="absolute bottom-1 left-1 size-4 rounded-full bg-emerald-500 ring-4 ring-solar-bg-card" />
+            </div>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div
-              v-for="spec in engineer.specialties"
-              :key="spec.title"
-              class="flex items-start gap-3.5 p-4 rounded-2xl border border-solar-border-card bg-solar-bg-card shadow-sm"
-            >
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/15 text-solar-navy-dark dark:text-solar-yellow">
-                <Zap v-if="spec.icon === 'Zap'" class="size-5 text-amber-500" />
-                <FlaskConical v-else-if="spec.icon === 'FlaskConical'" class="size-5 text-emerald-600" />
-                <BatteryCharging v-else-if="spec.icon === 'BatteryCharging'" class="size-5 text-amber-600" />
-                <ShieldCheck v-else class="size-5 text-blue-600" />
+            <div class="flex flex-col gap-2.5 text-right flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2.5">
+                <h1 class="text-xl sm:text-2xl lg:text-3xl font-black text-solar-text-heading">
+                  {{ dynamicEngineer.name }}
+                </h1>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                  <CheckCircle2 class="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>مهندس معتمد ومفحوص 100%</span>
+                </span>
               </div>
-              <div class="text-right">
-                <h3 class="text-xs sm:text-sm font-black text-solar-text-heading mb-1">{{ spec.title }}</h3>
-                <p class="text-[11px] text-solar-text-muted leading-relaxed">{{ spec.desc }}</p>
+
+              <p class="text-xs sm:text-sm text-solar-text-body leading-relaxed max-w-2xl font-semibold">
+                {{ dynamicEngineer.title }}
+              </p>
+
+              <!-- وسوم الموقع والخبرة والترخيص -->
+              <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                <span class="inline-flex items-center gap-1 rounded-lg bg-solar-bg-subtle px-2.5 py-1 text-solar-text-body font-medium">
+                  <MapPin class="size-3.5 text-solar-yellow" />
+                  <span>{{ dynamicEngineer.governorateName }} - الجمهورية اليمنية</span>
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-lg bg-solar-bg-subtle px-2.5 py-1 text-solar-text-body font-medium">
+                  <Clock class="size-3.5 text-solar-yellow" />
+                  <span>{{ dynamicEngineer.experience }}</span>
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 text-amber-800 dark:text-amber-400 border border-amber-500/30 px-2.5 py-1 font-bold">
+                  <Award class="size-3.5 text-solar-yellow" />
+                  <span>{{ dynamicEngineer.license }}</span>
+                </span>
               </div>
             </div>
           </div>
+
+          <!-- التقييم وأزرار التواصل للزائر -->
+          <div class="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end justify-between gap-4 shrink-0">
+            <div class="flex items-center gap-1.5 font-bold text-amber-500">
+              <span class="text-sm font-black text-solar-text-heading">{{ dynamicEngineer.rating }}</span>
+              <div class="flex">
+                <Star v-for="i in 5" :key="i" class="size-4 fill-amber-400 text-amber-400" />
+              </div>
+              <span class="text-solar-text-muted text-xs">({{ dynamicEngineer.reviewsCount }} تقييم موثق)</span>
+            </div>
+
+            <div class="flex items-center gap-2.5 w-full sm:w-auto">
+              <!-- زر واتساب إذا توفر الهاتف -->
+              <button
+                v-if="dynamicEngineer.phone"
+                type="button"
+                @click="handleWhatsApp"
+                class="flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-black text-white hover:bg-emerald-700 shadow-xs transition-all whitespace-nowrap cursor-pointer"
+              >
+                <MessageCircle class="size-4 shrink-0" />
+                <span>تواصل عبر واتساب</span>
+              </button>
+
+              <NuxtLink
+                to="/engineers"
+                class="btn-outline flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-xs sm:text-sm font-bold shadow-xs transition-all whitespace-nowrap"
+              >
+                <ArrowLeft class="size-4 shrink-0" />
+                <span>دليل المهندسين</span>
+              </NuxtLink>
+            </div>
+          </div>
         </div>
 
-        <!-- 3. كيف تسير الاستشارة الهندسية -->
-        <div class="flex flex-col gap-3">
+        <!-- الإحصائيات الأربعة الرئيسية في الأسفل -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 border-t border-solar-border-card pt-6 text-center">
+          <div class="p-3 rounded-2xl bg-solar-bg-subtle">
+            <span class="block text-xl sm:text-2xl font-black text-solar-text-heading">+{{ dynamicEngineer.projectsCount }}</span>
+            <span class="text-xs text-solar-text-muted font-semibold">مشروع معتمد ومنجز</span>
+          </div>
+          <div class="p-3 rounded-2xl bg-solar-bg-subtle">
+            <span class="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">100%</span>
+            <span class="text-xs text-solar-text-muted font-semibold">مطابقة المعايير القياسية</span>
+          </div>
+          <div class="p-3 rounded-2xl bg-solar-bg-subtle">
+            <span class="block text-xl sm:text-2xl font-black text-solar-text-heading">نقابة المهندسين</span>
+            <span class="text-xs text-solar-text-muted font-semibold">مرخص ومسجل رسمياً</span>
+          </div>
+          <div class="p-3 rounded-2xl bg-solar-bg-subtle">
+            <span class="block text-xl sm:text-2xl font-black text-solar-navy-dark dark:text-solar-yellow">معتمد ومفحوص</span>
+            <span class="text-xs text-solar-text-muted font-semibold">تحقق رسمي من SolarHub</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- بطاقة النبذة والبيانات المهنية الحقيقية -->
+      <div class="solar-card p-6 sm:p-8 flex flex-col gap-6">
+        <div class="flex items-center justify-between gap-4 border-b border-solar-border-card pb-4">
           <div class="flex items-center gap-2">
             <span class="h-4 w-1.5 rounded-full bg-solar-yellow" />
-            <h2 class="text-sm sm:text-base font-black text-solar-text-heading">كيف تسير الاستشارة الهندسية عبر منصة سولار هب؟</h2>
+            <h2 class="text-base sm:text-lg font-black text-solar-text-heading">النبذة المهنية والمؤهلات</h2>
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-3 p-5 rounded-2xl bg-solar-bg-subtle border border-solar-border-card">
-            <div class="flex items-center gap-3">
-              <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-solar-navy text-white text-xs font-black shadow-sm">
-                1
-              </span>
-              <p class="text-xs font-semibold text-solar-text-heading">استلام بيانات الموقع وقراءات الاستهلاك عبر المنصة.</p>
-            </div>
+          <!-- زر تحميل السيرة الذاتية الرسمية إذا توفرت -->
+          <a
+            v-if="dynamicEngineer.cvUrl"
+            :href="dynamicEngineer.cvUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 border border-blue-200 dark:border-blue-900/50 px-3.5 py-2 rounded-xl transition-colors w-fit"
+          >
+            <Download class="size-4" />
+            <span>تحميل السيرة الذاتية الرسمية (CV PDF)</span>
+          </a>
+        </div>
 
-            <div class="flex items-center gap-3">
-              <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-solar-navy text-white text-xs font-black shadow-sm">
-                2
-              </span>
-              <p class="text-xs font-semibold text-solar-text-heading">إجراء محاكاة PVsyst وإعداد المخططات الفنية المعتمدة.</p>
-            </div>
+        <p class="text-xs sm:text-sm text-solar-text-body leading-relaxed bg-solar-bg-subtle/60 p-5 rounded-2xl border border-solar-border-card">
+          {{ dynamicEngineer.bio }}
+        </p>
 
-            <div class="flex items-center gap-3">
-              <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-solar-navy text-white text-xs font-black shadow-sm">
-                3
-              </span>
-              <p class="text-xs font-semibold text-solar-text-heading">تسليم التقرير الهندسي الشامل مع جلسة مناقشة وتوضيح.</p>
+        <!-- مجالات الخبرة المعتمدة -->
+        <div class="grid gap-4 sm:grid-cols-3 pt-2">
+          <div class="solar-card flex items-start gap-3 p-4">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+              <Zap class="size-5" />
+            </span>
+            <div class="text-right">
+              <h4 class="text-xs font-black text-solar-text-heading">تصميم ومحاكاة PVsyst</h4>
+              <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">دراسات جدوى متقدمة وحساب الإنتاجية السنوية وفواقد التوليد.</p>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- تبويب معرض المشاريع -->
-      <div v-else-if="activeTab === 'projects'" class="grid gap-4 sm:grid-cols-2">
-        <div class="solar-card p-4">
-          <h4 class="text-xs font-bold text-solar-text-heading mb-1">محطة أسقف مصنع مياه هنا (1.2MW On-Grid)</h4>
-          <p class="text-[11px] text-solar-text-muted">تصميم ومحاكاة PVsyst وإعداد كراسة المواصفات لربط شبكة الجهد المتوسط.</p>
-        </div>
-        <div class="solar-card p-4">
-          <h4 class="text-xs font-bold text-solar-text-heading mb-1">منظومة ضخ مياه زراعية لمزرعة (75kW Off-Grid)</h4>
-          <p class="text-[11px] text-solar-text-muted">تحجيم مضخات غاطسة بنظام إنفرتر متغير التردد VFD لتوفير الديزل بنسبة 100%.</p>
-        </div>
-      </div>
-
-      <!-- تبويب الاعتمادات -->
-      <div v-else-if="activeTab === 'certificates'" class="space-y-3">
-        <div class="flex items-center justify-between p-3.5 rounded-xl border border-solar-border-card bg-solar-bg-subtle text-xs">
-          <span class="font-bold text-solar-text-heading">نقابة المهندسين اليمنيين - مرتبة استشاري نظم طاقة متجددة</span>
-          <span class="text-emerald-700 dark:text-emerald-400 font-bold">سارية وموثقة</span>
-        </div>
-        <div class="flex items-center justify-between p-3.5 rounded-xl border border-solar-border-card bg-solar-bg-subtle text-xs">
-          <span class="font-bold text-solar-text-heading">شهادة محاكاة متقدمة معتمدة PVsyst Professional</span>
-          <span class="text-emerald-700 dark:text-emerald-400 font-bold">معتمدة</span>
-        </div>
-      </div>
-
-      <!-- تبويب التقييمات -->
-      <div v-else class="space-y-4">
-        <div class="border-b border-solar-border-card pb-3">
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-bold text-solar-text-heading">مؤسسة سبأ للاستثمار والزراعة</span>
-            <div class="flex text-amber-400"><Star v-for="i in 5" :key="i" class="size-3.5 fill-amber-400" /></div>
+          <div class="solar-card flex items-start gap-3 p-4">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+              <ShieldCheck class="size-5" />
+            </span>
+            <div class="text-right">
+              <h4 class="text-xs font-black text-solar-text-heading">مطابقة الأحمال الكهربائية</h4>
+              <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">اختيار قواطع الحماية والكابلات وتوافق الإنفرترات والبطاريات.</p>
+            </div>
           </div>
-          <p class="text-xs text-solar-text-body">دراسة جدوى وافية جداً وحسابات دقيقة وفرت علينا تكاليف إنفرترات زائدة في المحطة.</p>
+
+          <div class="solar-card flex items-start gap-3 p-4">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+              <FileCheck class="size-5" />
+            </span>
+            <div class="text-right">
+              <h4 class="text-xs font-black text-solar-text-heading">الفحص الميداني والتسليم</h4>
+              <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">معاينة التثبيت الميكانيكي، التأريض، وجودة التوصيلات الكهربائية.</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

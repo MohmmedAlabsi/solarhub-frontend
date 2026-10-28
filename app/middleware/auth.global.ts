@@ -9,10 +9,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const isLandingPage = path === '/'
 
   // المسارات المحمية التي تتطلب تسجيل الدخول إجبارياً
-  const isAdminRoute = path.startsWith('/admin')
-  const isEngineerRoute = path.startsWith('/engineer')
-  const isSupplierRoute = path.startsWith('/supplier')
-  const isCustomerRoute = path.startsWith('/customer')
+  const isAdminRoute = path.startsWith('/admin/') || path === '/admin'
+  const isEngineerRoute = (path.startsWith('/engineer/') || path === '/engineer') && !path.startsWith('/engineers')
+  const isSupplierRoute = (path.startsWith('/supplier/') || path === '/supplier') && !path.startsWith('/suppliers')
+  const isCustomerRoute = path.startsWith('/customer/') || path === '/customer'
   const isProtectedRoute = isAdminRoute || isEngineerRoute || isSupplierRoute || isCustomerRoute
 
   // 1. إذا كان المسار محمياً ولا يوجد توكن جلسة إطلاقاً
