@@ -1,5 +1,29 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import type { EngineerProfile, EngineerProfileTab } from '../../types/engineer'
+import { visitorEngineers } from '~~/app/data/visitor-mock'
+
+export function getEngineerProfile(id: number): EngineerProfile | undefined {
+  const base = visitorEngineers.find(item => item.id === String(id)) || visitorEngineers[0]
+  if (!base) return undefined
+  return {
+    id,
+    name: base.name,
+    title: base.title,
+    specialty: base.specialty,
+    city: base.city,
+    licenseNumber: base.license || `YE-${id * 1420}`,
+    experienceYears: base.experience ? parseInt(base.experience) || 5 : 5,
+    responseTime: base.responseSpeed || 'ساعتان',
+    professionalBio: base.bio || '',
+    rating: base.rating,
+    reviewsCount: base.reviewsCount,
+    verified: base.verified,
+    avatar: base.avatar,
+    expertise: base.specialties || [],
+    certificates: [],
+    projects: [],
+  } as unknown as EngineerProfile
+}
 
 function routeId(value: string | string[] | undefined) {
   const v = Array.isArray(value) ? value[0] : value

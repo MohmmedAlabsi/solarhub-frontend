@@ -26,6 +26,7 @@ import { useTheme } from '~/composables/useTheme'
 import ThemeToggle from '~/components/common/ThemeToggle.vue'
 
 definePageMeta({
+  layout: 'default',
   layout: 'supplier',
 })
 

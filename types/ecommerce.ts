@@ -17,7 +17,7 @@ export interface Product {
   rating: number
   reviewsCount: number
   image: string
-  specs: {
+  specs?: {
     power?: string
     efficiency?: string
     voltage?: string
@@ -30,6 +30,7 @@ export interface Product {
   isQuoteOnly?: boolean
   badge?: string
   inStock: boolean
+  stockQuantity?: number
 }
 
 export interface CartItem {
