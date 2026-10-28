@@ -29,10 +29,14 @@ export function resolveProductImage(rawImage: string | null | undefined, categor
   return '/images/hero-solar.png'
 }
 
-function getRandomSlice<T>(array: T[], count: number): T[] {
-  if (array.length <= count) return [...array]
-  const shuffled = [...array].sort(() => Math.random() - 0.5)
-  return shuffled.slice(0, count)
+function getChunkSlice<T>(array: T[], index: number, size: number): T[] {
+  if (array.length <= size) return [...array]
+  const start = (index * size) % array.length
+  let slice = array.slice(start, start + size)
+  if (slice.length < size) {
+    slice = slice.concat(array.slice(0, size - slice.length))
+  }
+  return slice
 }
 
 export function useVisitorLanding() {
@@ -43,26 +47,28 @@ export function useVisitorLanding() {
   const allStores = ref<VisitorStoreItem[]>([])
   const allEngineers = ref<VisitorEngineerItem[]>([])
 
-  // العناصر المعروضة حالياً في السلايدرات العشوائية المتجددة كل 50 ثانية
+  // العناصر المعروضة حالياً في السلايدرات العشوائية المتجددة كل 10 ثواني
   const displayedProducts = ref<VisitorProductItem[]>([])
   const displayedStores = ref<VisitorStoreItem[]>([])
   const displayedEngineers = ref<VisitorEngineerItem[]>([])
 
-  // فهارس شرائح التصفح
-  const productSlideIndex = ref(0)
-  const storeSlideIndex = ref(0)
-  const engineerSlideIndex = ref(0)
+  // فهارس شرائح التصفح السلس للـ Carousel
+  const productChunkIndex = ref(0)
+  const storeChunkIndex = ref(0)
+  const engineerChunkIndex = ref(0)
+
+  // عدد الشرائح الإجمالي لكل قطاع
+  const totalProductSlides = computed(() => Math.max(1, Math.ceil(allProducts.value.length / 4)))
+  const totalStoreSlides = computed(() => Math.max(1, Math.ceil(allStores.value.length / 3)))
+  const totalEngineerSlides = computed(() => Math.max(1, Math.ceil(allEngineers.value.length / 3)))
 
   // حالة التحميل والخطأ
   const isLoading = ref(true)
   const errorMessage = ref('')
 
-  // مؤقت التدوير التلقائي (كل 50 ثانية بالضبط كما طلب المستخدم)
-  const ROTATE_INTERVAL_SECONDS = 50
+  // مؤقت التدوير التلقائي (مضبوط الآن على 10 ثواني بالضبط حسب طلب المستخدم)
+  const ROTATE_INTERVAL_SECONDS = 10
   const secondsLeft = ref(ROTATE_INTERVAL_SECONDS)
-  const timerProgress = computed(() => {
-    return Math.round(((ROTATE_INTERVAL_SECONDS - secondsLeft.value) / ROTATE_INTERVAL_SECONDS) * 100)
-  })
 
   let intervalTimer: ReturnType<typeof setInterval> | null = null
 
@@ -140,15 +146,66 @@ export function useVisitorLanding() {
 
   function cycleRandomItems() {
     if (allProducts.value.length > 0) {
-      displayedProducts.value = getRandomSlice(allProducts.value, 4)
+      productChunkIndex.value = (productChunkIndex.value + 1) % totalProductSlides.value
+      displayedProducts.value = getChunkSlice(allProducts.value, productChunkIndex.value, 4)
     }
     if (allStores.value.length > 0) {
-      displayedStores.value = getRandomSlice(allStores.value, 3)
+      storeChunkIndex.value = (storeChunkIndex.value + 1) % totalStoreSlides.value
+      displayedStores.value = getChunkSlice(allStores.value, storeChunkIndex.value, 3)
     }
     if (allEngineers.value.length > 0) {
-      displayedEngineers.value = getRandomSlice(allEngineers.value, 3)
+      engineerChunkIndex.value = (engineerChunkIndex.value + 1) % totalEngineerSlides.value
+      displayedEngineers.value = getChunkSlice(allEngineers.value, engineerChunkIndex.value, 3)
     }
     secondsLeft.value = ROTATE_INTERVAL_SECONDS
+  }
+
+  function nextProductsSlide() {
+    if (allProducts.value.length > 4) {
+      productChunkIndex.value = (productChunkIndex.value + 1) % totalProductSlides.value
+      displayedProducts.value = getChunkSlice(allProducts.value, productChunkIndex.value, 4)
+      secondsLeft.value = ROTATE_INTERVAL_SECONDS
+    }
+  }
+
+  function prevProductsSlide() {
+    if (allProducts.value.length > 4) {
+      productChunkIndex.value = (productChunkIndex.value - 1 + totalProductSlides.value) % totalProductSlides.value
+      displayedProducts.value = getChunkSlice(allProducts.value, productChunkIndex.value, 4)
+      secondsLeft.value = ROTATE_INTERVAL_SECONDS
+    }
+  }
+
+  function nextStoresSlide() {
+    if (allStores.value.length > 3) {
+      storeChunkIndex.value = (storeChunkIndex.value + 1) % totalStoreSlides.value
+      displayedStores.value = getChunkSlice(allStores.value, storeChunkIndex.value, 3)
+      secondsLeft.value = ROTATE_INTERVAL_SECONDS
+    }
+  }
+
+  function prevStoresSlide() {
+    if (allStores.value.length > 3) {
+      storeChunkIndex.value = (storeChunkIndex.value - 1 + totalStoreSlides.value) % totalStoreSlides.value
+      displayedStores.value = getChunkSlice(allStores.value, storeChunkIndex.value, 3)
+      secondsLeft.value = ROTATE_INTERVAL_SECONDS
+    }
+  }
+
+  function nextEngineersSlide() {
+    if (allEngineers.value.length > 3) {
+      engineerChunkIndex.value = (engineerChunkIndex.value + 1) % totalEngineerSlides.value
+      displayedEngineers.value = getChunkSlice(allEngineers.value, engineerChunkIndex.value, 3)
+      secondsLeft.value = ROTATE_INTERVAL_SECONDS
+    }
+  }
+
+  function prevEngineersSlide() {
+    if (allEngineers.value.length > 3) {
+      engineerChunkIndex.value = (engineerChunkIndex.value - 1 + totalEngineerSlides.value) % totalEngineerSlides.value
+      displayedEngineers.value = getChunkSlice(allEngineers.value, engineerChunkIndex.value, 3)
+      secondsLeft.value = ROTATE_INTERVAL_SECONDS
+    }
   }
 
   function startRotationTimer() {
@@ -204,8 +261,14 @@ export function useVisitorLanding() {
         allEngineers.value = []
       }
 
-      // تهيئة المعروضات العشوائية وبدء عداد الـ 50 ثانية
-      cycleRandomItems()
+      // تهيئة المعروضات الحالية والبدء التلقائي كل 10 ثواني
+      productChunkIndex.value = 0
+      storeChunkIndex.value = 0
+      engineerChunkIndex.value = 0
+      displayedProducts.value = getChunkSlice(allProducts.value, 0, 4)
+      displayedStores.value = getChunkSlice(allStores.value, 0, 3)
+      displayedEngineers.value = getChunkSlice(allEngineers.value, 0, 3)
+
       startRotationTimer()
     } catch (err: any) {
       console.error('Visitor landing page fetch error:', err)
@@ -218,28 +281,6 @@ export function useVisitorLanding() {
       displayedEngineers.value = []
     } finally {
       isLoading.value = false
-    }
-  }
-
-  // التدوير اليدوي الفوري للمستخدم إذا أراد استبدال العناصر المعروضة قبل انتهاء الـ 50 ثانية
-  function shuffleProductsNow() {
-    if (allProducts.value.length > 0) {
-      displayedProducts.value = getRandomSlice(allProducts.value, 4)
-      secondsLeft.value = ROTATE_INTERVAL_SECONDS
-    }
-  }
-
-  function shuffleStoresNow() {
-    if (allStores.value.length > 0) {
-      displayedStores.value = getRandomSlice(allStores.value, 3)
-      secondsLeft.value = ROTATE_INTERVAL_SECONDS
-    }
-  }
-
-  function shuffleEngineersNow() {
-    if (allEngineers.value.length > 0) {
-      displayedEngineers.value = getRandomSlice(allEngineers.value, 3)
-      secondsLeft.value = ROTATE_INTERVAL_SECONDS
     }
   }
 
@@ -258,18 +299,23 @@ export function useVisitorLanding() {
     displayedProducts,
     displayedStores,
     displayedEngineers,
-    productSlideIndex,
-    storeSlideIndex,
-    engineerSlideIndex,
+    productChunkIndex,
+    storeChunkIndex,
+    engineerChunkIndex,
+    totalProductSlides,
+    totalStoreSlides,
+    totalEngineerSlides,
     isLoading,
     errorMessage,
     secondsLeft,
-    timerProgress,
     stats,
     fetchVisitorData,
     cycleRandomItems,
-    shuffleProductsNow,
-    shuffleStoresNow,
-    shuffleEngineersNow,
+    nextProductsSlide,
+    prevProductsSlide,
+    nextStoresSlide,
+    prevStoresSlide,
+    nextEngineersSlide,
+    prevEngineersSlide,
   }
 }

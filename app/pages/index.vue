@@ -5,6 +5,8 @@ import {
   Award,
   BatteryCharging,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Compass,
   Cpu,
@@ -12,7 +14,6 @@ import {
   MapPin,
   Package,
   Percent,
-  RotateCw,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
@@ -23,8 +24,6 @@ import {
   Zap,
 } from 'lucide-vue-next'
 import { useVisitorLanding } from '~/composables/useVisitorLanding'
-import VisitorDetailModal from '~/components/visitor/VisitorDetailModal.vue'
-import type { VisitorProductItem, VisitorStoreItem, VisitorEngineerItem } from '~/types/visitor'
 
 useSeoMeta({
   title: 'سولار هب | وجهتك الموثوقة لمنظومات ومنتجات الطاقة الشمسية المتكاملة',
@@ -41,7 +40,7 @@ const topCategories = [
   { label: 'أدوات التحكم', sub: 'Smart Trackers & MPPT', icon: Cpu, query: 'controller' },
 ]
 
-// استدعاء البيانات الحقيقية من قاعدة البيانات ومؤقت الـ 50 ثانية
+// استدعاء البيانات الحقيقية من قاعدة البيانات ومؤقت الـ 10 ثواني السلس
 const {
   allProducts,
   allStores,
@@ -49,33 +48,23 @@ const {
   displayedProducts,
   displayedStores,
   displayedEngineers,
+  productChunkIndex,
+  storeChunkIndex,
+  engineerChunkIndex,
+  totalProductSlides,
+  totalStoreSlides,
+  totalEngineerSlides,
   isLoading,
   errorMessage,
-  secondsLeft,
-  timerProgress,
   stats,
   fetchVisitorData,
-  shuffleProductsNow,
-  shuffleStoresNow,
-  shuffleEngineersNow,
+  nextProductsSlide,
+  prevProductsSlide,
+  nextStoresSlide,
+  prevStoresSlide,
+  nextEngineersSlide,
+  prevEngineersSlide,
 } = useVisitorLanding()
-
-// نافذة التفاصيل الإيضاحية للقراءة فقط (Browse-Only Modal)
-const isDetailModalOpen = ref(false)
-const detailType = ref<'product' | 'store' | 'engineer' | null>(null)
-const selectedDetailItem = ref<VisitorProductItem | VisitorStoreItem | VisitorEngineerItem | null>(null)
-
-function openDetail(type: 'product' | 'store' | 'engineer', item: any) {
-  detailType.value = type
-  selectedDetailItem.value = item
-  isDetailModalOpen.value = true
-}
-
-function closeDetail() {
-  isDetailModalOpen.value = false
-  detailType.value = null
-  selectedDetailItem.value = null
-}
 </script>
 
 <template>
@@ -147,7 +136,7 @@ function closeDetail() {
           <div class="flex flex-wrap items-center gap-3.5 pt-2">
             <NuxtLink
               to="/stores"
-              class="btn-primary h-12 px-6 text-sm font-black gap-2 shadow-md cursor-pointer"
+              class="btn-primary h-12 px-6 text-sm font-black gap-2 shadow-md cursor-pointer hover:scale-[1.02] active:scale-95 transition-all"
             >
               <Store class="size-4.5" />
               <span>دليل المتاجر والوكلاء</span>
@@ -155,7 +144,7 @@ function closeDetail() {
 
             <NuxtLink
               to="/engineers"
-              class="btn-outline h-12 px-6 text-sm font-bold gap-2 cursor-pointer"
+              class="btn-outline h-12 px-6 text-sm font-bold gap-2 cursor-pointer hover:border-solar-yellow transition-all"
             >
               <Users class="size-4.5 text-solar-navy-dark dark:text-solar-yellow" />
               <span>دليل المهندسين المعتمدين</span>
@@ -336,55 +325,58 @@ function closeDetail() {
     </section>
 
     <!-- ============================================================ -->
-    <!-- 4. سلايدر المنتجات الشمسية المتجدد كل 50 ثانية من قاعدة البيانات -->
+    <!-- 4. سلايدر المنتجات الشمسية السلس المتجدد كل 10 ثواني (10s Slider) -->
     <!-- ============================================================ -->
     <section class="container-page" aria-label="سلايدر المنتجات الشمسية">
-      <!-- ترويسة السلايدر وشريط الـ 50 ثانية -->
-      <div class="solar-card p-4 sm:p-5 rounded-3xl mb-6 bg-gradient-to-r from-solar-bg-card to-solar-bg-subtle/50 border border-solar-border-card shadow-xs">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="flex size-8 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
-                <Zap class="size-4 stroke-[2.5]" />
-              </span>
-              <h2 class="text-xl sm:text-2xl font-black text-solar-text-heading tracking-tight">
-                أحدث وأبرز المنتجات الشمسية (سلايدر حي)
-              </h2>
-            </div>
-            <p class="text-xs text-solar-text-muted mt-1">
-              تصفح عشوائي حي للمنتجات من قاعدة البيانات • يتجدد تلقائياً كل 50 ثانية
-            </p>
+      <!-- ترويسة السلايدر المحدثة: بدون زر عشوائي وبدون شريط تقدم مع أزرار تنقل أنيقة -->
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="flex size-8 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+              <Zap class="size-4 stroke-[2.5]" />
+            </span>
+            <h2 class="text-xl sm:text-2xl font-black text-solar-text-heading tracking-tight">
+              أحدث وأبرز المنتجات الشمسية
+            </h2>
           </div>
-
-          <!-- مؤشر العداد التنازلي وزر التدوير العشوائي الفوري -->
-          <div class="flex items-center gap-3 self-start sm:self-auto">
-            <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white dark:bg-solar-bg-card border border-solar-border-card text-xs font-mono font-bold shadow-2xs">
-              <Clock class="size-3.5 text-solar-yellow animate-spin" style="animation-duration: 8s" />
-              <span class="text-solar-text-heading">{{ secondsLeft }} ثانية</span>
-            </div>
-
-            <button
-              type="button"
-              @click="shuffleProductsNow"
-              title="عرض منتجات عشوائية أخرى الآن"
-              class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-solar-yellow text-solar-navy-dark text-xs font-black hover:bg-solar-yellow-hover transition-all active:scale-95 shadow-xs cursor-pointer"
-            >
-              <RotateCw class="size-3.5 stroke-[2.5]" />
-              <span>عشوائي الآن</span>
-            </button>
-          </div>
+          <p class="text-xs text-solar-text-muted mt-1">
+            عرض متجدد تلقائياً كل 10 ثواني من المنتجات المعتمدة في قاعدة البيانات
+          </p>
         </div>
 
-        <!-- شريط التقدم الزمني للـ 50 ثانية -->
-        <div class="w-full bg-slate-200 dark:bg-slate-700/50 h-1.5 rounded-full mt-4 overflow-hidden">
-          <div
-            class="bg-solar-yellow h-full transition-all duration-1000 ease-linear rounded-full"
-            :style="{ width: `${timerProgress}%` }"
-          />
+        <!-- أزرار التقليب السلس اليدوي للزائر -->
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="prevProductsSlide"
+            class="flex size-9 items-center justify-center rounded-xl border border-solar-border-card bg-solar-bg-card hover:bg-solar-yellow hover:text-solar-navy-dark hover:border-solar-yellow text-solar-text-heading transition-all shadow-2xs cursor-pointer active:scale-95"
+            title="المنتجات السابقة"
+            aria-label="السابق"
+          >
+            <ChevronRight class="size-4 stroke-[2.5]" />
+          </button>
+
+          <button
+            type="button"
+            @click="nextProductsSlide"
+            class="flex size-9 items-center justify-center rounded-xl border border-solar-border-card bg-solar-bg-card hover:bg-solar-yellow hover:text-solar-navy-dark hover:border-solar-yellow text-solar-text-heading transition-all shadow-2xs cursor-pointer active:scale-95"
+            title="المنتجات التالية"
+            aria-label="التالي"
+          >
+            <ChevronLeft class="size-4 stroke-[2.5]" />
+          </button>
+
+          <NuxtLink
+            to="/products"
+            class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0 hover:border-solar-yellow"
+          >
+            <span>عرض الكتالوج بالكامل (+{{ stats.totalProducts }})</span>
+            <ArrowLeft class="size-3.5" />
+          </NuxtLink>
         </div>
       </div>
 
-      <!-- محتوى سلايدر المنتجات (Browse-Only: لا طلب سعر، لا مفضلة) -->
+      <!-- محتوى سلايدر المنتجات (Smooth TransitionGroup) -->
       <div v-if="isLoading" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div v-for="i in 4" :key="`p-skel-${i}`" class="solar-card p-4 rounded-2xl animate-pulse space-y-3">
           <div class="aspect-[4/3] rounded-xl bg-solar-bg-subtle" />
@@ -400,87 +392,101 @@ function closeDetail() {
         <p class="text-xs text-solar-text-muted mt-1">ستظهر المنتجات في السلايدر تلقائياً فور إضافتها من المتاجر.</p>
       </div>
 
-      <!-- بطاقات المنتجات المطابقة تماماً لتصميم بطاقة المنتج في النسخة السابقة -->
-      <div v-else class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div
-          v-for="product in displayedProducts"
-          :key="product.id"
-          class="solar-card flex flex-col justify-between overflow-hidden p-4 hover:border-solar-yellow transition-all duration-300 shadow-xs hover:shadow-md"
+      <!-- بطاقات المنتجات مع انتقال سلس (TransitionGroup) -->
+      <div v-else class="relative overflow-hidden">
+        <TransitionGroup
+          name="slider-smooth"
+          tag="div"
+          class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
         >
-          <div>
-            <!-- الصورة والعلامة المائية للماركة وبادج الضمان -->
-            <div class="relative mb-3 flex aspect-[4/3] w-full items-center justify-center rounded-xl bg-solar-bg-subtle p-3 overflow-hidden border border-solar-border-card/40">
-              <img
-                :src="product.imageUrl"
-                :alt="product.title"
-                class="h-full w-full object-contain"
-                loading="lazy"
-                @error="(e) => ((e.target as HTMLImageElement).src = '/images/hero-solar.png')"
-              />
-              <span class="absolute bottom-2 left-2 rounded-md bg-solar-bg-card/90 px-2 py-0.5 text-[10px] font-bold text-solar-navy-dark dark:text-solar-yellow border border-solar-border-card/40 shadow-sm">
-                {{ product.brand }}
-              </span>
-              <span
-                v-if="product.warrantyPeriod"
-                class="absolute top-2 right-2 rounded-md bg-solar-navy-dark/85 text-solar-yellow px-2 py-0.5 text-[9px] font-bold shadow-sm border border-solar-border-card/30"
+          <div
+            v-for="product in displayedProducts"
+            :key="`prod-${product.id}`"
+            class="solar-card group flex flex-col justify-between overflow-hidden p-4 hover:border-solar-yellow transition-all duration-300 shadow-xs hover:shadow-lg hover:-translate-y-1"
+          >
+            <div>
+              <!-- الصورة والعلامة المائية للماركة وبادج الضمان (قابلة للنقر وتنتقل لصفحة تفاصيل المنتج مباشرة) -->
+              <NuxtLink
+                :to="`/products/${product.id}`"
+                class="relative mb-3 flex aspect-[4/3] w-full items-center justify-center rounded-2xl bg-solar-bg-subtle p-3 overflow-hidden border border-solar-border-card/40 cursor-pointer block"
               >
-                {{ product.warrantyPeriod }}
-              </span>
-            </div>
+                <img
+                  :src="product.imageUrl"
+                  :alt="product.title"
+                  class="h-full w-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
+                  loading="lazy"
+                  @error="(e) => ((e.target as HTMLImageElement).src = '/images/hero-solar.png')"
+                />
+                <span class="absolute bottom-2 left-2 rounded-md bg-solar-bg-card/90 px-2 py-0.5 text-[10px] font-bold text-solar-navy-dark dark:text-solar-yellow border border-solar-border-card/40 shadow-sm backdrop-blur-2xs">
+                  {{ product.brand }}
+                </span>
+                <span
+                  v-if="product.warrantyPeriod"
+                  class="absolute top-2 right-2 rounded-md bg-solar-navy-dark/90 text-solar-yellow px-2 py-0.5 text-[9px] font-bold shadow-sm border border-solar-border-card/30 backdrop-blur-2xs"
+                >
+                  {{ product.warrantyPeriod }}
+                </span>
+              </NuxtLink>
 
-            <!-- التقييم والنوع -->
-            <div class="flex items-center justify-between gap-2 text-xs mb-1.5">
-              <span class="text-solar-text-muted text-[11px] truncate">{{ product.category }}</span>
-              <div class="flex items-center gap-1 font-bold text-amber-500">
-                <Star class="size-3.5 fill-amber-400 text-amber-400" />
-                <span>{{ product.rating ?? 4.85 }}</span>
+              <!-- التقييم والنوع -->
+              <div class="flex items-center justify-between gap-2 text-xs mb-1.5">
+                <span class="text-solar-text-muted text-[11px] truncate">{{ product.category }}</span>
+                <div class="flex items-center gap-1 font-bold text-amber-500">
+                  <Star class="size-3.5 fill-amber-400 text-amber-400" />
+                  <span>{{ product.rating ?? 4.85 }}</span>
+                </div>
+              </div>
+
+              <!-- اسم المنتج كرابط لصفحة التفاصيل -->
+              <NuxtLink
+                :to="`/products/${product.id}`"
+                class="block text-xs sm:text-sm font-black text-solar-text-heading line-clamp-2 leading-snug mb-2 hover:text-solar-navy dark:hover:text-solar-yellow transition-colors"
+                :title="product.title"
+              >
+                {{ product.title }}
+              </NuxtLink>
+
+              <!-- المتجر والموقع -->
+              <div class="flex items-center gap-1.5 text-[11px] text-solar-text-muted mb-4">
+                <Store class="size-3.5 shrink-0 text-solar-navy-dark dark:text-solar-yellow" />
+                <span class="truncate">{{ product.storeName }} ({{ product.governorateName }})</span>
               </div>
             </div>
 
-            <!-- الاسم -->
-            <h3 class="text-xs sm:text-sm font-black text-solar-text-heading line-clamp-2 leading-snug mb-2" :title="product.title">
-              {{ product.title }}
-            </h3>
+            <!-- بطاقة التصفح السفلية (الانتقال المباشر لصفحة تفاصيل المنتج مع سلايدر الصور) -->
+            <div class="flex flex-col gap-2 pt-2 border-t border-solar-border-card/60">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-[10px] text-solar-text-muted">السعر الاسترشادي:</span>
+                <span class="font-black font-mono text-solar-navy-dark dark:text-solar-yellow">
+                  {{ product.price ? `${product.price.toLocaleString('en-US')} ر.ي` : 'عند التعاقد' }}
+                </span>
+              </div>
 
-            <!-- المتجر والموقع -->
-            <div class="flex items-center gap-1.5 text-[11px] text-solar-text-muted mb-4">
-              <Store class="size-3.5 shrink-0 text-solar-navy-dark dark:text-solar-yellow" />
-              <span class="truncate">{{ product.storeName }} ({{ product.governorateName }})</span>
+              <NuxtLink
+                :to="`/products/${product.id}`"
+                class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-sm hover:shadow-md transition-all cursor-pointer"
+              >
+                <span>معاينة تفاصيل المنتج</span>
+                <ArrowLeft class="size-3.5" />
+              </NuxtLink>
             </div>
           </div>
+        </TransitionGroup>
 
-          <!-- بطاقة التصفح السفلية (Browse-Only: معاينة التفاصيل بدون طلب سعر أو مفضلة) -->
-          <div class="flex flex-col gap-2 pt-2 border-t border-solar-border-card/60">
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-[10px] text-solar-text-muted">السعر الاسترشادي:</span>
-              <span class="font-black font-mono text-solar-navy-dark dark:text-solar-yellow">
-                {{ product.price ? `${product.price.toLocaleString('en-US')} ر.ي` : 'عند التعاقد' }}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              @click="openDetail('product', product)"
-              class="btn-primary w-full py-2 text-xs font-black gap-1.5 justify-center shadow-sm cursor-pointer"
-            >
-              <span>معاينة تفاصيل المنتج</span>
-              <ArrowLeft class="size-3.5" />
-            </button>
-          </div>
+        <!-- مؤشرات نقاط الشريحة الحالية بالسلايدر (Dots Navigation) -->
+        <div v-if="totalProductSlides > 1" class="flex justify-center items-center gap-1.5 mt-5">
+          <span
+            v-for="(_, idx) in totalProductSlides"
+            :key="`p-dot-${idx}`"
+            class="h-1.5 rounded-full transition-all duration-300"
+            :class="productChunkIndex === idx ? 'w-6 bg-solar-yellow' : 'w-1.5 bg-slate-300 dark:bg-slate-700'"
+          />
         </div>
-      </div>
-
-      <!-- زر الانتقال لجميع المنتجات في صفحة المنتجات المخصصة -->
-      <div class="text-center mt-10">
-        <NuxtLink to="/products" class="btn-outline px-8 py-3 text-xs font-black gap-2 shadow-sm hover:border-solar-yellow">
-          <span>مشاهدة جميع المنتجات (+{{ stats.totalProducts }})</span>
-          <ArrowLeft class="size-4" />
-        </NuxtLink>
       </div>
     </section>
 
     <!-- ============================================================ -->
-    <!-- 5. سلايدر المتاجر والوكلاء المعتمدين المتجدد كل 50 ثانية من قاعدة البيانات -->
+    <!-- 5. سلايدر المتاجر والوكلاء المعتمدين المتجدد كل 10 ثواني -->
     <!-- ============================================================ -->
     <section class="container-page" aria-label="سلايدر المتاجر المعتمدة">
       <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
@@ -492,20 +498,31 @@ function closeDetail() {
           </p>
         </div>
 
+        <!-- أزرار التنقل السلس -->
         <div class="flex items-center gap-2">
           <button
             type="button"
-            @click="shuffleStoresNow"
-            title="عرض متاجر عشوائية أخرى"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-solar-yellow text-solar-navy-dark text-xs font-black hover:bg-solar-yellow-hover transition-all cursor-pointer"
+            @click="prevStoresSlide"
+            class="flex size-9 items-center justify-center rounded-xl border border-solar-border-card bg-solar-bg-card hover:bg-solar-yellow hover:text-solar-navy-dark hover:border-solar-yellow text-solar-text-heading transition-all shadow-2xs cursor-pointer active:scale-95"
+            title="المتاجر السابقة"
+            aria-label="السابق"
           >
-            <RotateCw class="size-3" />
-            <span>عشوائي</span>
+            <ChevronRight class="size-4 stroke-[2.5]" />
+          </button>
+
+          <button
+            type="button"
+            @click="nextStoresSlide"
+            class="flex size-9 items-center justify-center rounded-xl border border-solar-border-card bg-solar-bg-card hover:bg-solar-yellow hover:text-solar-navy-dark hover:border-solar-yellow text-solar-text-heading transition-all shadow-2xs cursor-pointer active:scale-95"
+            title="المتاجر التالية"
+            aria-label="التالي"
+          >
+            <ChevronLeft class="size-4 stroke-[2.5]" />
           </button>
 
           <NuxtLink
             to="/stores"
-            class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0"
+            class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0 hover:border-solar-yellow"
           >
             <span>دليل المتاجر بالكامل ({{ stats.totalStores }})</span>
             <ArrowLeft class="size-3.5" />
@@ -521,84 +538,101 @@ function closeDetail() {
         </div>
       </div>
 
-      <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div
-          v-for="store in displayedStores"
-          :key="store.id"
-          class="solar-card flex flex-col justify-between p-5 hover:border-solar-yellow transition-all shadow-xs hover:shadow-md"
+      <div v-else class="relative overflow-hidden">
+        <TransitionGroup
+          name="slider-smooth"
+          tag="div"
+          class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         >
-          <div>
-            <!-- الرأس والبادج -->
-            <div class="flex items-start justify-between gap-3 mb-4">
-              <span class="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                <ShieldCheck class="size-3 text-blue-600 dark:text-blue-400" />
-                <span>معتمد رسمياً</span>
-              </span>
-
-              <div class="flex items-center gap-2.5">
-                <div class="text-right">
-                  <h3 class="text-sm font-black text-solar-text-heading line-clamp-1">{{ store.companyName }}</h3>
-                  <p class="text-[11px] text-solar-text-muted flex items-center justify-end gap-1">
-                    <MapPin class="size-3" />
-                    <span>{{ store.governorateName }}</span>
-                  </p>
-                </div>
-                <div class="size-11 rounded-xl bg-solar-navy-dark text-solar-yellow flex items-center justify-center font-black text-xs shadow-sm overflow-hidden border border-solar-border-card">
-                  <img
-                    v-if="store.logoUrl && !store.logoUrl.includes('logo-expanded')"
-                    :src="store.logoUrl"
-                    :alt="store.companyName"
-                    class="h-full w-full object-cover"
-                  />
-                  <span v-else>{{ store.companyName.substring(0, 2) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- إحصائيات المتجر -->
-            <div class="grid grid-cols-2 gap-2 text-center p-2.5 rounded-xl bg-solar-bg-subtle mb-4">
-              <div>
-                <span class="block text-sm font-black text-solar-navy-dark dark:text-solar-yellow">{{ store.productsCount ?? 12 }}+</span>
-                <span class="text-[10px] text-solar-text-muted">منتج معتمد</span>
-              </div>
-              <div class="border-r border-solar-border-card">
-                <span class="block text-sm font-black text-amber-500">★ {{ store.rating }}</span>
-                <span class="text-[10px] text-solar-text-muted">تقييم المعتمدين</span>
-              </div>
-            </div>
-
-            <!-- نبذة المتجر -->
-            <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mb-4">
-              {{ store.bio }}
-            </p>
-
-            <!-- الوسوم والماركات -->
-            <div class="flex flex-wrap gap-1.5 mb-5">
-              <span
-                v-for="tag in (store.tags || ['ألواح شمسية', 'إنفرترات', 'بطاريات'])"
-                :key="tag"
-                class="rounded-md bg-solar-bg-card border border-solar-border-card px-2 py-0.5 text-[10px] text-solar-text-body font-medium"
-              >
-                {{ tag }}
-              </span>
-            </div>
-          </div>
-
-          <!-- زر التصفح للزائر -->
-          <button
-            type="button"
-            @click="openDetail('store', store)"
-            class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-sm cursor-pointer"
+          <div
+            v-for="store in displayedStores"
+            :key="`store-${store.id}`"
+            class="solar-card group flex flex-col justify-between p-5 hover:border-solar-yellow transition-all duration-300 shadow-xs hover:shadow-lg hover:-translate-y-1"
           >
-            <span>معاينة بيانات المتجر</span>
-            <ArrowLeft class="size-3.5" />
-          </button>
+            <div>
+              <!-- الرأس والبادج -->
+              <div class="flex items-start justify-between gap-3 mb-4">
+                <span class="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  <ShieldCheck class="size-3 text-blue-600 dark:text-blue-400" />
+                  <span>معتمد رسمياً</span>
+                </span>
+
+                <div class="flex items-center gap-2.5">
+                  <div class="text-right">
+                    <h3 class="text-sm font-black text-solar-text-heading line-clamp-1 group-hover:text-solar-navy dark:group-hover:text-solar-yellow transition-colors">
+                      {{ store.companyName }}
+                    </h3>
+                    <p class="text-[11px] text-solar-text-muted flex items-center justify-end gap-1">
+                      <MapPin class="size-3" />
+                      <span>{{ store.governorateName }}</span>
+                    </p>
+                  </div>
+                  <div class="size-11 rounded-xl bg-solar-navy-dark text-solar-yellow flex items-center justify-center font-black text-xs shadow-sm overflow-hidden border border-solar-border-card">
+                    <img
+                      v-if="store.logoUrl && !store.logoUrl.includes('logo-expanded')"
+                      :src="store.logoUrl"
+                      :alt="store.companyName"
+                      class="h-full w-full object-cover"
+                    />
+                    <span v-else>{{ store.companyName.substring(0, 2) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- إحصائيات المتجر -->
+              <div class="grid grid-cols-2 gap-2 text-center p-2.5 rounded-xl bg-solar-bg-subtle mb-4">
+                <div>
+                  <span class="block text-sm font-black text-solar-navy-dark dark:text-solar-yellow">{{ store.productsCount ?? 12 }}+</span>
+                  <span class="text-[10px] text-solar-text-muted">منتج معتمد</span>
+                </div>
+                <div class="border-r border-solar-border-card">
+                  <span class="block text-sm font-black text-amber-500">★ {{ store.rating }}</span>
+                  <span class="text-[10px] text-solar-text-muted">تقييم المعتمدين</span>
+                </div>
+              </div>
+
+              <!-- نبذة المتجر -->
+              <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mb-4">
+                {{ store.bio }}
+              </p>
+
+              <!-- الوسوم والماركات -->
+              <div class="flex flex-wrap gap-1.5 mb-5">
+                <span
+                  v-for="tag in (store.tags || ['ألواح شمسية', 'إنفرترات', 'بطاريات'])"
+                  :key="tag"
+                  class="rounded-md bg-solar-bg-card border border-solar-border-card px-2 py-0.5 text-[10px] text-solar-text-body font-medium"
+                >
+                  {{ tag }}
+                </span>
+              </div>
+            </div>
+
+            <!-- زر التصفح للزائر ينقل لصفحة المتجر -->
+            <NuxtLink
+              :to="`/stores/${store.id}`"
+              class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-sm hover:shadow-md transition-all cursor-pointer"
+            >
+              <span>زيارة المتجر ومنتجاته</span>
+              <ArrowLeft class="size-3.5" />
+            </NuxtLink>
+          </div>
+        </TransitionGroup>
+
+        <!-- مؤشرات نقاط الشريحة الحالية -->
+        <div v-if="totalStoreSlides > 1" class="flex justify-center items-center gap-1.5 mt-5">
+          <span
+            v-for="(_, idx) in totalStoreSlides"
+            :key="`s-dot-${idx}`"
+            class="h-1.5 rounded-full transition-all duration-300"
+            :class="storeChunkIndex === idx ? 'w-6 bg-solar-yellow' : 'w-1.5 bg-slate-300 dark:bg-slate-700'"
+          />
         </div>
       </div>
     </section>
 
     <!-- ============================================================ -->
-    <!-- 6. سلايدر المهندسين والاستشاريين المتجدد كل 50 ثانية من قاعدة البيانات -->
+    <!-- 6. سلايدر المهندسين والاستشاريين المتجدد كل 10 ثواني -->
     <!-- ============================================================ -->
     <section class="container-page" aria-label="سلايدر المهندسين المعتمدين">
       <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
@@ -610,20 +644,31 @@ function closeDetail() {
           </p>
         </div>
 
+        <!-- أزرار التنقل السلس -->
         <div class="flex items-center gap-2">
           <button
             type="button"
-            @click="shuffleEngineersNow"
-            title="عرض مهندسين عشوائيين آخرين"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-solar-yellow text-solar-navy-dark text-xs font-black hover:bg-solar-yellow-hover transition-all cursor-pointer"
+            @click="prevEngineersSlide"
+            class="flex size-9 items-center justify-center rounded-xl border border-solar-border-card bg-solar-bg-card hover:bg-solar-yellow hover:text-solar-navy-dark hover:border-solar-yellow text-solar-text-heading transition-all shadow-2xs cursor-pointer active:scale-95"
+            title="المهندسون السابقون"
+            aria-label="السابق"
           >
-            <RotateCw class="size-3" />
-            <span>عشوائي</span>
+            <ChevronRight class="size-4 stroke-[2.5]" />
+          </button>
+
+          <button
+            type="button"
+            @click="nextEngineersSlide"
+            class="flex size-9 items-center justify-center rounded-xl border border-solar-border-card bg-solar-bg-card hover:bg-solar-yellow hover:text-solar-navy-dark hover:border-solar-yellow text-solar-text-heading transition-all shadow-2xs cursor-pointer active:scale-95"
+            title="المهندسون التاليون"
+            aria-label="التالي"
+          >
+            <ChevronLeft class="size-4 stroke-[2.5]" />
           </button>
 
           <NuxtLink
             to="/engineers"
-            class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0"
+            class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0 hover:border-solar-yellow"
           >
             <span>دليل المهندسين بالكامل ({{ stats.totalEngineers }})</span>
             <ArrowLeft class="size-3.5" />
@@ -639,70 +684,85 @@ function closeDetail() {
         </div>
       </div>
 
-      <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div
-          v-for="eng in displayedEngineers"
-          :key="eng.id"
-          class="solar-card flex flex-col justify-between p-5 hover:border-solar-yellow transition-all shadow-xs hover:shadow-md"
+      <div v-else class="relative overflow-hidden">
+        <TransitionGroup
+          name="slider-smooth"
+          tag="div"
+          class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         >
-          <div>
-            <!-- رأس بطاقة المهندس: الصورة مع النقطة الخضراء والبادج المعتمد -->
-            <div class="flex items-start justify-between gap-3 mb-3">
-              <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                <CheckCircle2 class="size-3 text-emerald-600 dark:text-emerald-400" />
-                <span>معتمد</span>
-              </span>
+          <div
+            v-for="eng in displayedEngineers"
+            :key="`eng-${eng.id}`"
+            class="solar-card group flex flex-col justify-between p-5 hover:border-solar-yellow transition-all duration-300 shadow-xs hover:shadow-lg hover:-translate-y-1"
+          >
+            <div>
+              <!-- رأس بطاقة المهندس: الصورة مع النقطة الخضراء والبادج المعتمد -->
+              <div class="flex items-start justify-between gap-3 mb-3">
+                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <CheckCircle2 class="size-3 text-emerald-600 dark:text-emerald-400" />
+                  <span>معتمد</span>
+                </span>
 
-              <div class="relative shrink-0">
-                <img
-                  :src="eng.photoUrl"
-                  :alt="eng.name"
-                  class="w-14 h-14 shrink-0 rounded-full object-cover border-2 border-solar-yellow ring-2 ring-solar-bg-card shadow-sm"
-                  @error="(e) => ((e.target as HTMLImageElement).src = '/images/hero-solar.png')"
-                />
-                <span class="absolute bottom-0 left-0 size-3 rounded-full bg-emerald-500 ring-2 ring-solar-bg-card" />
+                <div class="relative shrink-0">
+                  <img
+                    :src="eng.photoUrl"
+                    :alt="eng.name"
+                    class="w-14 h-14 shrink-0 rounded-full object-cover border-2 border-solar-yellow ring-2 ring-solar-bg-card shadow-sm"
+                    @error="(e) => ((e.target as HTMLImageElement).src = '/images/hero-solar.png')"
+                  />
+                  <span class="absolute bottom-0 left-0 size-3 rounded-full bg-emerald-500 ring-2 ring-solar-bg-card" />
+                </div>
+              </div>
+
+              <!-- الاسم والتخصص والوصف -->
+              <div class="text-right mb-3">
+                <h3 class="text-base font-black text-solar-text-heading group-hover:text-solar-navy dark:group-hover:text-solar-yellow transition-colors">{{ eng.name }}</h3>
+                <p class="text-xs font-bold text-solar-navy-dark dark:text-solar-yellow mt-0.5">{{ eng.specialization }}</p>
+                <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mt-1.5">
+                  {{ eng.bio }}
+                </p>
+              </div>
+
+              <!-- معلومات الخبرة والموقع والتقييم والمشاريع -->
+              <div class="grid grid-cols-2 gap-2 text-[11px] text-solar-text-muted border-y border-solar-border-card/60 py-3 mb-4">
+                <span class="flex items-center gap-1.5 truncate">
+                  <Clock class="size-3.5 text-solar-navy-dark dark:text-solar-yellow shrink-0" />
+                  {{ eng.yearsOfExperience }}+ سنوات خبرة
+                </span>
+                <span class="flex items-center gap-1.5 truncate">
+                  <MapPin class="size-3.5 text-solar-navy-dark dark:text-solar-yellow shrink-0" />
+                  {{ eng.governorateName }}
+                </span>
+                <span class="flex items-center gap-1.5">
+                  <Star class="size-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                  <span class="font-bold text-solar-text-heading">{{ eng.rating }}</span> ({{ eng.ratingsCount }} تقييم)
+                </span>
+                <span class="flex items-center gap-1.5 font-semibold text-solar-navy-dark dark:text-solar-yellow">
+                  <Award class="size-3.5 text-solar-yellow shrink-0" />
+                  {{ eng.projectsCount ?? 18 }} مشروع منجز
+                </span>
               </div>
             </div>
 
-            <!-- الاسم والتخصص والوصف -->
-            <div class="text-right mb-3">
-              <h3 class="text-base font-black text-solar-text-heading">{{ eng.name }}</h3>
-              <p class="text-xs font-bold text-solar-navy-dark dark:text-solar-yellow mt-0.5">{{ eng.specialization }}</p>
-              <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mt-1.5">
-                {{ eng.bio }}
-              </p>
-            </div>
-
-            <!-- معلومات الخبرة والموقع والتقييم والمشاريع -->
-            <div class="grid grid-cols-2 gap-2 text-[11px] text-solar-text-muted border-y border-solar-border-card/60 py-3 mb-4">
-              <span class="flex items-center gap-1.5 truncate">
-                <Clock class="size-3.5 text-solar-navy-dark dark:text-solar-yellow shrink-0" />
-                {{ eng.yearsOfExperience }}+ سنوات خبرة
-              </span>
-              <span class="flex items-center gap-1.5 truncate">
-                <MapPin class="size-3.5 text-solar-navy-dark dark:text-solar-yellow shrink-0" />
-                {{ eng.governorateName }}
-              </span>
-              <span class="flex items-center gap-1.5">
-                <Star class="size-3.5 fill-amber-400 text-amber-400 shrink-0" />
-                <span class="font-bold text-solar-text-heading">{{ eng.rating }}</span> ({{ eng.ratingsCount }} تقييم)
-              </span>
-              <span class="flex items-center gap-1.5 font-semibold text-solar-navy-dark dark:text-solar-yellow">
-                <Award class="size-3.5 text-solar-yellow shrink-0" />
-                {{ eng.projectsCount ?? 18 }} مشروع منجز
-              </span>
-            </div>
+            <!-- زر التصفح للزائر ينقل لصفحة المهندس -->
+            <NuxtLink
+              :to="`/engineers/${eng.id}`"
+              class="btn-primary w-full py-2.5 text-xs font-black gap-1.5 justify-center shadow-sm hover:shadow-md transition-all cursor-pointer"
+            >
+              <span>معاينة الملف المهني</span>
+              <ArrowLeft class="size-3.5" />
+            </NuxtLink>
           </div>
+        </TransitionGroup>
 
-          <!-- زر التصفح للزائر (Browse-Only: معاينة الملف المهني بدون طلب استشارة) -->
-          <button
-            type="button"
-            @click="openDetail('engineer', eng)"
-            class="btn-primary w-full py-2.5 text-xs font-black gap-1.5 justify-center shadow-sm cursor-pointer"
-          >
-            <span>معاينة الملف المهني</span>
-            <ArrowLeft class="size-3.5" />
-          </button>
+        <!-- مؤشرات نقاط الشريحة الحالية -->
+        <div v-if="totalEngineerSlides > 1" class="flex justify-center items-center gap-1.5 mt-5">
+          <span
+            v-for="(_, idx) in totalEngineerSlides"
+            :key="`e-dot-${idx}`"
+            class="h-1.5 rounded-full transition-all duration-300"
+            :class="engineerChunkIndex === idx ? 'w-6 bg-solar-yellow' : 'w-1.5 bg-slate-300 dark:bg-slate-700'"
+          />
         </div>
       </div>
     </section>
@@ -781,13 +841,28 @@ function closeDetail() {
         </div>
       </div>
     </section>
-
-    <!-- النافذة المنبثقة الإيضاحية للقراءة فقط (Browse-Only Detail Modal) -->
-    <VisitorDetailModal
-      :is-open="isDetailModalOpen"
-      :type="detailType"
-      :item="selectedDetailItem"
-      @close="closeDetail"
-    />
   </div>
 </template>
+
+<style scoped>
+/* تأثير الانتقال السلس والمتميز للسلايدرات */
+.slider-smooth-move,
+.slider-smooth-enter-active,
+.slider-smooth-leave-active {
+  transition: all 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slider-smooth-enter-from {
+  opacity: 0;
+  transform: translateY(16px) scale(0.97);
+}
+
+.slider-smooth-leave-to {
+  opacity: 0;
+  transform: translateY(-16px) scale(0.97);
+}
+
+.slider-smooth-leave-active {
+  position: absolute;
+}
+</style>
