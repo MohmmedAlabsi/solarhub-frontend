@@ -12,6 +12,8 @@ export interface VisitorProductItem {
   governorateName: string
   storeName: string
   storeId?: number
+  rating?: number
+  reviewsCount?: number
 }
 
 export interface VisitorStoreItem {
@@ -25,6 +27,8 @@ export interface VisitorStoreItem {
   rating: number
   ratingsCount: number
   whatsappNumber?: string
+  productsCount?: number
+  tags?: string[]
 }
 
 export interface VisitorEngineerItem {
@@ -38,6 +42,7 @@ export interface VisitorEngineerItem {
   rating: number
   ratingsCount: number
   licenseNumber: string
+  projectsCount?: number
 }
 
 export interface PlatformStats {
