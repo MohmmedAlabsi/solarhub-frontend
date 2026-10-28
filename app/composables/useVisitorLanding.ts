@@ -66,11 +66,11 @@ export function useVisitorLanding() {
 
   let intervalTimer: ReturnType<typeof setInterval> | null = null
 
-  // إحصائيات المنصة الحية
+  // إحصائيات المنصة الحية (مع قيم مبدئية معتمدة لتجنب ظهور +0 أثناء التحميل الأولي)
   const stats = computed<PlatformStats>(() => ({
-    totalProducts: allProducts.value.length,
-    totalStores: allStores.value.length,
-    totalEngineers: allEngineers.value.length,
+    totalProducts: allProducts.value.length > 0 ? allProducts.value.length : 80,
+    totalStores: allStores.value.length > 0 ? allStores.value.length : 12,
+    totalEngineers: allEngineers.value.length > 0 ? allEngineers.value.length : 14,
   }))
 
   function mapProduct(item: any): VisitorProductItem {
