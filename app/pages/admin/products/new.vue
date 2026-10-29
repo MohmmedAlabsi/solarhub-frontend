@@ -612,7 +612,7 @@ async function handleSubmit() {
                 <Trash2 class="size-3.5" />
               </button>
 
-              <img :src="img.image_url || img.url" alt="صورة المنتج" class="h-24 w-24 object-contain" />
+              <img :src="img.image_url || (img as any).url" alt="صورة المنتج" class="h-24 w-24 object-contain" />
             </div>
 
             <!-- الصور المختارة محلياً -->

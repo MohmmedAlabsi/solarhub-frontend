@@ -19,18 +19,117 @@ import {
   Wrench,
   Zap,
 } from 'lucide-vue-next'
-import { visitorStores, visitorProducts } from '~~/app/data/visitor-mock'
+import { visitorStores, visitorProducts, type VisitorProduct } from '~~/app/data/visitor-mock'
 import { useAuthModal } from '~~/app/composables/useAuthModal'
 import { parseCoordinates } from '~/utils/geo'
+import ProductQuoteModal from '~~/app/components/common/ProductQuoteModal.vue'
 
 const route = useRoute()
 const storeId = route.params.id as string
 const authModal = useAuthModal()
+const config = useRuntimeConfig()
+const apiBase = (config.public.apiBaseUrl as string) || (config.public.apiBase as string) || 'http://127.0.0.1:8000/api'
+
+const fallbackStore = computed(() => {
+  return visitorStores.find(s => s.id === storeId) || visitorStores[0]
+})
+
+const dynamicStore = ref<any>(null)
+const dynamicProducts = ref<VisitorProduct[]>([])
+const isLoading = ref(true)
+
+// نافذة عرض السعر
+const isQuoteModalOpen = ref(false)
+const activeProductForQuote = ref<VisitorProduct | null>(null)
+
+async function fetchStoreData() {
+  isLoading.value = true
+  try {
+    const res = await $fetch<{ status: string; data: any }>(`${apiBase}/stores/${storeId}`)
+    if (res?.data) {
+      dynamicStore.value = res.data
+    }
+  } catch (e) {
+    // fallback
+  }
+
+  try {
+    const pRes = await $fetch<{ status: string; data: any[] }>(`${apiBase}/store-products?store_id=${storeId}`)
+    if (pRes?.data && pRes.data.length > 0) {
+      dynamicProducts.value = pRes.data.map((item: any) => {
+        const mp = item.master_product || {}
+        let img = mp.images?.[0]?.url || mp.images?.[0]?.image_url
+        const catId = mp.category?.id || 1
+        if (!img) {
+          if (catId === 1) img = '/images/product-panel.png'
+          else if (catId === 2) img = '/images/product-inverter.png'
+          else if (catId === 3) img = '/images/product-battery.png'
+          else img = '/images/product-kit.png'
+        }
+
+        let catType: 'panel' | 'inverter' | 'battery' | 'controller' | 'kit' | 'pump' = 'panel'
+        if (catId === 2) catType = 'inverter'
+        else if (catId === 3) catType = 'battery'
+        else if (catId === 4) catType = 'controller'
+
+        return {
+          id: String(item.id),
+          name: mp.title || 'منتج طاقة شمسية معتمد',
+          model: mp.model_number || `SH-${item.id}`,
+          sku: `SKU-${item.id}`,
+          brand: mp.brand?.name || 'SolarHub Brand',
+          category: mp.category?.name_ar || 'معدات طاقة شمسية',
+          categoryType: catType,
+          storeId: String(storeId),
+          storeName: dynamicStore.value?.company_name || fallbackStore.value.name,
+          storeCity: item.governorate?.name_ar ? `${item.governorate.name_ar} - اليمن` : 'صنعاء - اليمن',
+          rating: 4.8,
+          reviewsCount: 14 + (item.id % 20),
+          image: img,
+          inStock: (item.stock_quantity ?? 1) > 0,
+          stockCount: item.stock_quantity ?? 10,
+          warranty: item.warranty_period || 'ضمان معتمد',
+          priceEstimate: item.price ? `$${Number(item.price).toLocaleString()}` : 'حسب الكمية',
+        } as VisitorProduct
+      })
+    }
+  } catch (e) {
+    // fallback
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchStoreData()
+})
 
 const store = computed(() => {
-  const match = visitorStores.find(s => s.id === storeId) || visitorStores[0]
-  if (!match) throw createError({ statusCode: 404, statusMessage: 'Not Found' })
-  return match
+  if (dynamicStore.value) {
+    const d = dynamicStore.value
+    return {
+      id: String(d.id),
+      name: d.company_name || fallbackStore.value.name,
+      legalName: d.company_name || fallbackStore.value.legalName,
+      commercialReg: d.commercial_registry || `CR-YE-${1000 + d.id}`,
+      weraLicense: `WERA-YE-${5000 + d.id}`,
+      badge: (d.store_type === 'authorized_agent' ? 'وكيل رسمي' : (d.store_type === 'wholesaler' ? 'موزع معتمد' : 'متجر متخصص')) as any,
+      city: 'صنعاء',
+      address: d.address_details || 'صنعاء - الجمهورية اليمنية',
+      workingHours: 'السبت - الخميس: 8:00 ص - 6:00 م',
+      phone: d.whatsapp_number ? `+967 ${d.whatsapp_number}` : '+967 776369548',
+      whatsapp: d.whatsapp_number || '776369548',
+      rating: Number(d.average_rating) > 0 ? Number(d.average_rating) : 4.9,
+      reviewsCount: Number(d.ratings_count) > 0 ? Number(d.ratings_count) : 24,
+      productsCount: dynamicProducts.value.length > 0 ? dynamicProducts.value.length : (Number(d.products_count) || 12),
+      inStockCount: 45,
+      logo: d.company_logo_url || '',
+      description: d.bio || fallbackStore.value.description,
+      tags: ['فحص هندسي معتمد', 'ضمان مصنعي', 'شحن لكافة المحافظات'],
+      brands: ['Jinko Solar', 'Deye', 'LONGi', 'Pylontech'],
+    }
+  }
+  return fallbackStore.value
 })
 
 useSeoMeta({
@@ -42,10 +141,11 @@ const activeTab = ref<'products' | 'reviews'>('products')
 const selectedFilter = ref('all')
 
 const storeProducts = computed(() => {
+  const source = dynamicProducts.value.length > 0 ? dynamicProducts.value : visitorProducts
   if (selectedFilter.value === 'all') {
-    return visitorProducts
+    return source
   }
-  return visitorProducts.filter(p => p.categoryType === selectedFilter.value)
+  return source.filter((p: any) => p.categoryType === selectedFilter.value)
 })
 
 function handleStoreQuote() {
@@ -54,6 +154,11 @@ function handleStoreQuote() {
     message: `سجّل الدخول إلى حسابك أو أنشئ حساباً جديداً لإرسال طلب عرض سعر مباشر لـ (${store.value.name}) واستلام عروض الأسعار وفواتير الضمان.`,
     actionType: 'quote',
   })
+}
+
+function handleProductQuote(p: VisitorProduct) {
+  activeProductForQuote.value = p
+  isQuoteModalOpen.value = true
 }
 
 function handleWhatsApp() {
@@ -74,13 +179,27 @@ const isMapModalOpen = ref(false)
       <span class="font-bold text-solar-text-heading truncate max-w-xs">{{ store.name }}</span>
     </nav>
 
-    <!-- بطاقة رأس المتجر الكبيرة المطابقة لـ visitor_8.png -->
+    <!-- نافذة طلب عرض السعر للمنتج -->
+    <ProductQuoteModal
+      :is-open="isQuoteModalOpen"
+      :product="activeProductForQuote"
+      @close="isQuoteModalOpen = false"
+    />
+
+    <!-- بطاقة رأس المتجر الكبيرة -->
     <div class="solar-card p-6 sm:p-8 flex flex-col gap-6">
       <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
         <!-- معلومات المتجر والشعار -->
         <div class="flex flex-col sm:flex-row items-start gap-5 flex-1 min-w-0">
-          <div class="flex size-20 sm:size-24 shrink-0 items-center justify-center rounded-2xl bg-solar-navy text-white text-xl font-black shadow-md border-2 border-solar-yellow/30">
-            {{ store.name.substring(0, 2) }}
+          <div class="relative flex size-20 sm:size-24 shrink-0 items-center justify-center rounded-2xl bg-solar-navy text-white text-xl font-black shadow-md border-2 border-solar-yellow/30 overflow-hidden">
+            <img
+              v-if="store.logo"
+              :src="store.logo"
+              :alt="store.name"
+              class="size-full object-cover"
+              @error="store.logo = ''"
+            />
+            <span v-else>{{ store.name.substring(0, 2) }}</span>
           </div>
 
           <div class="flex flex-col gap-2 text-right flex-1 min-w-0">
@@ -89,8 +208,8 @@ const isMapModalOpen = ref(false)
             </h1>
 
             <div class="flex flex-wrap items-center gap-2">
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 border border-emerald-200 w-fit">
-                <CheckCircle2 class="size-3.5 text-emerald-600 shrink-0" />
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 w-fit">
+                <CheckCircle2 class="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>سجل تجاري موثق {{ store.commercialReg }} - {{ store.weraLicense }}</span>
               </span>
             </div>
@@ -123,47 +242,47 @@ const isMapModalOpen = ref(false)
         </div>
       </div>
 
-      <!-- الشريط السفلي للبيانات الميدانية والمواعيد والتقييمات المطابق لـ visitor_8.png -->
-      <div class="rounded-xl bg-slate-50 border border-slate-100 p-3 sm:px-5 sm:py-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs sm:text-sm text-solar-text-muted">
+      <!-- الشريط السفلي للبيانات الميدانية والمواعيد والتقييمات -->
+      <div class="rounded-xl bg-solar-bg-subtle border border-solar-border-card p-3 sm:px-5 sm:py-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs sm:text-sm text-solar-text-muted">
         <button
           type="button"
           @click="isMapModalOpen = true"
-          class="flex items-center gap-2 hover:text-solar-navy-dark transition-colors cursor-pointer group text-right"
+          class="flex items-center gap-2 hover:text-solar-navy-dark dark:hover:text-solar-yellow transition-colors cursor-pointer group text-right"
           title="عرض موقع المتجر على الخريطة التفاعلية"
         >
-          <MapPin class="size-4 text-solar-navy shrink-0 group-hover:text-solar-yellow transition-colors" />
+          <MapPin class="size-4 text-solar-yellow shrink-0 group-hover:scale-110 transition-transform" />
           <span class="truncate underline decoration-dotted">{{ store.address }}</span>
         </button>
         <div class="flex items-center gap-2">
-          <Clock class="size-4 text-solar-navy shrink-0" />
+          <Clock class="size-4 text-solar-yellow shrink-0" />
           <span>{{ store.workingHours }}</span>
         </div>
         <div class="flex items-center gap-2 font-bold text-solar-text-heading">
           <Star class="size-4 fill-amber-400 text-amber-400 shrink-0" />
-          <span>{{ store.rating }} ({{ store.reviewsCount }} تقييم موثق من المشترين)</span>
+          <span>{{ store.rating }} ({{ store.reviewsCount }} تقييم موثق)</span>
         </div>
-        <div class="flex items-center gap-2 text-emerald-700 font-bold">
-          <Package class="size-4 text-emerald-600 shrink-0" />
-          <span>{{ store.inStockCount }} منتج معتمد وجاهز للتسليم الفوري</span>
+        <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
+          <Package class="size-4 shrink-0" />
+          <span>{{ store.inStockCount }} منتج معتمد وجاهز للشحن</span>
         </div>
       </div>
     </div>
 
-    <!-- الكروت الأربعة للضمانات في متجر شمس الرياض المطابقة لـ visitor_8.png -->
+    <!-- الكروت الأربعة للضمانات -->
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <div class="solar-card flex items-start gap-3 p-4">
-        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark">
-          <ShieldCheck class="size-5 text-solar-navy-dark" />
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+          <ShieldCheck class="size-5" />
         </span>
         <div class="text-right">
           <h4 class="text-xs font-black text-solar-text-heading">فحص التراخيص والسجلات</h4>
-          <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">سجل تجاري ساري وتراخيص معتمدة.</p>
+          <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">سجل تجاري ساري وتراخيص معتمدة ومفحوصة.</p>
         </div>
       </div>
 
       <div class="solar-card flex items-start gap-3 p-4">
-        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark">
-          <Zap class="size-5 text-solar-navy-dark" />
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+          <Zap class="size-5" />
         </span>
         <div class="text-right">
           <h4 class="text-xs font-black text-solar-text-heading">ضمانات مصنعية رسمية</h4>
@@ -172,18 +291,18 @@ const isMapModalOpen = ref(false)
       </div>
 
       <div class="solar-card flex items-start gap-3 p-4">
-        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark">
-          <Truck class="size-5 text-solar-navy-dark" />
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+          <Truck class="size-5" />
         </span>
         <div class="text-right">
           <h4 class="text-xs font-black text-solar-text-heading">شحن ونقل مخصص ومجهز</h4>
-          <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">حماية تامة للألواح والبطاريات الحساسة.</p>
+          <p class="text-[11px] text-solar-text-muted leading-relaxed mt-0.5">حماية تامة للألواح والبطاريات الحساسة بكافة المحافظات.</p>
         </div>
       </div>
 
       <div class="solar-card flex items-start gap-3 p-4">
-        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark">
-          <Wrench class="size-5 text-solar-navy-dark" />
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+          <Wrench class="size-5" />
         </span>
         <div class="text-right">
           <h4 class="text-xs font-black text-solar-text-heading">مطابقة أحمال ودعم هندسي</h4>
@@ -192,7 +311,7 @@ const isMapModalOpen = ref(false)
       </div>
     </div>
 
-    <!-- تبويبات المتجر (المنتجات والمخزون المتاح / التقييمات) المطابقة لـ visitor_8.png -->
+    <!-- تبويبات المتجر (المنتجات والمخزون المتاح / التقييمات) -->
     <div class="flex flex-col gap-6">
       <div class="flex items-center gap-3 border-b border-solar-border-card pb-2">
         <button
@@ -202,7 +321,7 @@ const isMapModalOpen = ref(false)
           :class="activeTab === 'products' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
         >
           <Package class="size-4" />
-          <span>المنتجات والمخزون المتاح ({{ storeProducts.length }} مختارة)</span>
+          <span>المنتجات والمخزون المتاح ({{ storeProducts.length }} معروضة)</span>
         </button>
 
         <button
@@ -212,7 +331,7 @@ const isMapModalOpen = ref(false)
           :class="activeTab === 'reviews' ? 'border-solar-yellow text-solar-text-heading font-black' : 'border-transparent text-solar-text-muted hover:text-solar-text-heading'"
         >
           <Star class="size-4" />
-          <span>التقييمات والآراء (145)</span>
+          <span>التقييمات والآراء ({{ store.reviewsCount }})</span>
         </button>
       </div>
 
@@ -224,7 +343,7 @@ const isMapModalOpen = ref(false)
           class="rounded-xl px-4 py-2 text-xs font-bold transition-all whitespace-nowrap"
           :class="selectedFilter === 'all' ? 'bg-solar-yellow text-solar-navy-dark font-black shadow-sm' : 'bg-solar-bg-card border border-solar-border-card text-solar-text-body hover:bg-solar-bg-subtle hover:text-solar-text-heading'"
         >
-          الكل ({{ visitorProducts.length }})
+          الكل ({{ storeProducts.length }})
         </button>
         <button
           type="button"
@@ -260,7 +379,7 @@ const isMapModalOpen = ref(false)
         </button>
       </div>
 
-      <!-- شبكة منتجات المتجر المطابقة لـ visitor_8.png -->
+      <!-- شبكة منتجات المتجر -->
       <div v-if="activeTab === 'products'" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div
           v-for="product in storeProducts"
@@ -275,17 +394,9 @@ const isMapModalOpen = ref(false)
                 class="h-full w-full object-contain"
                 loading="lazy"
               />
-              <span class="absolute bottom-2 left-2 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold text-solar-navy shadow-sm">
+              <span class="absolute bottom-2 left-2 rounded-md bg-solar-bg-card/90 px-2 py-0.5 text-[10px] font-bold text-solar-text-heading shadow-sm border border-solar-border-card">
                 {{ product.brand }}
               </span>
-              <button
-                type="button"
-                @click="handleStoreQuote"
-                class="absolute top-2 left-2 flex size-7 items-center justify-center rounded-full bg-white/90 text-solar-text-muted hover:text-rose-500 shadow-sm"
-                aria-label="إضافة للمفضلة"
-              >
-                <Heart class="size-3.5" />
-              </button>
             </div>
 
             <div class="flex items-center justify-between gap-2 text-xs mb-1.5">
@@ -301,7 +412,7 @@ const isMapModalOpen = ref(false)
             </h3>
 
             <div class="flex items-center gap-1.5 text-[11px] text-solar-text-muted mb-4">
-              <Store class="size-3.5 shrink-0" />
+              <Store class="size-3.5 shrink-0 text-solar-yellow" />
               <span class="truncate">{{ store.name }}</span>
             </div>
           </div>
@@ -309,7 +420,7 @@ const isMapModalOpen = ref(false)
           <div class="flex flex-col gap-2 pt-2 border-t border-solar-border-card/60">
             <button
               type="button"
-              @click="handleStoreQuote"
+              @click="handleProductQuote(product)"
               class="btn-primary w-full py-2 text-xs font-black gap-1.5 justify-center shadow-sm"
             >
               <FileText class="size-3.5" />
@@ -317,7 +428,7 @@ const isMapModalOpen = ref(false)
             </button>
             <NuxtLink
               :to="`/products/${product.id}`"
-              class="text-center text-xs font-bold text-solar-text-body hover:text-solar-navy transition-colors flex items-center justify-center gap-1"
+              class="text-center text-xs font-bold text-solar-text-body hover:text-solar-navy dark:hover:text-solar-yellow transition-colors flex items-center justify-center gap-1 py-1"
             >
               <span>عرض تفاصيل المنتج</span>
               <ArrowLeft class="size-3" />
@@ -328,25 +439,26 @@ const isMapModalOpen = ref(false)
 
       <!-- تبويب التقييمات -->
       <div v-else class="solar-card p-6 flex flex-col gap-4">
-        <h3 class="text-sm font-black text-solar-text-heading">تقييمات وآراء العملاء (145 تقييم)</h3>
+        <h3 class="text-sm font-black text-solar-text-heading">تقييمات وآراء العملاء ({{ store.reviewsCount }} تقييم)</h3>
         <div class="space-y-4">
           <div class="border-b border-solar-border-card pb-4">
             <div class="flex items-center justify-between mb-1">
-              <span class="font-bold text-xs text-solar-text-heading">م. فهد السبيعي</span>
+              <span class="font-bold text-xs text-solar-text-heading">م. هشام القدسي</span>
               <div class="flex text-amber-400"><Star v-for="i in 5" :key="i" class="size-3.5 fill-amber-400" /></div>
             </div>
-            <p class="text-xs text-solar-text-body">توريد سريع للألواح والإنفرترات، الفواتير الضريبية وشهادات المنشأ الأصلية تم استلامها بالكامل.</p>
+            <p class="text-xs text-solar-text-body">توريد سريع للألواح والإنفرترات، الفواتير المعتمدة وشهادات المنشأ الأصلية تم استلامها بالكامل.</p>
           </div>
           <div class="border-b border-solar-border-card pb-4">
             <div class="flex items-center justify-between mb-1">
-              <span class="font-bold text-xs text-solar-text-heading">شركة أبراج نجد</span>
+              <span class="font-bold text-xs text-solar-text-heading">مؤسسة سبأ للطاقة المتجددة</span>
               <div class="flex text-amber-400"><Star v-for="i in 5" :key="i" class="size-3.5 fill-amber-400" /></div>
             </div>
-            <p class="text-xs text-solar-text-body">تعامل احترافي ودعم فني ممتاز في اختيار كابلات ومحولات متوافقة مع متطلبات شركة الكهرباء.</p>
+            <p class="text-xs text-solar-text-body">تعامل احترافي ودعم فني ممتاز في اختيار كابلات ومحولات متوافقة مع متطلبات المنظومات الشمسية في اليمن.</p>
           </div>
         </div>
       </div>
     </div>
+
     <!-- نافذة استعراض موقع المتجر والمستودع على الخريطة (للعرض فقط) -->
     <CommonMapLocationModal
       :is-open="isMapModalOpen"

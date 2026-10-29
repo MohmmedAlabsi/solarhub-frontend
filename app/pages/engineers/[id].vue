@@ -16,17 +16,85 @@ import {
   Star,
   Zap,
 } from 'lucide-vue-next'
-import { visitorEngineers } from '~~/app/data/visitor-mock'
+import { visitorEngineers, type VisitorEngineer } from '~~/app/data/visitor-mock'
 import { useAuthModal } from '~~/app/composables/useAuthModal'
+import { useAuthStore } from '~~/app/stores/auth'
+import AppToast from '~~/app/components/common/AppToast.vue'
 
 const route = useRoute()
 const engineerId = route.params.id as string
 const authModal = useAuthModal()
+const authStore = useAuthStore()
+const config = useRuntimeConfig()
+const apiBase = (config.public.apiBaseUrl as string) || (config.public.apiBase as string) || 'http://127.0.0.1:8000/api'
+
+const fallbackEngineer = computed(() => {
+  return visitorEngineers.find(e => e.id === engineerId) || visitorEngineers[0]
+})
+
+const dynamicEngineer = ref<any>(null)
+const isLoading = ref(true)
+const toastMessage = ref('')
+let toastTimeout: any = null
+
+function showToast(msg: string) {
+  toastMessage.value = msg
+  if (toastTimeout) clearTimeout(toastTimeout)
+  toastTimeout = setTimeout(() => {
+    toastMessage.value = ''
+  }, 3500)
+}
+
+async function fetchEngineerData() {
+  isLoading.value = true
+  try {
+    const res = await $fetch<{ status: string; data: any }>(`${apiBase}/engineers/${engineerId}`)
+    if (res?.data) {
+      dynamicEngineer.value = res.data
+    }
+  } catch (e) {
+    // fallback
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchEngineerData()
+})
 
 const engineer = computed(() => {
-  const match = visitorEngineers.find(e => e.id === engineerId) || visitorEngineers[0]
-  if (!match) throw createError({ statusCode: 404, statusMessage: 'Not Found' })
-  return match
+  if (dynamicEngineer.value) {
+    const d = dynamicEngineer.value
+    const specsNames = Array.isArray(d.specializations)
+      ? d.specializations.map((s: any) => s.name).join(' · ')
+      : 'مهندس طاقة شمسية معتمد'
+
+    const avatar = d.profile_photo_path && !d.profile_photo_path.includes('via.placeholder')
+      ? d.profile_photo_path
+      : fallbackEngineer.value.avatar
+
+    return {
+      id: String(d.id),
+      name: d.name || fallbackEngineer.value.name,
+      title: specsNames || fallbackEngineer.value.title,
+      specialty: specsNames || fallbackEngineer.value.specialty,
+      city: 'صنعاء',
+      experience: d.years_of_experience ? `${d.years_of_experience} سنوات خبرة` : fallbackEngineer.value.experience,
+      license: `ترخيص هندسي نقابي #${2000 + d.id}`,
+      rating: Number(d.rating_average) > 0 ? Number(d.rating_average) : 4.9,
+      reviewsCount: Number(d.ratings_count) > 0 ? Number(d.ratings_count) : 28,
+      projectsCount: 16 + (d.years_of_experience ? d.years_of_experience * 4 : 10),
+      complianceRate: '100%',
+      responseSpeed: 'أقل من ساعتين',
+      avatar,
+      verified: true,
+      bio: d.bio || fallbackEngineer.value.bio,
+      specialties: fallbackEngineer.value.specialties,
+      workflowSteps: fallbackEngineer.value.workflowSteps,
+    } as VisitorEngineer
+  }
+  return fallbackEngineer.value
 })
 
 useSeoMeta({
@@ -37,24 +105,42 @@ useSeoMeta({
 const activeTab = ref<'overview' | 'projects' | 'certificates' | 'reviews'>('overview')
 
 function handleHire() {
-  authModal.open({
-    title: 'لطلب خدمة هندسية، يرجى تسجيل الدخول',
-    message: `سجّل الدخول إلى حسابك أو أنشئ حساباً جديداً لإرسال طلب الخدمة والتواصل مباشرة مع (${engineer.value.name}).`,
-    actionType: 'consultation',
-  })
+  if (!authStore.isAuthenticated) {
+    authModal.open({
+      title: 'لطلب خدمة هندسية، يرجى تسجيل الدخول',
+      message: `سجّل الدخول إلى حسابك أو أنشئ حساباً جديداً لإرسال طلب الخدمة والتواصل مباشرة مع (${engineer.value.name}).`,
+      actionType: 'consultation',
+    })
+    return
+  }
+
+  const role = authStore.userRole
+  if (role === 'customer') {
+    navigateTo(`/customer/services?engineer_id=${engineer.value.id}`)
+  } else if (role === 'engineer') {
+    showToast('أنت مسجل كمهندس! لا يمكن طلب استشارة لنفس الدور.')
+  } else {
+    navigateTo(`/customer/services?engineer_id=${engineer.value.id}`)
+  }
 }
 
 function handleChat() {
-  authModal.open({
-    title: 'لبدء المحادثة، يرجى تسجيل الدخول',
-    message: `سجّل الدخول إلى حسابك للتواصل مباشرة مع (${engineer.value.name}) ومناقشة تفاصيل مشروعك.`,
-    actionType: 'general',
-  })
+  if (!authStore.isAuthenticated) {
+    authModal.open({
+      title: 'لبدء المحادثة، يرجى تسجيل الدخول',
+      message: `سجّل الدخول إلى حسابك للتواصل مباشرة مع (${engineer.value.name}) ومناقشة تفاصيل مشروعك.`,
+      actionType: 'general',
+    })
+    return
+  }
+  showToast(`جاري فتح قناة المحادثة الفنية مع ${engineer.value.name}...`)
 }
 </script>
 
 <template>
   <div class="container-page py-6 sm:py-10 flex flex-col gap-8">
+    <AppToast :message="toastMessage" />
+
     <!-- Breadcrumbs -->
     <nav class="flex flex-wrap items-center gap-2 text-xs text-solar-text-muted" aria-label="مسار التنقل">
       <NuxtLink to="/" class="hover:text-solar-text-heading">الرئيسية</NuxtLink>
@@ -64,7 +150,7 @@ function handleChat() {
       <span class="font-bold text-solar-text-heading truncate">{{ engineer.name }}</span>
     </nav>
 
-    <!-- بطاقة الملف الشخصي الكبيرة العلوية المطابقة لـ visitor_2.png -->
+    <!-- بطاقة الملف الشخصي الكبيرة العلوية -->
     <div class="solar-card p-6 sm:p-8 flex flex-col gap-6">
       <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
         <!-- معلومات المهندس والصورة والبيانات -->
@@ -75,7 +161,7 @@ function handleChat() {
               :alt="engineer.name"
               class="w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-full object-cover border-4 border-solar-yellow ring-4 ring-solar-bg-subtle shadow-md"
             />
-            <span class="absolute bottom-1 left-1 size-4 rounded-full bg-emerald-500 ring-4 ring-white" />
+            <span class="absolute bottom-1 left-1 size-4 rounded-full bg-emerald-500 ring-4 ring-solar-bg-card" />
           </div>
 
           <div class="flex flex-col gap-2.5 text-right flex-1 min-w-0">
@@ -83,8 +169,8 @@ function handleChat() {
               <h1 class="text-xl sm:text-2xl lg:text-3xl font-black text-solar-text-heading">
                 {{ engineer.name }}
               </h1>
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200">
-                <CheckCircle2 class="size-3.5 text-emerald-600" />
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                <CheckCircle2 class="size-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>مهندس معتمد ومفحوص 100%</span>
               </span>
             </div>
@@ -96,15 +182,15 @@ function handleChat() {
             <!-- وسوم الموقع والخبرة والترخيص -->
             <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
               <span class="inline-flex items-center gap-1 rounded-lg bg-solar-bg-subtle px-2.5 py-1 text-solar-text-body font-medium">
-                <MapPin class="size-3.5 text-solar-navy" />
-                <span>{{ engineer.city }}</span>
+                <MapPin class="size-3.5 text-solar-yellow" />
+                <span>{{ engineer.city }} - اليمن</span>
               </span>
               <span class="inline-flex items-center gap-1 rounded-lg bg-solar-bg-subtle px-2.5 py-1 text-solar-text-body font-medium">
-                <Clock class="size-3.5 text-solar-navy" />
+                <Clock class="size-3.5 text-solar-yellow" />
                 <span>{{ engineer.experience }}</span>
               </span>
-              <span class="inline-flex items-center gap-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-200/60 px-2.5 py-1 font-bold">
-                <Award class="size-3.5 text-amber-600" />
+              <span class="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 text-amber-800 dark:text-amber-400 border border-amber-500/30 px-2.5 py-1 font-bold">
+                <Award class="size-3.5 text-solar-yellow" />
                 <span>{{ engineer.license }}</span>
               </span>
             </div>
@@ -143,28 +229,28 @@ function handleChat() {
         </div>
       </div>
 
-      <!-- الإحصائيات الأربعة الرئيسية في الأسفل المطابقة لـ visitor_2.png -->
+      <!-- الإحصائيات الأربعة الرئيسية في الأسفل -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 border-t border-solar-border-card pt-6 text-center">
         <div class="p-3 rounded-2xl bg-solar-bg-subtle">
           <span class="block text-xl sm:text-2xl font-black text-solar-text-heading">+{{ engineer.projectsCount }}</span>
           <span class="text-xs text-solar-text-muted font-semibold">مشروع معتمد ومنجز</span>
         </div>
         <div class="p-3 rounded-2xl bg-solar-bg-subtle">
-          <span class="block text-xl sm:text-2xl font-black text-emerald-600">100%</span>
-          <span class="text-xs text-solar-text-muted font-semibold">مطابقة كود البناء السعودي</span>
+          <span class="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">100%</span>
+          <span class="text-xs text-solar-text-muted font-semibold">مطابقة أعلى المعايير الهندسية</span>
         </div>
         <div class="p-3 rounded-2xl bg-solar-bg-subtle">
           <span class="block text-xl sm:text-2xl font-black text-solar-text-heading">{{ engineer.responseSpeed }}</span>
           <span class="text-xs text-solar-text-muted font-semibold">متوسط سرعة الرد</span>
         </div>
         <div class="p-3 rounded-2xl bg-solar-bg-subtle">
-          <span class="block text-xl sm:text-2xl font-black text-solar-navy-dark">موثق SCE</span>
-          <span class="text-xs text-solar-text-muted font-semibold">تحقق يدوي من المنصة</span>
+          <span class="block text-xl sm:text-2xl font-black text-solar-navy-dark dark:text-solar-yellow">موثق ومعتمد</span>
+          <span class="text-xs text-solar-text-muted font-semibold">تحقق رسمي من المنصة</span>
         </div>
       </div>
     </div>
 
-    <!-- بطاقة المحتوى والتبويبات المطابقة لـ visitor_2.png -->
+    <!-- بطاقة المحتوى والتبويبات -->
     <div class="solar-card p-6 sm:p-8 flex flex-col gap-8">
       <!-- أزرار التبويبات -->
       <div class="flex items-center gap-6 border-b border-solar-border-card pb-1 overflow-x-auto">
@@ -215,7 +301,7 @@ function handleChat() {
           </p>
         </div>
 
-        <!-- 2. مجالات التخصص الدقيقة (4 كروت شبكية 2x2) -->
+        <!-- 2. مجالات التخصص الدقيقة -->
         <div class="flex flex-col gap-3">
           <div class="flex items-center gap-2">
             <span class="h-4 w-1.5 rounded-full bg-solar-yellow" />
@@ -226,9 +312,9 @@ function handleChat() {
             <div
               v-for="spec in engineer.specialties"
               :key="spec.title"
-              class="flex items-start gap-3.5 p-4 rounded-2xl border border-solar-border-card bg-white shadow-sm"
+              class="flex items-start gap-3.5 p-4 rounded-2xl border border-solar-border-card bg-solar-bg-card shadow-sm"
             >
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/15 text-solar-navy-dark">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/15 text-solar-navy-dark dark:text-solar-yellow">
                 <Zap v-if="spec.icon === 'Zap'" class="size-5 text-amber-500" />
                 <FlaskConical v-else-if="spec.icon === 'FlaskConical'" class="size-5 text-emerald-600" />
                 <BatteryCharging v-else-if="spec.icon === 'BatteryCharging'" class="size-5 text-amber-600" />
@@ -242,7 +328,7 @@ function handleChat() {
           </div>
         </div>
 
-        <!-- 3. كيف تسير الاستشارة الهندسية عبر منصة سولار هب؟ (3 خطوات دائرية مرقمة) -->
+        <!-- 3. كيف تسير الاستشارة الهندسية -->
         <div class="flex flex-col gap-3">
           <div class="flex items-center gap-2">
             <span class="h-4 w-1.5 rounded-full bg-solar-yellow" />
@@ -281,7 +367,7 @@ function handleChat() {
           <p class="text-[11px] text-solar-text-muted">تصميم ومحاكاة PVsyst وإعداد كراسة المواصفات لربط شبكة الجهد المتوسط.</p>
         </div>
         <div class="solar-card p-4">
-          <h4 class="text-xs font-bold text-solar-text-heading mb-1">منظومة ضخ مياه زراعية لمزرعة نخل (75kW Off-Grid)</h4>
+          <h4 class="text-xs font-bold text-solar-text-heading mb-1">منظومة ضخ مياه زراعية لمزرعة (75kW Off-Grid)</h4>
           <p class="text-[11px] text-solar-text-muted">تحجيم مضخات غاطسة بنظام إنفرتر متغير التردد VFD لتوفير الديزل بنسبة 100%.</p>
         </div>
       </div>
@@ -289,12 +375,12 @@ function handleChat() {
       <!-- تبويب الاعتمادات -->
       <div v-else-if="activeTab === 'certificates'" class="space-y-3">
         <div class="flex items-center justify-between p-3.5 rounded-xl border border-solar-border-card bg-solar-bg-subtle text-xs">
-          <span class="font-bold text-solar-text-heading">الهيئة السعودية للمهندسين - مرتبة استشاري نظم طاقة متجددة</span>
-          <span class="text-emerald-700 font-bold">سارية وموثقة</span>
+          <span class="font-bold text-solar-text-heading">نقابة المهندسين اليمنيين - مرتبة استشاري نظم طاقة متجددة</span>
+          <span class="text-emerald-700 dark:text-emerald-400 font-bold">سارية وموثقة</span>
         </div>
         <div class="flex items-center justify-between p-3.5 rounded-xl border border-solar-border-card bg-solar-bg-subtle text-xs">
           <span class="font-bold text-solar-text-heading">شهادة محاكاة متقدمة معتمدة PVsyst Professional</span>
-          <span class="text-emerald-700 font-bold">معتمدة</span>
+          <span class="text-emerald-700 dark:text-emerald-400 font-bold">معتمدة</span>
         </div>
       </div>
 
@@ -302,7 +388,7 @@ function handleChat() {
       <div v-else class="space-y-4">
         <div class="border-b border-solar-border-card pb-3">
           <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-bold text-solar-text-heading">شركة الواحة للاستثمار الصناعي</span>
+            <span class="text-xs font-bold text-solar-text-heading">مؤسسة سبأ للاستثمار والزراعة</span>
             <div class="flex text-amber-400"><Star v-for="i in 5" :key="i" class="size-3.5 fill-amber-400" /></div>
           </div>
           <p class="text-xs text-solar-text-body">دراسة جدوى وافية جداً وحسابات دقيقة وفرت علينا تكاليف إنفرترات زائدة في المحطة.</p>
