@@ -562,6 +562,7 @@ export const useAdminPermissions = () => {
       ? currentUser.permissions
       : authCookiePerms
 
+    // التحقق الدقيق وفق الصلاحيات المسندة لهذا المشرف
     if (userPerms && userPerms.length > 0) {
       if (Array.isArray(permission)) {
         return permission.some(p => userPerms.includes(p))
@@ -569,7 +570,8 @@ export const useAdminPermissions = () => {
       return userPerms.includes(permission)
     }
 
-    if (currentUser.role === 'admin' || !currentUser.role) {
+    // في حال عدم توفر الصلاحيات أثناء تهيئة الـ SSR الأولية
+    if (!currentUser && authCookiePerms.length === 0) {
       return true
     }
 

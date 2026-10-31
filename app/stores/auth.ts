@@ -59,6 +59,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setAuth(newUser: any, newToken: string) {
     token.value = newToken
+    if (import.meta.client) {
+      try {
+        localStorage.setItem('solarhub_token', newToken)
+        localStorage.setItem('auth_token', newToken)
+      } catch {}
+    }
     setUser(newUser)
     isInitialized.value = true
   }
@@ -87,12 +93,31 @@ export const useAuthStore = defineStore('auth', () => {
       }
       user.value = normalizedUser
       authUserCookie.value = normalizedUser
+      if (Array.isArray(newUser.permissions) && newUser.permissions.length > 0) {
+        authPermissionsCookie.value = newUser.permissions
+      }
+      if (import.meta.client) {
+        try {
+          localStorage.setItem('solarhub_user', JSON.stringify(normalizedUser))
+        } catch {}
+      }
     }
     isInitialized.value = true
   }
 
   function setToken(newToken: string | null) {
     token.value = newToken
+    if (import.meta.client) {
+      try {
+        if (newToken) {
+          localStorage.setItem('solarhub_token', newToken)
+          localStorage.setItem('auth_token', newToken)
+        } else {
+          localStorage.removeItem('solarhub_token')
+          localStorage.removeItem('auth_token')
+        }
+      } catch {}
+    }
   }
 
   function clearAuth() {
@@ -100,6 +125,13 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     authUserCookie.value = null
     authPermissionsCookie.value = []
+    if (import.meta.client) {
+      try {
+        localStorage.removeItem('solarhub_token')
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('solarhub_user')
+      } catch {}
+    }
     isInitialized.value = true
     clearErrors()
   }
@@ -177,9 +209,16 @@ export const useAuthStore = defineStore('auth', () => {
     const targetId = userId || user.value?.id
     if (!targetId) return []
 
+    // 1. If permissions already exist on user object, sync cookie and return immediately
+    if (user.value && String(user.value.id) === String(targetId) && Array.isArray(user.value.permissions) && user.value.permissions.length > 0) {
+      authPermissionsCookie.value = user.value.permissions
+      return user.value.permissions
+    }
+
+    // 2. Fetch using apiRequest with explicit Authorization Bearer token
     try {
-      const res = await $fetch<{ status: string; data?: { all_permissions?: string[] } }>(`/api/admin/permissions/users/${targetId}`)
-      if (res?.status === 'success' && res.data?.all_permissions) {
+      const res = await apiRequest<any>(`/admin/permissions/users/${targetId}`)
+      if (res.success && res.data?.all_permissions) {
         const perms = res.data.all_permissions
         if (user.value && String(user.value.id) === String(targetId)) {
           user.value.permissions = perms
@@ -190,7 +229,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       // Fallback silently to existing cookie
     }
-    return authPermissionsCookie.value || []
+    return authPermissionsCookie.value || user.value?.permissions || []
   }
 
   /**
@@ -207,8 +246,8 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await apiRequest<any>('/auth/me')
       if (res.success && res.data) {
         setUser(res.data)
-        if (res.data.id) {
-          await fetchUserPermissions(res.data.id)
+        if (res.data.id && (!res.data.permissions || res.data.permissions.length === 0)) {
+          await fetchUserPermissions(res.data.id).catch(() => {})
         }
         return user.value
       } else {
@@ -238,10 +277,9 @@ export const useAuthStore = defineStore('auth', () => {
       })
 
       if (res.success && res.data) {
-        token.value = res.data.token
-        setUser(res.data.user)
-        if (res.data.user?.id) {
-          await fetchUserPermissions(res.data.user.id)
+        setAuth(res.data.user, res.data.token)
+        if (res.data.user?.id && (!res.data.user.permissions || res.data.user.permissions.length === 0)) {
+          await fetchUserPermissions(res.data.user.id).catch(() => {})
         }
         return { success: true, user: user.value }
       }
