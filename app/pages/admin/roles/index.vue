@@ -303,6 +303,9 @@ function getGroupIcon(iconName: string) {
                 @change="selectUser(($event.target as HTMLSelectElement).value)"
                 class="solar-input h-11 w-full pl-9 pr-10 text-xs font-bold text-solar-text-heading appearance-none bg-white cursor-pointer hover:border-solar-navy/30 transition-colors"
               >
+                <option v-if="adminUsers.length === 0" value="" disabled selected>
+                  {{ isLoading ? 'جاري تحميل المشرفين...' : 'لا يوجد مشرفون مسجلون' }}
+                </option>
                 <option v-for="user in adminUsers" :key="user.id" :value="user.id">
                   {{ user.name }} ({{ user.email }})
                 </option>

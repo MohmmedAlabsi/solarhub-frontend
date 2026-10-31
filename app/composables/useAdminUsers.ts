@@ -1,11 +1,23 @@
 import type { AdminUser, AdminUserStatus } from '../../types/admin'
 
+export interface CreateAdminUserPayload {
+  name: string
+  email: string
+  phone: string
+  password: string
+  password_confirmation: string
+  governorate_id?: number | null
+  status?: AdminUserStatus
+  default_coordinates?: string | null
+}
+
 export const useAdminUsers = () => {
   const { $api } = useNuxtApp()
   const { notify } = useAdminNotice()
 
   const users = useState<AdminUser[]>('admin_users_data', () => [])
   const isLoading = ref(false)
+  const isActionLoading = ref(false)
   const error = ref<string | null>(null)
 
   /**
@@ -78,9 +90,12 @@ export const useAdminUsers = () => {
 
       const mapped: AdminUser[] = Array.from(uniqueUsersMap.values()).map((item: any) => {
         let role = 'عميل سكني'
-        if (item.has_store) {
+        const itemRoles = Array.isArray(item.roles) ? item.roles : (item.role ? [item.role] : [])
+        if (itemRoles.includes('admin') || item.role === 'admin') {
+          role = 'مسؤول نظام'
+        } else if (item.has_store || itemRoles.includes('supplier')) {
           role = 'مورد معتمد'
-        } else if (item.has_engineer_profile) {
+        } else if (item.has_engineer_profile || itemRoles.includes('engineer')) {
           role = 'مهندس طاقة شمسية'
         }
 
@@ -120,6 +135,55 @@ export const useAdminUsers = () => {
       return users.value
     } finally {
       isLoading.value = false
+    }
+  }
+
+  /**
+   * إنشاء حساب مسؤول جديد (Admin) عبر الـ API
+   */
+  const createUser = async (
+    payload: CreateAdminUserPayload
+  ): Promise<{ success: boolean; error?: string; errors?: Record<string, string[]> }> => {
+    isActionLoading.value = true
+    try {
+      const res: any = await $api('/users', {
+        method: 'POST',
+        body: payload,
+      })
+
+      const raw = res?.data || res
+      const userStatus: AdminUserStatus =
+        raw.status === 'suspended' ? 'suspended' : raw.status === 'inactive' ? 'inactive' : 'active'
+
+      const newUser: AdminUser = {
+        id: String(raw.id),
+        name: raw.name || payload.name,
+        email: raw.email || payload.email,
+        phone: raw.phone || payload.phone,
+        city: raw.governorate?.name_ar || 'اليمن',
+        role: 'مسؤول نظام',
+        active: userStatus === 'active',
+        status: userStatus,
+        createdAt: raw.created_at || new Date().toISOString(),
+      }
+
+      // إضافة المستخدم الجديد مباشرة في بداية القائمة
+      users.value = [newUser, ...users.value.filter(u => u.id !== newUser.id)]
+
+      notify('تم إنشاء حساب المسؤول بنجاح.')
+      return { success: true }
+    } catch (err: any) {
+      console.error('Failed to create admin user:', err)
+      const fieldErrors = err?.data?.errors || err?.response?._data?.errors || {}
+      const msg = err?.data?.message || err?.userMessage || err?.message || 'تعذر إنشاء حساب المسؤول. يرجى مراجعة الحقول.'
+      notify(msg)
+      return {
+        success: false,
+        error: msg,
+        errors: fieldErrors,
+      }
+    } finally {
+      isActionLoading.value = false
     }
   }
 
@@ -169,8 +233,10 @@ export const useAdminUsers = () => {
   return {
     users,
     isLoading,
+    isActionLoading,
     error,
     fetchUsers,
+    createUser,
     updateUserStatus,
   }
 }
