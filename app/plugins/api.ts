@@ -9,13 +9,30 @@ export default defineNuxtPlugin(() => {
   })
 
   const getActiveToken = (): string | null => {
+    // 1. Direct cookie ref value
     if (tokenCookie.value) return tokenCookie.value
+
+    // 2. Client-side fallbacks (document.cookie and localStorage)
     if (import.meta.client) {
       try {
         const local = localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token')
-        if (local) return local
+        if (local) {
+          tokenCookie.value = local
+          return local
+        }
       } catch {
         /* storage fallback */
+      }
+
+      try {
+        const match = document.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/)
+        if (match && match[1]) {
+          const val = decodeURIComponent(match[1])
+          tokenCookie.value = val
+          return val
+        }
+      } catch {
+        /* cookie fallback */
       }
     }
     return null
@@ -49,6 +66,12 @@ export default defineNuxtPlugin(() => {
 
       // 401 Unauthorized: Session expired or invalid token
       if (status === 401) {
+        // Do NOT clear session or redirect if the request was an optional background permission check
+        const reqUrl = response?.url || ''
+        if (reqUrl.includes('/permissions/users/') || reqUrl.includes('/permissions/admins')) {
+          return
+        }
+
         tokenCookie.value = null
         if (import.meta.client) {
           try {

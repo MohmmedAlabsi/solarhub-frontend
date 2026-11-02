@@ -3,7 +3,7 @@ import { Download, Loader2, MapPin, RefreshCw, Search, Trash2, UserPlus } from '
 import AdminSectionHeading from '../../../components/admin/workspace/AdminSectionHeading.vue'
 import AdminModal from '../../../components/admin/common/AdminModal.vue'
 import AdminPagination from '../../../components/admin/common/AdminPagination.vue'
-import AdminDirectoryForm from '../../../components/admin/directory/AdminDirectoryForm.vue'
+import AdminUserCreateModal from '../../../components/admin/directory/AdminUserCreateModal.vue'
 import type { AdminUser, AdminUserStatus } from '../../../../types/admin'
 
 definePageMeta({ layout: 'admin' })
@@ -211,7 +211,8 @@ function exportList() {
       </div>
     </div>
 
-    <AdminDirectoryForm v-model="addOpen" kind="user" />
+    <!-- مودل إضافة مستخدم جديد (مسؤول نظام) متناسق مع جدول users -->
+    <AdminUserCreateModal v-model="addOpen" @created="page = 1" />
 
     <AdminModal v-model="deleteOpen" title="تأكيد حذف المستخدم" max-width="md">
       <p class="text-sm leading-7">هل تريد حذف المستخدم <strong>{{ selected?.name }}</strong> من القائمة المعروضة؟</p>

@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
     const payloadStr = JSON.stringify({ user_id: Number(id) })
     const { stdout } = await execFileAsync('php', [scriptPath, 'get_user_permissions', payloadStr], {
       cwd: 'G:\\solarhub-api',
-      timeout: 10000,
+      timeout: 60000,
     })
 
     return JSON.parse(stdout.trim())
