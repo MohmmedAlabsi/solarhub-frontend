@@ -20,6 +20,6 @@ const { notifications, totalCount, unreadCount, sentCount, activeTab, overview, 
     <ul v-else-if="viewState === 'ready'" class="flex min-w-0 flex-col gap-3" :aria-label="activeTab === 'sent' ? 'الإشعارات الصادرة' : 'الإشعارات الواردة'"><NotificationItem v-for="notification in notifications" :key="notification.id" :notification="notification" @activate="activateNotification" /></ul>
     <NotificationEmptyState v-else :filtered="viewState === 'filtered-empty'" :class="viewState === 'empty' ? 'mt-4' : ''" @reset="resetFilter" />
     <p v-if="noticeMessage" class="rounded-xl bg-solar-status-info-bg p-4 text-xs leading-7 text-solar-text-heading" role="status" aria-live="polite">{{ noticeMessage }}</p>
-    <p v-if="viewState !== 'empty'" class="text-[10px] text-solar-text-muted">{{ activeTab === 'sent' ? 'سجلات صادرة تجريبية فقط؛ لا تثبت إرسالًا أو تسليمًا أو قراءة فعلية من المستلم.' : 'بيانات تجريبية؛ حالة القراءة محفوظة داخل الجلسة فقط دون مزامنة الخادم.' }}</p>
+    <p v-if="viewState !== 'empty'" class="text-[10px] text-solar-text-muted">يتم مزامنة حالة الإشعارات وتحديثها تلقائياً مع خادم منصة SolarHub.</p>
   </div>
 </template>

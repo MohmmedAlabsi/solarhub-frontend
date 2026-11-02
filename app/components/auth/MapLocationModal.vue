@@ -7,6 +7,7 @@ interface Props {
   initialCoordinates?: { lat: number; lng: number }
   title?: string
   subtitle?: string
+  readonly?: boolean
 }
 
 defineProps<Props>()
@@ -23,6 +24,7 @@ const emit = defineEmits<{
     :initial-coordinates="initialCoordinates"
     :title="title"
     :subtitle="subtitle"
+    :readonly="readonly"
     @close="emit('close')"
     @select="(loc) => emit('select', loc)"
   />

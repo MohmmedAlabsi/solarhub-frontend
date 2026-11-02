@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowRight, Award, BatteryCharging, Droplets, FileText, Grid3X3, SlidersHorizontal, ThermometerSun } from 'lucide-vue-next'
+import { ArrowRight, Award, BatteryCharging, Droplets, FileText, Grid3X3, Loader2, SlidersHorizontal, ThermometerSun } from 'lucide-vue-next'
 import EngineerCertificateCard from '../../../components/customer/engineers/profile/EngineerCertificateCard.vue'
 import EngineerProfileHeader from '../../../components/customer/engineers/profile/EngineerProfileHeader.vue'
 import EngineerProfileTabs from '../../../components/customer/engineers/profile/EngineerProfileTabs.vue'
@@ -7,7 +7,7 @@ import EngineerProjectCard from '../../../components/customer/engineers/profile/
 import EngineerReviews from '../../../components/customer/engineers/profile/EngineerReviews.vue'
 
 definePageMeta({ layout: 'customer' })
-const { engineer, activeTab, backQuery, noticeMessage, selectTab, requestService, sendMessage } = useEngineerProfile()
+const { engineer, isLoading, activeTab, backQuery, noticeMessage, selectTab, requestService, sendMessage } = useEngineerProfile()
 useSeoMeta({ title: () => engineer.value ? `${engineer.value.name} | SolarHub` : 'المهندس غير موجود | SolarHub' })
 </script>
 
@@ -19,7 +19,12 @@ useSeoMeta({ title: () => engineer.value ? `${engineer.value.name} | SolarHub` :
       <template v-if="engineer"><span>/</span><span class="font-bold text-solar-text-heading">{{ engineer.name }}</span></template>
     </nav>
 
-    <template v-if="engineer">
+    <div v-if="isLoading" class="flex min-h-[350px] flex-col items-center justify-center solar-card p-12 text-center">
+      <Loader2 class="size-10 animate-spin text-solar-yellow mb-3" />
+      <p class="text-sm font-bold text-solar-text-heading">جارٍ تحميل ملف المهندس المعتمد...</p>
+    </div>
+
+    <template v-else-if="engineer">
       <EngineerProfileHeader :engineer="engineer" @service="requestService" @message="sendMessage" />
       <EngineerProfileTabs :active-tab="activeTab" :review-count="engineer.verifiedReviews" @select="selectTab" />
 
@@ -50,19 +55,19 @@ useSeoMeta({ title: () => engineer.value ? `${engineer.value.name} | SolarHub` :
         <div v-else class="rounded-2xl border border-dashed border-solar-border-card bg-white px-5 py-14 text-center">
           <Grid3X3 class="mx-auto size-10 text-solar-text-muted" aria-hidden="true" />
           <h3 class="mt-4 text-lg font-bold text-solar-text-heading">لا توجد مشاريع متاحة</h3>
-          <p class="mt-2 text-sm text-solar-text-muted">لم تُضف مشاريع لهذا المهندس ضمن البيانات التجريبية بعد.</p>
+          <p class="mt-2 text-sm text-solar-text-muted">لم تُضف مشاريع لهذا المهندس بعد.</p>
         </div>
       </section>
       <section v-else-if="activeTab === 'certificates'" class="solar-card p-5 sm:p-7" aria-labelledby="certificates-heading">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 id="certificates-heading" class="flex items-center gap-2 text-lg font-extrabold text-solar-text-heading"><Award class="size-5 text-amber-700" aria-hidden="true" /> الشهادات والاعتمادات المهنية الرسمية</h2>
-          <p class="text-xs text-solar-text-muted">بيانات تجريبية موثقة ضمن العرض فقط</p>
+          <p class="text-xs text-solar-text-muted">اعتمادات مهنية موثقة</p>
         </div>
         <div v-if="engineer.certificates.length" class="mt-5 grid gap-5 md:grid-cols-2">
           <EngineerCertificateCard v-for="certificate in engineer.certificates" :key="certificate.id" :certificate="certificate" />
         </div>
         <div v-else class="mt-5 rounded-xl border border-dashed border-solar-border-card bg-solar-bg-subtle px-5 py-12 text-center">
-          <Award class="mx-auto size-9 text-solar-text-muted" aria-hidden="true" /><h3 class="mt-3 font-bold text-solar-text-heading">لا توجد شهادات متاحة</h3><p class="mt-2 text-sm text-solar-text-muted">لم تُضف شهادات لهذا المهندس ضمن البيانات التجريبية بعد.</p>
+          <Award class="mx-auto size-9 text-solar-text-muted" aria-hidden="true" /><h3 class="mt-3 font-bold text-solar-text-heading">لا توجد شهادات متاحة</h3><p class="mt-2 text-sm text-solar-text-muted">لم تُضف شهادات لهذا المهندس بعد.</p>
         </div>
       </section>
     </template>

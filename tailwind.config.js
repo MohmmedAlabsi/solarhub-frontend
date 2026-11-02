@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     './app/components/**/*.{vue,js,ts}',
     './app/layouts/**/*.vue',
@@ -27,19 +28,19 @@ export default {
             divider: '#3E556D',
           },
           bg: {
-            page: '#F9F9FF',
-            card: '#FFFFFF',
-            subtle: '#F1F5F9',
+            page: 'var(--solar-bg-page, #F9F9FF)',
+            card: 'var(--solar-bg-card, #FFFFFF)',
+            subtle: 'var(--solar-bg-subtle, #F1F5F9)',
           },
           border: {
-            card: '#DBDDE1',
-            input: '#CBD5E1',
+            card: 'var(--solar-border-card, #DBDDE1)',
+            input: 'var(--solar-border-input, #CBD5E1)',
           },
           text: {
-            heading: '#0C253C',
-            body: '#334E68',
-            secondary: '#5A5E63',
-            muted: '#727579',
+            heading: 'var(--solar-text-heading, #0C253C)',
+            body: 'var(--solar-text-body, #334E68)',
+            secondary: 'var(--solar-text-secondary, #5A5E63)',
+            muted: 'var(--solar-text-muted, #727579)',
           },
           status: {
             success: '#059669',

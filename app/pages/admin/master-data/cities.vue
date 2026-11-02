@@ -56,10 +56,7 @@ const filteredCities = computed(() => {
     // Search query
     if (!searchQuery.value.trim()) return true
     const q = searchQuery.value.trim().toLowerCase()
-    return (
-      c.name_ar.toLowerCase().includes(q) ||
-      (c.name_en && c.name_en.toLowerCase().includes(q))
-    )
+    return c.name_ar.toLowerCase().includes(q)
   })
 })
 
@@ -70,7 +67,6 @@ const editingId = ref<number | null>(null)
 
 const form = ref({
   name_ar: '',
-  name_en: '',
   is_active: true,
 })
 
@@ -79,7 +75,6 @@ function openCreateModal() {
   editingId.value = null
   form.value = {
     name_ar: '',
-    name_en: '',
     is_active: true,
   }
   isModalOpen.value = true
@@ -90,7 +85,6 @@ function openEditModal(city: Governorate) {
   editingId.value = city.id
   form.value = {
     name_ar: city.name_ar,
-    name_en: city.name_en || '',
     is_active: city.is_active !== false,
   }
   isModalOpen.value = true
@@ -101,7 +95,6 @@ async function handleSaveCity() {
 
   const payload = {
     name_ar: form.value.name_ar.trim(),
-    name_en: form.value.name_en.trim() || undefined,
     is_active: form.value.is_active,
   }
 
@@ -195,7 +188,7 @@ async function executeDelete() {
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="البحث بالاسم العربي أو الإنجليزي..."
+              placeholder="البحث باسم المحافظة..."
               class="solar-input h-10 pr-9 pl-4 text-xs w-full"
             />
           </div>
@@ -220,8 +213,7 @@ async function executeDelete() {
           <thead class="bg-solar-bg-subtle/70 text-solar-text-muted font-bold border-b border-solar-border-card">
             <tr>
               <th class="py-3.5 px-4 font-bold text-center w-12">#</th>
-              <th class="py-3.5 px-4 font-bold">اسم المحافظة (بالعربية)</th>
-              <th class="py-3.5 px-4 font-bold">NAME (ENGLISH)</th>
+              <th class="py-3.5 px-4 font-bold">اسم المحافظة</th>
               <th class="py-3.5 px-4 font-bold text-center">حالة التفعيل</th>
               <th class="py-3.5 px-4 font-bold text-center">الإجراءات</th>
             </tr>
@@ -246,11 +238,6 @@ async function executeDelete() {
                   />
                   <span>{{ item.name_ar }}</span>
                 </span>
-              </td>
-
-              <!-- Name in English -->
-              <td class="py-4 px-4 font-mono font-medium text-solar-text-body text-xs" dir="ltr">
-                {{ item.name_en || '—' }}
               </td>
 
               <!-- حالة التفعيل -->
@@ -282,7 +269,7 @@ async function executeDelete() {
             </tr>
 
             <tr v-if="filteredCities.length === 0">
-              <td colspan="5" class="py-12 text-center text-solar-text-muted">
+              <td colspan="4" class="py-12 text-center text-solar-text-muted">
                 لا توجد محافظات مطابقة لمعايير البحث الحالية.
               </td>
             </tr>
@@ -301,24 +288,13 @@ async function executeDelete() {
     >
       <form @submit.prevent="handleSaveCity" class="flex flex-col gap-4">
         <div>
-          <label class="block text-xs font-bold text-solar-text-body mb-1.5">اسم المحافظة / المنطقة بالعربية *</label>
+          <label class="block text-xs font-bold text-solar-text-body mb-1.5">اسم المحافظة / المنطقة *</label>
           <input
             v-model="form.name_ar"
             type="text"
             required
             placeholder="مثال: الرياض أو صنعاء أو عدن"
             class="solar-input h-11 text-xs w-full"
-          />
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-solar-text-body mb-1.5">الاسم بالإنجليزية (ENGLISH)</label>
-          <input
-            v-model="form.name_en"
-            type="text"
-            placeholder="Riyadh Region"
-            dir="ltr"
-            class="solar-input h-11 text-xs text-right font-mono w-full"
           />
         </div>
 

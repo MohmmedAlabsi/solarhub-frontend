@@ -65,8 +65,8 @@ export const useAuth = () => {
 
       if (response?.data?.token && response?.data?.user) {
         authStore.setAuth(response.data.user, response.data.token)
-        if (response.data.user.id) {
-          await authStore.fetchUserPermissions(response.data.user.id)
+        if (response.data.user.id && (!response.data.user.permissions || response.data.user.permissions.length === 0)) {
+          await authStore.fetchUserPermissions(response.data.user.id).catch(() => {})
         }
       }
 
@@ -257,8 +257,8 @@ export const useAuth = () => {
 
       if (response?.data) {
         authStore.setUser(response.data)
-        if (response.data.id) {
-          await authStore.fetchUserPermissions(response.data.id)
+        if (response.data.id && (!response.data.permissions || response.data.permissions.length === 0)) {
+          await authStore.fetchUserPermissions(response.data.id).catch(() => {})
         }
         return response.data
       }
@@ -285,7 +285,7 @@ export const useAuth = () => {
     } finally {
       authStore.clearAuth()
       isLoading.value = false
-      navigateTo('/auth/login')
+      navigateTo('/auth/login', { replace: true })
     }
   }
 

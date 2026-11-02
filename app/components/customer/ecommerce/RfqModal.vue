@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { CheckCircle2, Send, X } from 'lucide-vue-next'
-import type { Product } from '~~/types/ecommerce'
+import { AlertCircle, CheckCircle2, Loader2, Send, X } from 'lucide-vue-next'
+import { useCustomerProducts } from '~~/app/composables/useCustomerProducts'
 
 interface RfqSubmission {
-  product: Product | null
+  product: any
   quantity: number
   notes: string
-  city: string
+  targetPrice?: number | null
 }
 
 const props = defineProps<{
-  product: Product | null
+  product: any
   isOpen: boolean
 }>()
 
@@ -19,23 +19,54 @@ const emit = defineEmits<{
   (e: 'submitted', rfqData: RfqSubmission): void
 }>()
 
+const { sendQuoteRequest, isActionLoading } = useCustomerProducts()
+
 const quantity = ref(1)
 const notes = ref('')
-const projectCity = ref('الرياض')
+const targetPrice = ref<number | null>(null)
 const isSubmitted = ref(false)
+const errorMessage = ref<string | null>(null)
 
-function submitRfq() {
-  isSubmitted.value = true
-  setTimeout(() => {
+watch(() => props.isOpen, (open) => {
+  if (open) {
+    quantity.value = props.product?.minOrderQty || 1
+    notes.value = ''
+    targetPrice.value = null
+    isSubmitted.value = false
+    errorMessage.value = null
+  }
+})
+
+async function submitRfq() {
+  if (!props.product) return
+
+  const storeProductId = props.product.storeProductId || props.product.id
+  errorMessage.value = null
+
+  try {
+    await sendQuoteRequest({
+      store_product_id: Number(storeProductId),
+      quantity: quantity.value,
+      customer_target_price: targetPrice.value,
+      customer_notes: notes.value,
+    })
+
+    isSubmitted.value = true
     emit('submitted', {
       product: props.product,
       quantity: quantity.value,
       notes: notes.value,
-      city: projectCity.value,
+      targetPrice: targetPrice.value,
     })
-    isSubmitted.value = false
-    emit('close')
-  }, 1600)
+
+    setTimeout(() => {
+      isSubmitted.value = false
+      emit('close')
+    }, 2000)
+  } catch (err: any) {
+    console.error('Failed to submit quote request:', err)
+    errorMessage.value = err?.userMessage || err?.data?.message || err?.message || 'حدث خطأ أثناء إرسال طلب عرض السعر، يرجى التأكد من تسجيل الدخول والمحاولة لاحقاً.'
+  }
 }
 </script>
 
@@ -69,8 +100,14 @@ function submitRfq() {
       <div v-else class="flex flex-col gap-4">
         <div class="flex flex-col gap-1 border-b border-solar-border-card pb-4">
           <span class="text-xs font-bold text-amber-600">طلب عرض سعر مخصص (RFQ)</span>
-          <h3 class="text-lg font-bold text-solar-text-heading">{{ product?.name }}</h3>
-          <p class="text-xs text-solar-text-muted">المورد المعتمد: {{ product?.storeName }}</p>
+          <h3 class="text-lg font-bold text-solar-text-heading">{{ product?.name || product?.title }}</h3>
+          <p class="text-xs text-solar-text-muted">المورد المعتمد: {{ product?.storeName || 'الوكيل المعتمد' }}</p>
+        </div>
+
+        <!-- رسالة الخطأ إن وجدت -->
+        <div v-if="errorMessage" class="flex items-center gap-2 rounded-xl bg-red-50 p-3 text-xs text-red-700 border border-red-200">
+          <AlertCircle class="size-4 shrink-0" />
+          <span>{{ errorMessage }}</span>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -85,14 +122,14 @@ function submitRfq() {
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold text-solar-text-body">موقع المشروع / المدينة:</label>
-            <select v-model="projectCity" class="solar-input">
-              <option value="الرياض">الرياض</option>
-              <option value="جدة">جدة</option>
-              <option value="الدمام">الدمام</option>
-              <option value="القصيم">القصيم</option>
-              <option value="المدينة المنورة">المدينة المنورة</option>
-            </select>
+            <label class="text-xs font-semibold text-solar-text-body">السعر المستهدف للوحدة (اختياري):</label>
+            <input
+              v-model.number="targetPrice"
+              type="number"
+              min="0"
+              placeholder="مثال: 450 ر.س"
+              class="solar-input"
+            />
           </div>
         </div>
 
@@ -101,30 +138,33 @@ function submitRfq() {
           <textarea
             v-model="notes"
             rows="3"
-            placeholder="مثال: بحاجة إلى دراسة توافق مع انفرتر هجين، أو توفير كابلات تيار مستمر..."
+            placeholder="حدد أي تفاصيل هندسية، اشتراطات التركيب، أو متطلبات الفاتورة والضمان..."
             class="solar-input resize-none"
           />
         </div>
 
-        <div class="mt-2 flex gap-3">
-          <button
-            type="button"
-            @click="submitRfq"
-            class="btn-primary flex-1 gap-2"
-          >
-            <Send class="size-4" />
-            <span>إرسال طلب السعر للمورد</span>
-          </button>
+        <div class="flex items-center justify-end gap-3 pt-2 border-t border-solar-border-card">
           <button
             type="button"
             @click="emit('close')"
-            class="btn-outline px-4"
+            class="btn-outline text-xs px-4 py-2.5"
+            :disabled="isActionLoading"
           >
             إلغاء
+          </button>
+
+          <button
+            type="button"
+            @click="submitRfq"
+            class="btn-primary text-xs px-6 py-2.5 gap-2"
+            :disabled="isActionLoading"
+          >
+            <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+            <Send v-else class="size-4" />
+            <span>إرسال الطلب للمورد</span>
           </button>
         </div>
       </div>
     </div>
   </div>
 </template>
-

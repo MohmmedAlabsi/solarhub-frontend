@@ -40,7 +40,7 @@ function handleRegister() {
         />
 
         <!-- نافذة المودال المطابقة لتصميم visitor_9.png -->
-        <div class="relative w-full max-w-sm rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-solar-border-card text-center z-10">
+        <div class="relative w-full max-w-sm rounded-3xl bg-solar-bg-card p-6 sm:p-7 shadow-2xl border border-solar-border-card text-center z-10">
           <!-- زر الإغلاق -->
           <button
             type="button"
@@ -52,7 +52,7 @@ function handleRegister() {
           </button>
 
           <!-- الأيقونة التنبيهية الذهبية -->
-          <div class="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200/60 text-amber-500 shadow-sm">
+          <div class="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 shadow-sm">
             <Lock class="size-7" />
           </div>
 

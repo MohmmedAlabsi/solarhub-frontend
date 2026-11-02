@@ -1,53 +1,255 @@
 <script setup lang="ts">
-import { ArrowLeft, ChevronDown, FileText, MapPin, Paperclip, ShieldCheck, SlidersHorizontal } from 'lucide-vue-next'
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  ChevronDown,
+  FileText,
+  Loader2,
+  MapPin,
+  Paperclip,
+  ShieldCheck,
+  SlidersHorizontal,
+} from 'lucide-vue-next'
 import FormField from '../../common/FormField.vue'
 import ServiceAttachments from './ServiceAttachments.vue'
-import { serviceOptions, serviceRegions } from '../../../composables/useServiceRequest'
+import { useCustomerServices } from '../../../composables/useCustomerServices'
 
-const { form, errors, attachments, submitting, submissionState, statusMessage, addAttachments, removeAttachment, submit } = useServiceRequest()
-const controlClass = 'solar-input min-h-11 min-w-0 disabled:opacity-60'
+const router = useRouter()
+const {
+  serviceTypes,
+  governorates,
+  isActionLoading,
+  error: apiError,
+  fetchServiceTypes,
+  fetchGovernorates,
+  createServiceRequest,
+} = useCustomerServices()
 
+const form = reactive({
+  serviceTypeId: '' as string | number,
+  governorateId: '' as string | number,
+  capacity: '',
+  description: '',
+  locationDetails: '',
+  locationCoordinates: '',
+})
+
+const errors = reactive<Record<string, string>>({})
+const attachments = shallowRef<File[]>([])
+const statusMessage = ref('')
+const submissionState = ref<'idle' | 'success' | 'error'>('idle')
 const isMapModalOpen = ref(false)
 
+const controlClass = 'solar-input min-h-11 min-w-0 disabled:opacity-60'
+
+onMounted(async () => {
+  await Promise.allSettled([
+    fetchServiceTypes(),
+    fetchGovernorates(),
+  ])
+})
+
 function handleLocationSelected(loc: { address: string; lat: number; lng: number; governorate?: string }) {
-  form.location = `${loc.address} (إحداثيات: ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)})`
-  if (loc.governorate) {
-    const match = serviceRegions.find(r => r.includes(loc.governorate!) || loc.governorate!.includes(r))
+  form.locationDetails = loc.address
+  form.locationCoordinates = `${loc.lat.toFixed(6)},${loc.lng.toFixed(6)}`
+
+  if (loc.governorate && governorates.value.length > 0) {
+    const match = governorates.value.find(g =>
+      g.name_ar.includes(loc.governorate!) || loc.governorate!.includes(g.name_ar)
+    )
     if (match) {
-      form.region = match
+      form.governorateId = match.id
     }
+  }
+}
+
+function addAttachments(files: File[]) {
+  if (isActionLoading.value) return
+  delete errors.attachments
+  const validFiles: File[] = []
+  const maxBytes = 10 * 1024 * 1024 // 10MB
+
+  for (const file of files) {
+    if (file.size > maxBytes) {
+      errors.attachments = `الملف ${file.name} يتجاوز الحجم المسموح (10 ميجابايت).`
+      continue
+    }
+    validFiles.push(file)
+  }
+
+  if (validFiles.length > 0) {
+    attachments.value = [...attachments.value, ...validFiles]
+  }
+}
+
+function removeAttachment(index: number) {
+  if (isActionLoading.value) return
+  attachments.value = attachments.value.filter((_, i) => i !== index)
+  delete errors.attachments
+}
+
+function validate(): boolean {
+  Object.keys(errors).forEach(k => delete errors[k])
+
+  if (!form.serviceTypeId) {
+    errors.serviceTypeId = 'يرجى اختيار نوع الخدمة الهندسية.'
+  }
+
+  if (!form.governorateId) {
+    errors.governorateId = 'يرجى اختيار المحافظة.'
+  }
+
+  if (form.description.trim().length < 15) {
+    errors.description = 'اكتب وصفاً تفصيلياً للمشروع لا يقل عن 15 حرفاً.'
+  }
+
+  if (form.capacity) {
+    const num = parseFloat(form.capacity.trim())
+    if (isNaN(num) || num <= 0) {
+      errors.capacity = 'أدخل سعة رقمية موجبة (مثال: 15).'
+    }
+  }
+
+  return Object.keys(errors).length === 0
+}
+
+async function handleSubmit() {
+  if (isActionLoading.value) return
+  statusMessage.value = ''
+
+  if (!validate()) {
+    submissionState.value = 'error'
+    statusMessage.value = 'يرجى استكمال الحقول المطلوبة والموضحة باللون الأحمر.'
+    return
+  }
+
+  try {
+    const formData = new FormData()
+    formData.append('service_type_id', String(form.serviceTypeId))
+    if (form.governorateId) {
+      formData.append('governorate_id', String(form.governorateId))
+    }
+    if (form.capacity.trim()) {
+      formData.append('system_capacity_estimate', form.capacity.trim())
+    }
+    formData.append('description', form.description.trim())
+    if (form.locationDetails.trim()) {
+      formData.append('location_details', form.locationDetails.trim())
+    }
+    if (form.locationCoordinates.trim()) {
+      formData.append('location_coordinates', form.locationCoordinates.trim())
+    }
+    if (attachments.value.length > 0) {
+      formData.append('attachment', attachments.value[0])
+    }
+
+    const created = await createServiceRequest(formData)
+    submissionState.value = 'success'
+    statusMessage.value = 'تم نشر طلب الخدمة الهندسية بنجاح! سيتم تحويلك إلى صفحة تفاصيل الطلب...'
+
+    setTimeout(() => {
+      router.push(`/customer/services/${created.id || ''}`)
+    }, 1200)
+  } catch (err: any) {
+    submissionState.value = 'error'
+    statusMessage.value =
+      err?.data?.message || err?.message || 'تعذر إرسال الطلب، يرجى التحقق من الاتصال والمحاولة مجدداً.'
   }
 }
 </script>
 
 <template>
-  <form novalidate class="service-request-form rounded-xl border border-[#f0f0f5] bg-white px-5 pb-10 pt-8 sm:px-10 sm:pt-16" :aria-busy="submitting" @submit.prevent="submit">
-    <fieldset :disabled="submitting" class="min-w-0 space-y-12 sm:space-y-[52px]" aria-label="بيانات طلب خدمة هندسية جديدة">
+  <form novalidate class="service-request-form rounded-2xl border border-solar-border-card bg-white p-6 sm:p-10 shadow-sm" :aria-busy="isActionLoading" @submit.prevent="handleSubmit">
+    <fieldset :disabled="isActionLoading" class="min-w-0 space-y-10" aria-label="بيانات طلب خدمة هندسية جديدة">
+      <!-- القسم الأول: بيانات الخدمة -->
       <section aria-labelledby="service-data-heading">
-        <h2 id="service-data-heading" class="mb-5 flex items-center gap-2 text-lg font-bold text-solar-text-heading"><SlidersHorizontal class="size-8 rounded-lg bg-solar-status-info-bg p-1.5" aria-hidden="true" />القسم الأول: بيانات الخدمة</h2>
+        <h2 id="service-data-heading" class="mb-5 flex items-center gap-2 text-base font-bold text-solar-text-heading">
+          <SlidersHorizontal class="size-8 rounded-xl bg-solar-status-info-bg p-1.5 text-solar-navy-dark" aria-hidden="true" />
+          <span>القسم الأول: بيانات الخدمة والموقع</span>
+        </h2>
+
         <div class="grid gap-6 md:grid-cols-3">
+          <!-- نوع الخدمة -->
           <div>
-            <FormField label="نوع الخدمة الهندسية" required :error="errors.serviceType"><span class="relative block"><select v-model="form.serviceType" :class="controlClass" class="appearance-none pl-9" required :aria-invalid="!!errors.serviceType"><option value="" disabled>اختر نوع الخدمة الهندسية</option><option v-for="option in serviceOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select><ChevronDown class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-solar-text-muted" aria-hidden="true" /></span></FormField>
-            <p class="mt-2 max-w-[240px] text-xs leading-[14px] text-solar-text-muted">اختر طبيعة الاستشارة أو الخدمة الفنية المطلوبة لمشروعك.</p>
+            <FormField label="نوع الخدمة الهندسية" required :error="errors.serviceTypeId">
+              <span class="relative block">
+                <select v-model="form.serviceTypeId" :class="controlClass" class="appearance-none pl-9" required :aria-invalid="!!errors.serviceTypeId">
+                  <option value="" disabled>اختر نوع الخدمة الهندسية</option>
+                  <option v-for="type in serviceTypes" :key="type.id" :value="type.id">
+                    {{ type.name }}
+                  </option>
+                </select>
+                <ChevronDown class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-solar-text-muted" aria-hidden="true" />
+              </span>
+            </FormField>
+            <p class="mt-2 text-xs leading-relaxed text-solar-text-muted">اختر طبيعة الاستشارة أو الخدمة الفنية المطلوبة.</p>
           </div>
+
+          <!-- المحافظة -->
           <div>
-            <FormField label="المحافظة / المنطقة" required :error="errors.region"><span class="relative block"><select v-model="form.region" :class="controlClass" class="appearance-none pl-9" required :aria-invalid="!!errors.region"><option value="" disabled>اختر المحافظة</option><option v-for="region in serviceRegions" :key="region">{{ region }}</option></select><ChevronDown class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-solar-text-muted" aria-hidden="true" /></span></FormField>
-            <p class="mt-2 max-w-[240px] text-xs leading-[14px] text-solar-text-muted">المحافظة أو المنطقة الجغرافية التي يقع بها موقع المشروع.</p>
+            <FormField label="المحافظة" required :error="errors.governorateId">
+              <span class="relative block">
+                <select v-model="form.governorateId" :class="controlClass" class="appearance-none pl-9" required :aria-invalid="!!errors.governorateId">
+                  <option value="" disabled>اختر المحافظة</option>
+                  <option v-for="gov in governorates" :key="gov.id" :value="gov.id">
+                    {{ gov.name_ar }}
+                  </option>
+                </select>
+                <ChevronDown class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-solar-text-muted" aria-hidden="true" />
+              </span>
+            </FormField>
+            <p class="mt-2 text-xs leading-relaxed text-solar-text-muted">المحافظة أو المدينة التي يقع بها موقع المشروع.</p>
           </div>
+
+          <!-- السعة التقديرية -->
           <div>
-            <FormField label="السعة التقديرية للنظام" :error="errors.capacity"><input v-model="form.capacity" :class="controlClass" maxlength="100" placeholder="مثال: 15 كيلوواط (kW) أو سعة مضخة 10 حصان" :aria-invalid="!!errors.capacity" /></FormField>
-            <p class="mt-2 max-w-[240px] text-xs leading-[14px] text-solar-text-muted">القدرة الكهربائية المقدرة بالكيلوواط أو حجم النظام التقريبي المراد دراسته أو تركيبه.</p>
+            <FormField label="السعة التقديرية (كيلوواط - kW)" :error="errors.capacity">
+              <input
+                v-model="form.capacity"
+                type="number"
+                step="any"
+                min="0"
+                :class="controlClass"
+                placeholder="مثال: 15"
+                :aria-invalid="!!errors.capacity"
+              />
+            </FormField>
+            <p class="mt-2 text-xs leading-relaxed text-solar-text-muted">القدرة الكهربائية المقدرة بالكيلوواط أو حجم النظام المراد دراسته.</p>
           </div>
         </div>
       </section>
+
+      <!-- القسم الثاني: وصف المشروع -->
       <section aria-labelledby="description-heading">
-        <h2 id="description-heading" class="mb-5 flex items-center gap-2 text-lg font-bold text-solar-text-heading"><FileText class="size-8 rounded-lg bg-solar-status-info-bg p-1.5" aria-hidden="true" />القسم الثاني: وصف المشروع</h2>
-        <FormField label="وصف تفصيلي لاحتياج العميل" required :error="errors.description"><textarea v-model="form.description" :class="controlClass" class="h-[126px] min-h-[126px] resize-y" required minlength="20" maxlength="3000" :aria-invalid="!!errors.description" placeholder="وضح الغرض من النظام (سكني، تجاري، زراعي)، نوع المنظومة المطلوبة (متصلة بالشبكة، هجينة مع بطاريات، أو ضخ مياه)، وأي متطلبات خاصة ترغب في مراعاتها..." /></FormField>
-        <p class="mt-3 text-xs leading-4 text-solar-text-muted">اكتب شرحًا وافيًا للأحمال واحتياجات الطاقة لمساعدة المهندس على تقديم عرض دقيق.</p>
+        <h2 id="description-heading" class="mb-5 flex items-center gap-2 text-base font-bold text-solar-text-heading">
+          <FileText class="size-8 rounded-xl bg-solar-status-info-bg p-1.5 text-solar-navy-dark" aria-hidden="true" />
+          <span>القسم الثاني: وصف المشروع والاحتياج</span>
+        </h2>
+
+        <FormField label="وصف تفصيلي لاحتياجك من الخدمة" required :error="errors.description">
+          <textarea
+            v-model="form.description"
+            :class="controlClass"
+            class="h-28 min-h-28 resize-y"
+            required
+            minlength="15"
+            maxlength="3000"
+            :aria-invalid="!!errors.description"
+            placeholder="وضح الغرض من النظام (سكني، تجاري، زراعي ضخ مياه)، نوع المنظومة المطلوبة (متصلة بالشبكة، هجينة، بطاريات)، وأي متطلبات خاصة ترغب في مراعاتها..."
+          />
+        </FormField>
+        <p class="mt-2 text-xs leading-relaxed text-solar-text-muted">اكتب شرحاً وافياً للأحمال واحتياجات الطاقة لمساعدة المهندس على تقديم عرض دقيق.</p>
       </section>
+
+      <!-- القسم الثالث: معلومات الموقع والخريطة -->
       <section aria-labelledby="location-heading">
         <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h2 id="location-heading" class="flex items-center gap-2 text-lg font-bold text-solar-text-heading"><MapPin class="size-8 rounded-lg bg-solar-status-info-bg p-1.5" aria-hidden="true" />القسم الثالث: معلومات الموقع</h2>
+          <h2 id="location-heading" class="flex items-center gap-2 text-base font-bold text-solar-text-heading">
+            <MapPin class="size-8 rounded-xl bg-solar-status-info-bg p-1.5 text-solar-navy-dark" aria-hidden="true" />
+            <span>القسم الثالث: تفاصيل الموقع والإحداثيات</span>
+          </h2>
+
           <button
             type="button"
             @click="isMapModalOpen = true"
@@ -57,25 +259,74 @@ function handleLocationSelected(loc: { address: string; lat: number; lng: number
             <span>تحديد موقع المشروع على الخريطة</span>
           </button>
         </div>
-        <FormField label="معلومات الموقع والمكان" required :error="errors.location"><textarea v-model="form.location" :class="controlClass" class="h-[102px] min-h-[102px] resize-y" required minlength="10" maxlength="1500" :aria-invalid="!!errors.location" placeholder="مثال: مبنى سكني مكون من دورين وسطح خرساني معزول، أو مزرعة بأرض مستوية، والمدينة والحي بالتحديد..." /></FormField>
-        <p class="mt-3 text-xs leading-[18px] text-solar-text-muted">طبيعة المبنى أو الأرض، نوع السطح (خرساني، قرميد، شنكو، أرضي)، وسهولة الوصول للموقع.</p>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <FormField label="العنوان التفصيلي وطبيعة المكان" :error="errors.locationDetails">
+            <input
+              v-model="form.locationDetails"
+              type="text"
+              :class="controlClass"
+              placeholder="مثال: مبنى سكني مكون من دورين وسطح خرساني، حدة - شارع بيروت..."
+            />
+          </FormField>
+
+          <FormField label="الإحداثيات الجغرافية (خط العرض، خط الطول)">
+            <input
+              v-model="form.locationCoordinates"
+              type="text"
+              readonly
+              :class="controlClass"
+              class="bg-solar-bg-subtle text-solar-text-muted font-mono"
+              placeholder="يتم تحديدها تلقائياً من الخريطة (مثال: 15.3694, 44.1910)"
+            />
+          </FormField>
+        </div>
       </section>
+
+      <!-- القسم الرابع: المرفقات -->
       <section aria-labelledby="attachments-heading">
-        <h2 id="attachments-heading" class="mb-5 flex items-center gap-2 text-lg font-bold text-solar-text-heading"><Paperclip class="size-8 rounded-lg bg-solar-status-info-bg p-1.5" aria-hidden="true" />القسم الرابع: المرفقات</h2>
-        <p class="mb-2 text-sm text-solar-text-heading">ملفات توضيحية ومخططات (اختياري)</p>
-        <ServiceAttachments :files="attachments" :error="errors.attachments" :disabled="submitting" @add="addAttachments" @remove="removeAttachment" />
+        <h2 id="attachments-heading" class="mb-5 flex items-center gap-2 text-base font-bold text-solar-text-heading">
+          <Paperclip class="size-8 rounded-xl bg-solar-status-info-bg p-1.5 text-solar-navy-dark" aria-hidden="true" />
+          <span>القسم الرابع: المرفقات والمخططات (اختياري)</span>
+        </h2>
+        <ServiceAttachments :files="attachments" :error="errors.attachments" :disabled="isActionLoading" @add="addAttachments" @remove="removeAttachment" />
       </section>
     </fieldset>
-    <div class="mt-[58px] flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-      <p class="flex items-center gap-2 text-xs leading-5 text-solar-text-muted"><ShieldCheck class="size-4 shrink-0 text-[#856300]" aria-hidden="true" /><span>يتم فحص الطلب فورًا ومشاركته فقط مع نخبة المهندسين المعتمدين والمصنفين.<span class="block text-[11px] text-solar-text-muted">تجريبي داخل الجلسة؛ لن يُنشر طلب أو تُرفع ملفات.</span></span></p>
-      <button type="submit" :disabled="submitting || submissionState === 'success'" class="btn-primary h-11 w-full shrink-0 bg-[#ffc019] px-6 text-base font-bold text-[#17232e] shadow-none disabled:cursor-wait sm:w-[200px]">{{ submitting ? 'جارٍ الإرسال التجريبي...' : 'نشر الطلب' }}<ArrowLeft class="size-5" aria-hidden="true" /></button>
+
+    <!-- شريط الإجراء والزر النهائي -->
+    <div class="mt-8 flex flex-col gap-4 border-t border-solar-border-card pt-6 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-2 text-xs text-solar-text-muted">
+        <ShieldCheck class="size-4 text-emerald-600 shrink-0" />
+        <span>يتم مراجعة الطلب فوراً ومشاركته فقط مع نخبة المهندسين المعتمدين والمصنفين لدى المنصة.</span>
+      </div>
+
+      <button
+        type="submit"
+        :disabled="isActionLoading || submissionState === 'success'"
+        class="btn-primary h-11 w-full shrink-0 px-8 text-xs font-bold gap-2 sm:w-auto cursor-pointer disabled:opacity-50"
+      >
+        <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+        <ArrowLeft v-else class="size-4" />
+        <span>{{ isActionLoading ? 'جارٍ نشر الطلب...' : 'نشر طلب الخدمة الهندسية' }}</span>
+      </button>
     </div>
-    <p v-if="statusMessage" class="mt-4 rounded-lg p-4 text-sm leading-7" :class="submissionState === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-800'" role="status" aria-live="polite">{{ statusMessage }}</p>
+
+    <!-- رسالة الحالة والنتيجة -->
+    <div
+      v-if="statusMessage"
+      class="mt-4 flex items-center gap-3 rounded-xl p-4 text-xs font-semibold"
+      :class="submissionState === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'"
+      role="status"
+    >
+      <AlertCircle v-if="submissionState === 'error'" class="size-4 shrink-0 text-red-600" />
+      <CheckCircle2 v-else class="size-4 shrink-0 text-emerald-600" />
+      <span>{{ statusMessage }}</span>
+    </div>
 
     <!-- نافذة تحديد موقع المشروع على الخريطة -->
     <CommonMapLocationModal
       :is-open="isMapModalOpen"
-      :current-location="form.location"
+      :current-location="form.locationDetails"
       title="تحديد موقع مشروع الطاقة الشمسية على الخريطة"
       subtitle="حدد موقع السطح أو المزرعة أو المبنى لتمكين المهندسين من دراسة الإشعاع الشمسي وحساب التكاليف بدقة"
       @close="isMapModalOpen = false"
@@ -83,11 +334,3 @@ function handleLocationSelected(loc: { address: string; lat: number; lng: number
     />
   </form>
 </template>
-
-<style scoped>
-.service-request-form :deep(.solar-input) { border-color: #c8d3e6; border-radius: 8px; font-size: 13px; font-weight: 400; line-height: 20px; }
-.service-request-form :deep(.solar-input::placeholder) { color: #c5c8d3; opacity: 1; }
-.service-request-form :deep(label) { color: #13253f; font-weight: 400; line-height: 20px; }
-.service-request-form :deep(textarea.solar-input) { font-size: 14px; }
-.service-request-form h2 { line-height: 32px; }
-</style>

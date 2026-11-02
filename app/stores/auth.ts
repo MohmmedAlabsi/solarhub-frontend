@@ -14,6 +14,8 @@ export interface UserProfile {
     id: number
     name_ar: string
   } | string | null
+  default_coordinates?: string | null
+  store?: any
   has_store?: boolean
   has_engineer_profile?: boolean
   onboarding_status?: string
@@ -36,8 +38,14 @@ export const useAuthStore = defineStore('auth', () => {
     default: () => [],
   })
 
-  const user = ref<User | null>(null)
-  const isInitialized = ref(false)
+  const authUserCookie = useCookie<any | null>('auth_user', {
+    maxAge: 60 * 60 * 24 * 7,
+    sameSite: 'lax',
+    default: () => null,
+  })
+
+  const user = ref<User | null>(authUserCookie.value || null)
+  const isInitialized = ref(!!authUserCookie.value)
   const isAuthenticated = computed(() => !!token.value && !!user.value)
   const isEmailVerified = computed(() => !!user.value?.isVerified)
   const userRole = computed<UserRole | null>(() => (user.value?.role as UserRole) || null)
@@ -51,6 +59,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setAuth(newUser: any, newToken: string) {
     token.value = newToken
+    if (import.meta.client) {
+      try {
+        localStorage.setItem('solarhub_token', newToken)
+        localStorage.setItem('auth_token', newToken)
+      } catch {}
+    }
     setUser(newUser)
     isInitialized.value = true
   }
@@ -58,9 +72,10 @@ export const useAuthStore = defineStore('auth', () => {
   function setUser(newUser: any | null) {
     if (!newUser) {
       user.value = null
+      authUserCookie.value = null
       authPermissionsCookie.value = []
     } else {
-      user.value = {
+      const normalizedUser: User = {
         id: newUser.id,
         name: newUser.name,
         email: newUser.email,
@@ -69,10 +84,22 @@ export const useAuthStore = defineStore('auth', () => {
         status: newUser.status,
         governorate: typeof newUser.governorate === 'object' ? newUser.governorate?.name_ar : newUser.governorate,
         isVerified: !!(newUser.email_verified || newUser.isVerified || newUser.email_verified_at),
+        default_coordinates: newUser.default_coordinates || null,
+        store: newUser.store || null,
         has_store: newUser.has_store,
         has_engineer_profile: newUser.has_engineer_profile,
         createdAt: newUser.created_at || newUser.createdAt || new Date().toISOString(),
         permissions: Array.isArray(newUser.permissions) ? newUser.permissions : (authPermissionsCookie.value || []),
+      }
+      user.value = normalizedUser
+      authUserCookie.value = normalizedUser
+      if (Array.isArray(newUser.permissions) && newUser.permissions.length > 0) {
+        authPermissionsCookie.value = newUser.permissions
+      }
+      if (import.meta.client) {
+        try {
+          localStorage.setItem('solarhub_user', JSON.stringify(normalizedUser))
+        } catch {}
       }
     }
     isInitialized.value = true
@@ -80,12 +107,31 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setToken(newToken: string | null) {
     token.value = newToken
+    if (import.meta.client) {
+      try {
+        if (newToken) {
+          localStorage.setItem('solarhub_token', newToken)
+          localStorage.setItem('auth_token', newToken)
+        } else {
+          localStorage.removeItem('solarhub_token')
+          localStorage.removeItem('auth_token')
+        }
+      } catch {}
+    }
   }
 
   function clearAuth() {
     user.value = null
     token.value = null
+    authUserCookie.value = null
     authPermissionsCookie.value = []
+    if (import.meta.client) {
+      try {
+        localStorage.removeItem('solarhub_token')
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('solarhub_user')
+      } catch {}
+    }
     isInitialized.value = true
     clearErrors()
   }
@@ -163,9 +209,16 @@ export const useAuthStore = defineStore('auth', () => {
     const targetId = userId || user.value?.id
     if (!targetId) return []
 
+    // 1. If permissions already exist on user object, sync cookie and return immediately
+    if (user.value && String(user.value.id) === String(targetId) && Array.isArray(user.value.permissions) && user.value.permissions.length > 0) {
+      authPermissionsCookie.value = user.value.permissions
+      return user.value.permissions
+    }
+
+    // 2. Fetch using apiRequest with explicit Authorization Bearer token
     try {
-      const res = await $fetch<{ status: string; data?: { all_permissions?: string[] } }>(`/api/admin/permissions/users/${targetId}`)
-      if (res?.status === 'success' && res.data?.all_permissions) {
+      const res = await apiRequest<any>(`/admin/permissions/users/${targetId}`)
+      if (res.success && res.data?.all_permissions) {
         const perms = res.data.all_permissions
         if (user.value && String(user.value.id) === String(targetId)) {
           user.value.permissions = perms
@@ -176,7 +229,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       // Fallback silently to existing cookie
     }
-    return authPermissionsCookie.value || []
+    return authPermissionsCookie.value || user.value?.permissions || []
   }
 
   /**
@@ -193,8 +246,8 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await apiRequest<any>('/auth/me')
       if (res.success && res.data) {
         setUser(res.data)
-        if (res.data.id) {
-          await fetchUserPermissions(res.data.id)
+        if (res.data.id && (!res.data.permissions || res.data.permissions.length === 0)) {
+          await fetchUserPermissions(res.data.id).catch(() => {})
         }
         return user.value
       } else {
@@ -224,10 +277,9 @@ export const useAuthStore = defineStore('auth', () => {
       })
 
       if (res.success && res.data) {
-        token.value = res.data.token
-        setUser(res.data.user)
-        if (res.data.user?.id) {
-          await fetchUserPermissions(res.data.user.id)
+        setAuth(res.data.user, res.data.token)
+        if (res.data.user?.id && (!res.data.user.permissions || res.data.user.permissions.length === 0)) {
+          await fetchUserPermissions(res.data.user.id).catch(() => {})
         }
         return { success: true, user: user.value }
       }
@@ -252,12 +304,21 @@ export const useAuthStore = defineStore('auth', () => {
       const role = payload.role
 
       if (role === 'customer') {
-        const body = {
+        const body: Record<string, any> = {
           name: payload.name.trim(),
           email: payload.email.trim(),
           phone: payload.phone.trim(),
           password: payload.password,
           password_confirmation: payload.password_confirmation,
+        }
+
+        if (payload.governorate) body.governorate = payload.governorate
+        if (payload.governorate_id) body.governorate_id = payload.governorate_id
+        
+        const custCoords = (payload as any).default_coordinates || (payload as any).location_coordinates || (payload.location?.lat && payload.location?.lng ? `POINT(${payload.location.lng} ${payload.location.lat})` : null)
+        if (custCoords) {
+          body.default_coordinates = custCoords
+          body.location_coordinates = custCoords
         }
 
         const res = await apiRequest<any>('/auth/customer/register', {
@@ -294,7 +355,19 @@ export const useAuthStore = defineStore('auth', () => {
         const license = engPayload.licenseNumber || engPayload.license_number || `SCE-${Math.floor(100000 + Math.random() * 900000)}`
         formData.append('license_number', license)
 
-        // CV File
+        // Governorate & Coordinates
+        if (engPayload.governorate) formData.append('governorate', engPayload.governorate)
+        if (engPayload.governorate_id) formData.append('governorate_id', String(engPayload.governorate_id))
+        if (engPayload.location?.address) formData.append('address_details', engPayload.location.address)
+        if (engPayload.address_details || engPayload.addressDetails) formData.append('address_details', engPayload.address_details || engPayload.addressDetails)
+        
+        const engCoords = engPayload.default_coordinates || engPayload.location_coordinates || (engPayload.location?.lat && engPayload.location?.lng ? `POINT(${engPayload.location.lng} ${engPayload.location.lat})` : null)
+        if (engCoords) {
+          formData.append('location_coordinates', engCoords)
+          formData.append('default_coordinates', engCoords)
+        }
+
+        // CV File (strictly PDF)
         if (engPayload.cvFile) {
           formData.append('cv', engPayload.cvFile)
         }
@@ -339,9 +412,17 @@ export const useAuthStore = defineStore('auth', () => {
         const storeType = supPayload.storeType || supPayload.store_type || 'retailer'
         formData.append('store_type', storeType)
 
-        // Address details
-        const address = supPayload.addressDetails || supPayload.address_details || supPayload.governorate || 'المملكة العربية السعودية'
+        // Address details & Governorate
+        const address = supPayload.addressDetails || supPayload.address_details || supPayload.location?.address || supPayload.governorate || 'صنعاء'
         formData.append('address_details', address)
+        if (supPayload.governorate) formData.append('governorate', supPayload.governorate)
+        if (supPayload.governorate_id) formData.append('governorate_id', String(supPayload.governorate_id))
+
+        const supCoords = supPayload.default_coordinates || supPayload.location_coordinates || (supPayload.location?.lat && supPayload.location?.lng ? `POINT(${supPayload.location.lng} ${supPayload.location.lat})` : null)
+        if (supCoords) {
+          formData.append('location_coordinates', supCoords)
+          formData.append('default_coordinates', supCoords)
+        }
 
         // Commercial register file
         if (supPayload.commercialRegisterFile) {
@@ -443,6 +524,102 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Reset password with token from email link
+   */
+  async function resetPassword(payload: {
+    email: string
+    token: string
+    password: string
+    password_confirmation: string
+  }) {
+    isLoading.value = true
+    try {
+      const res = await apiRequest<null>('/auth/reset-password', {
+        method: 'POST',
+        body: {
+          email: payload.email.trim(),
+          token: payload.token.trim(),
+          password: payload.password,
+          password_confirmation: payload.password_confirmation,
+        },
+      })
+
+      return { success: res.success, message: res.message, error: res.error, errors: res.errors }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Update authenticated user's own profile (PUT /my/profile)
+   */
+  async function updateProfile(data: {
+    name?: string
+    phone?: string
+    governorate_id?: number
+    default_coordinates?: string
+    current_password?: string
+    password?: string
+    password_confirmation?: string
+  }) {
+    isLoading.value = true
+    try {
+      const res = await apiRequest<any>('/my/profile', {
+        method: 'PUT',
+        body: data,
+      })
+
+      if (res.success && res.data) {
+        setUser(res.data)
+        return { success: true, user: user.value, message: res.message || 'تم تحديث الملف الشخصي بنجاح' }
+      }
+
+      return { success: false, error: res.error, errors: res.errors }
+    } finally {
+      isLoading.value = false
+    }
+  }
+  /**
+   * Update store details (location, address, whatsapp, bio, etc.)
+   */
+  async function updateStore(storeId: number | string, data: {
+    company_name?: string
+    address_details?: string
+    location_coordinates?: string
+    whatsapp_number?: string
+    store_type?: string
+    bio?: string
+  }) {
+    isLoading.value = true
+    try {
+      const res = await apiRequest<any>(`/stores/${storeId}`, {
+        method: 'PUT',
+        body: data,
+      })
+      if (res.success && res.data) {
+        if (user.value && (user.value as any).store) {
+          (user.value as any).store = { ...(user.value as any).store, ...res.data }
+        }
+        return { success: true, store: res.data, message: res.message || 'تم تحديث بيانات المتجر والمستودع بنجاح' }
+      }
+      return { success: false, error: res.error, errors: res.errors }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Get appropriate dashboard path based on role
+   */
+  function getDashboardPath(role?: string | null): string {
+    const targetRole = (role || user.value?.role || '').trim().toLowerCase()
+    if (targetRole === 'admin') return '/admin'
+    if (targetRole === 'supplier') return '/supplier/dashboard'
+    if (targetRole === 'engineer') return '/engineer/dashboard'
+    return '/customer/dashboard'
+  }
+
+  /**
    * Logout user and revoke Sanctum access token
    */
   async function logout() {
@@ -452,7 +629,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } finally {
       clearAuth()
-      navigateTo('/auth/login')
+      navigateTo('/auth/login', { replace: true })
     }
   }
 
@@ -479,6 +656,10 @@ export const useAuthStore = defineStore('auth', () => {
     verifyOtp,
     resendOtp,
     forgotPassword,
+    resetPassword,
+    updateProfile,
+    updateStore,
+    getDashboardPath,
     logout,
   }
 })

@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
     })
     const { stdout } = await execFileAsync('php', [scriptPath, 'assign_role', payloadStr], {
       cwd: 'G:\\solarhub-api',
-      timeout: 10000,
+      timeout: 60000,
     })
 
     return JSON.parse(stdout.trim())

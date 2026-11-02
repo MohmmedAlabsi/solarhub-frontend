@@ -8,7 +8,7 @@ export default defineEventHandler(async () => {
     const scriptPath = 'G:\\solarhub-frontend\\server\\utils\\permissions-ops.php'
     const { stdout } = await execFileAsync('php', [scriptPath, 'fetch_permissions'], {
       cwd: 'G:\\solarhub-api',
-      timeout: 10000,
+      timeout: 60000,
     })
 
     return JSON.parse(stdout.trim())
