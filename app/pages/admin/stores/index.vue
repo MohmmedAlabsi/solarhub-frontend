@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ChevronDown, Download, Eye, Loader2, RefreshCw, Search, Trash2, UserPlus } from 'lucide-vue-next'
+import { ChevronDown, Download, Eye, Loader2, RefreshCw, Search, Trash2 } from 'lucide-vue-next'
 import AdminSectionHeading from '../../../components/admin/workspace/AdminSectionHeading.vue'
 import AdminPagination from '../../../components/admin/common/AdminPagination.vue'
 import AdminBadge from '../../../components/admin/common/AdminBadge.vue'
 import AdminModal from '../../../components/admin/common/AdminModal.vue'
-import AdminDirectoryForm from '../../../components/admin/directory/AdminDirectoryForm.vue'
 import AdminSupplierDetails from '../../../components/admin/directory/AdminSupplierDetails.vue'
 import type { AdminSupplier } from '../../../../types/admin'
 import { approvalLabels } from '../../../composables/useAdminWorkspace'
@@ -35,7 +34,6 @@ async function handleRefresh() {
 const query = ref('')
 const status = ref(String(route.query.status ?? 'all'))
 const storeType = ref('all')
-const addOpen = ref(false)
 const detailsOpen = ref(false)
 const deleteOpen = ref(false)
 const selected = ref<AdminSupplier>()
@@ -96,10 +94,6 @@ function exportList() {
       <button class="btn-outline" @click="exportList">
         <Download class="size-4" />
         تصدير القائمة
-      </button>
-      <button class="btn-dark" @click="page = 1; addOpen = true">
-        <UserPlus class="size-4" />
-        إضافة مورد جديد
       </button>
     </AdminSectionHeading>
 
@@ -224,7 +218,6 @@ function exportList() {
       </div>
     </div>
 
-    <AdminDirectoryForm v-model="addOpen" kind="supplier" />
     <AdminSupplierDetails v-model="detailsOpen" :record="selected" />
 
     <AdminModal v-model="deleteOpen" title="تأكيد حذف المورد" max-width="md">
