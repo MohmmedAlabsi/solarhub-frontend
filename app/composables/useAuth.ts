@@ -27,248 +27,46 @@ export const useAuth = () => {
     validationErrors.value = {}
   }
 
-  /**
-   * Helper to format backend validation error messages
-   */
-  const handleApiError = (err: any) => {
-    clearErrors()
-    if (err?.data) {
-      const data = err.data
-      if (data.errors) {
-        validationErrors.value = data.errors
-      }
-      error.value = data.message || 'حدث خطأ غير متوقع'
-    } else if (err?.message) {
-      error.value = err.message
-    } else {
-      error.value = 'تعذر الاتصال بالخادم، يرجى التحقق من اتصالك بالإنترنت'
-    }
-    return {
-      message: error.value,
-      errors: validationErrors.value,
-    }
-  }
+  let activeFetchCurrentUserPromise: Promise<any> | null = null
 
   /**
-   * Log in user
-   */
-  const loginUser = async (credentials: { login: string; password: string }, role?: string) => {
-    isLoading.value = true
-    clearErrors()
-
-    try {
-      const endpoint = role ? `/auth/${role}/login` : '/auth/login'
-      const response = await $api<ApiSuccessResponse<{ user: UserProfile; token: string }>>(endpoint, {
-        method: 'POST',
-        body: credentials,
-      })
-
-      if (response?.data?.token && response?.data?.user) {
-        authStore.setAuth(response.data.user, response.data.token)
-        if (response.data.user.id && (!response.data.user.permissions || response.data.user.permissions.length === 0)) {
-          await authStore.fetchUserPermissions(response.data.user.id).catch(() => {})
-        }
-      }
-
-      return {
-        success: true,
-        data: response.data,
-        message: response.message,
-      }
-    } catch (err: any) {
-      const errDetail = handleApiError(err)
-      return {
-        success: false,
-        error: errDetail.message,
-        errors: errDetail.errors,
-        status: err?.status || err?.statusCode,
-      }
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  /**
-   * Register a new user based on role
-   */
-  const registerUser = async (
-    role: 'customer' | 'engineer' | 'supplier',
-    payload: FormData | Record<string, any>
-  ) => {
-    isLoading.value = true
-    clearErrors()
-
-    try {
-      let response: ApiSuccessResponse<UserProfile>
-
-      if (role === 'customer') {
-        // Customer registration (JSON or FormData)
-        response = await $api<ApiSuccessResponse<UserProfile>>('/auth/customer/register', {
-          method: 'POST',
-          body: payload,
-        })
-      } else if (role === 'engineer') {
-        // Engineer registration with CV file (multipart/form-data)
-        response = await $api<ApiSuccessResponse<UserProfile>>('/auth/engineer/register', {
-          method: 'POST',
-          body: payload,
-        })
-      } else if (role === 'supplier') {
-        // Supplier registration with commercial register file (multipart/form-data)
-        response = await $api<ApiSuccessResponse<UserProfile>>('/auth/supplier/register', {
-          method: 'POST',
-          body: payload,
-        })
-      } else {
-        throw new Error('نوع الحساب غير صالح')
-      }
-
-      return {
-        success: true,
-        data: response.data,
-        message: response.message,
-      }
-    } catch (err: any) {
-      const errDetail = handleApiError(err)
-      return {
-        success: false,
-        error: errDetail.message,
-        errors: errDetail.errors,
-        status: err?.status || err?.statusCode,
-      }
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  /**
-   * Verify email OTP code
-   */
-  const verifyOtp = async (email: string, code: string) => {
-    isLoading.value = true
-    clearErrors()
-
-    try {
-      const response = await $api<ApiSuccessResponse<UserProfile>>('/auth/otp/verify', {
-        method: 'POST',
-        body: { email, code },
-      })
-
-      if (response?.data && authStore.user) {
-        authStore.setUser({
-          ...authStore.user,
-          ...response.data,
-          email_verified: true,
-          email_verified_at: new Date().toISOString(),
-        })
-      }
-
-      return {
-        success: true,
-        data: response.data,
-        message: response.message,
-      }
-    } catch (err: any) {
-      const errDetail = handleApiError(err)
-      return {
-        success: false,
-        error: errDetail.message,
-        errors: errDetail.errors,
-        status: err?.status || err?.statusCode,
-      }
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  /**
-   * Resend email OTP code
-   */
-  const resendOtp = async (email: string) => {
-    isLoading.value = true
-    clearErrors()
-
-    try {
-      const response = await $api<ApiSuccessResponse<null>>('/auth/otp/resend', {
-        method: 'POST',
-        body: { email },
-      })
-
-      return {
-        success: true,
-        message: response.message,
-      }
-    } catch (err: any) {
-      const errDetail = handleApiError(err)
-      return {
-        success: false,
-        error: errDetail.message,
-        errors: errDetail.errors,
-        status: err?.status || err?.statusCode,
-      }
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  /**
-   * Request password reset link
-   */
-  const forgotPassword = async (email: string) => {
-    isLoading.value = true
-    clearErrors()
-
-    try {
-      const response = await $api<ApiSuccessResponse<null>>('/auth/forgot-password', {
-        method: 'POST',
-        body: { email },
-      })
-
-      return {
-        success: true,
-        message: response.message,
-      }
-    } catch (err: any) {
-      const errDetail = handleApiError(err)
-      return {
-        success: false,
-        error: errDetail.message,
-        errors: errDetail.errors,
-        status: err?.status || err?.statusCode,
-      }
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  /**
-   * Fetch current authenticated user profile
+   * Fetch current authenticated user profile (deduplicated in-flight singleton)
    */
   const fetchCurrentUser = async () => {
+    if (activeFetchCurrentUserPromise) {
+      return activeFetchCurrentUserPromise
+    }
+
     if (!token.value) {
       authStore.clearAuth()
       return null
     }
 
-    try {
-      const response = await $api<ApiSuccessResponse<UserProfile>>('/auth/me', {
-        method: 'GET',
-      })
+    activeFetchCurrentUserPromise = (async () => {
+      try {
+        const response = await $api<ApiSuccessResponse<UserProfile>>('/auth/me', {
+          method: 'GET',
+        })
 
-      if (response?.data) {
-        authStore.setUser(response.data)
-        if (response.data.id && (!response.data.permissions || response.data.permissions.length === 0)) {
-          await authStore.fetchUserPermissions(response.data.id).catch(() => {})
+        if (response?.data) {
+          authStore.setUser(response.data)
+          if (response.data.id && (!response.data.permissions || response.data.permissions.length === 0)) {
+            await authStore.fetchUserPermissions(response.data.id).catch(() => {})
+          }
+          return response.data
         }
-        return response.data
+        return null
+      } catch (err: any) {
+        if (err?.status === 401) {
+          authStore.clearAuth()
+        }
+        return null
       }
-      return null
-    } catch (err: any) {
-      if (err?.status === 401) {
-        authStore.clearAuth()
-      }
-      return null
-    }
+    })().finally(() => {
+      activeFetchCurrentUserPromise = null
+    })
+
+    return activeFetchCurrentUserPromise
   }
 
   /**

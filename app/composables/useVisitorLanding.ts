@@ -226,7 +226,30 @@ export function useVisitorLanding() {
     }
   }
 
+  const landingStateCache = useState<{
+    products: VisitorProductItem[]
+    stores: VisitorStoreItem[]
+    engineers: VisitorEngineerItem[]
+    timestamp: number
+  } | null>('visitor_landing_cache', () => null)
+
   async function fetchVisitorData() {
+    // 1. Serve immediately from 5-minute client-side memory cache if valid
+    if (landingStateCache.value && Date.now() - landingStateCache.value.timestamp < 300000) {
+      allProducts.value = landingStateCache.value.products
+      allStores.value = landingStateCache.value.stores
+      allEngineers.value = landingStateCache.value.engineers
+      productChunkIndex.value = 0
+      storeChunkIndex.value = 0
+      engineerChunkIndex.value = 0
+      displayedProducts.value = getChunkSlice(allProducts.value, 0, 4)
+      displayedStores.value = getChunkSlice(allStores.value, 0, 3)
+      displayedEngineers.value = getChunkSlice(allEngineers.value, 0, 3)
+      isLoading.value = false
+      startRotationTimer()
+      return
+    }
+
     isLoading.value = true
     errorMessage.value = ''
 
@@ -259,6 +282,14 @@ export function useVisitorLanding() {
         allEngineers.value = Array.isArray(raw) ? raw.map(mapEngineer) : []
       } else {
         allEngineers.value = []
+      }
+
+      // حفظ في كاش الذاكرة المحلية
+      landingStateCache.value = {
+        products: allProducts.value,
+        stores: allStores.value,
+        engineers: allEngineers.value,
+        timestamp: Date.now(),
       }
 
       // تهيئة المعروضات الحالية والبدء التلقائي كل 10 ثواني
