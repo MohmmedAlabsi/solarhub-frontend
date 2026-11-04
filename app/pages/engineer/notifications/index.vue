@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock,
   Layers,
+  Loader2,
   MessageSquare,
   ShieldCheck,
   Star,
@@ -36,80 +37,54 @@ export interface EngineerNotification {
   iconColor: string
 }
 
+const { $api } = useNuxtApp()
 const filterTab = ref<'all' | 'unread'>('all')
 const toastMessage = ref('')
+const isLoading = ref(false)
 
-const notifications = ref<EngineerNotification[]>([
-  {
-    id: 1,
-    title: 'قبول العرض الهندسي للطلب #SR-2025-1042',
-    category: 'عروض مقبولة',
-    message: 'وافق العميل طارق منصور العمري على عرضك الهندسي لدراسة جدوى وتصميم محطة On-Grid بقدرة 25 kWp. يمكنك الآن بدء إعداد المخططات التنفيذية.',
-    time: 'اليوم، 11:30 ص',
-    read: false,
-    actionLabel: 'عرض تفاصيل المشروع والعرض',
-    actionLink: '/engineer/offers',
-    icon: CheckCircle2,
-    iconBg: 'bg-amber-100',
-    iconColor: 'text-amber-700',
-  },
-  {
-    id: 2,
-    title: 'طلب خدمة هندسية جديد متطابق مع تخصصك',
-    category: 'طلبات جديدة',
-    message: 'تم طرح طلب خدمة جديد: «فحص وتدقيق أداء محطة قائمة بقدرة 80 kWp في منطقة عسير». الطلب متاح الآن لتقديم العروض.',
-    time: 'اليوم، 09:15 ص',
-    read: false,
-    actionLabel: 'تقديم عرض هندسي',
-    actionLink: '/engineer/service-requests',
-    icon: Zap,
-    iconBg: 'bg-blue-100',
-    iconColor: 'text-blue-600',
-  },
-  {
-    id: 3,
-    title: 'تم التحقق ومزامنة الترخيص المهني بنجاح',
-    category: 'الاعتماد والتراخيص',
-    message: 'تم تحديث ومزامنة بيانات الاعتماد المهني الصادر من الهيئة السعودية للمهندسين (SCE-748921) ومطابقتها.',
-    time: 'أمس، 04:20 م',
-    read: true,
-    actionLabel: 'معاينة الملف المهني',
-    actionLink: '/engineer/profile',
-    icon: ShieldCheck,
-    iconBg: 'bg-blue-50',
-    iconColor: 'text-blue-600',
-  },
-  {
-    id: 4,
-    title: 'تقييم جديد من العميل لمشروع مكتمل',
-    category: 'التقييمات',
-    message: '«أضاف العميل فهد الدوسري تعليقاً: مهندس متميز ودقيق جداً في إعداد دراسة الجدوى ومخططات PVsyst.»',
-    time: '22 مايو 2024',
-    read: true,
-    rating: 5,
-    actionLabel: 'عرض التقييم في ملفك المهني',
-    actionLink: '/engineer/reviews',
-    icon: Star,
-    iconBg: 'bg-purple-50',
-    iconColor: 'text-purple-600',
-  },
-  {
-    id: 5,
-    title: 'استفسار جديد بخصوص العرض المقدم #OF-2025-084',
-    category: 'عروضي',
-    message: 'أرسل العميل استفساراً تقنياً حول الجدول الزمني لفحص واختبار التوافق مع كود البناء السعودي SBC.',
-    time: '18 مايو 2024',
-    read: true,
-    actionLabel: 'عرض تفاصيل العرض والرد',
-    actionLink: '/engineer/offers',
-    icon: MessageSquare,
-    iconBg: 'bg-gray-100',
-    iconColor: 'text-gray-700',
-  },
-])
+const notifications = ref<EngineerNotification[]>([])
+
+function formatRelativeTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'الآن'
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('ar-SA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return dateStr
+  }
+}
+
+async function loadNotifications() {
+  try {
+    isLoading.value = true
+    const res = await $api<any>('/my/notifications')
+    const items = res?.data || res
+    if (Array.isArray(items)) {
+      notifications.value = items.map((n: any) => ({
+        id: n.id,
+        title: n.title || 'إشعار من المنصة',
+        category: n.title?.includes('عرض') ? 'العروض' : n.title?.includes('طلب') ? 'طلبات جديدة' : 'تنبيه',
+        message: n.body || '',
+        time: formatRelativeTime(n.created_at),
+        read: !!n.is_read,
+        actionLabel: 'عرض التفاصيل',
+        actionLink: n.action_url || '/engineer/dashboard',
+        icon: n.title?.includes('عرض') ? CheckCircle2 : n.title?.includes('طلب') ? Zap : Bell,
+        iconBg: n.is_read ? 'bg-gray-100' : 'bg-amber-100',
+        iconColor: n.is_read ? 'text-gray-700' : 'text-amber-700',
+      }))
+    } else {
+      notifications.value = []
+    }
+  } catch {
+    notifications.value = []
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
-const totalCount = ref(6)
+const totalCount = computed(() => notifications.value.length)
 
 const filteredNotifications = computed(() => {
   if (filterTab.value === 'unread') {
@@ -118,9 +93,24 @@ const filteredNotifications = computed(() => {
   return notifications.value
 })
 
-function markAllAsRead() {
+async function markAllAsRead() {
+  try {
+    await $api('/my/notifications/read-all', { method: 'PATCH' })
+  } catch {
+    // Ignored if unsupported
+  }
   notifications.value.forEach(n => { n.read = true })
   showToast('تم تحديد جميع الإشعارات كمقروءة')
+}
+
+async function markSingleAsRead(item: EngineerNotification) {
+  if (item.read) return
+  item.read = true
+  try {
+    await $api(`/my/notifications/${item.id}/read`, { method: 'PATCH' })
+  } catch {
+    // Handled locally
+  }
 }
 
 function showToast(msg: string) {
@@ -129,6 +119,10 @@ function showToast(msg: string) {
     toastMessage.value = ''
   }, 3500)
 }
+
+onMounted(() => {
+  loadNotifications()
+})
 </script>
 
 <template>
@@ -148,7 +142,8 @@ function showToast(msg: string) {
       <!-- زر تحديد الكل كمقروء -->
       <button
         type="button"
-        class="flex items-center gap-1.5 text-xs font-bold text-solar-text-body hover:text-solar-navy-dark transition-colors self-start sm:self-auto"
+        :disabled="unreadCount === 0"
+        class="flex items-center gap-1.5 text-xs font-bold text-solar-text-body hover:text-solar-navy-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors self-start sm:self-auto"
         @click="markAllAsRead"
       >
         <CheckCheck class="size-4 text-solar-yellow" />
@@ -181,8 +176,30 @@ function showToast(msg: string) {
       </div>
     </div>
 
-    <!-- قائمة الإشعارات -->
-    <div class="space-y-4">
+    <!-- حالة التحميل -->
+    <div v-if="isLoading" class="flex flex-col items-center justify-center py-20 text-solar-text-muted">
+      <Loader2 class="size-8 animate-spin text-solar-navy mb-3" />
+      <span class="text-sm font-semibold">جاري تحميل الإشعارات...</span>
+    </div>
+
+    <!-- حالة عدم وجود إشعارات -->
+    <div
+      v-else-if="filteredNotifications.length === 0"
+      class="rounded-2xl border border-dashed border-solar-border-card bg-white p-12 text-center shadow-card"
+    >
+      <div class="mx-auto flex size-14 items-center justify-center rounded-2xl bg-solar-bg-subtle text-solar-text-muted mb-4">
+        <Bell class="size-7" />
+      </div>
+      <h3 class="text-base font-bold text-solar-text-heading">
+        {{ filterTab === 'unread' ? 'لا توجد إشعارات غير مقروءة' : 'لا توجد إشعارات جديدة حالياً' }}
+      </h3>
+      <p class="mt-1.5 text-xs text-solar-text-muted max-w-md mx-auto leading-relaxed">
+        ستظهر هنا تنبيهات طلبات الخدمات الجديدة، العروض المقبولة، وحالات تحديث ملفك المهني فور صدورها.
+      </p>
+    </div>
+
+    <!-- قائمة الإشعارات الفعلية -->
+    <div v-else class="space-y-4">
       <div
         v-for="item in filteredNotifications"
         :key="item.id"
@@ -231,6 +248,7 @@ function showToast(msg: string) {
               <NuxtLink
                 :to="item.actionLink"
                 class="inline-flex items-center gap-1.5 text-xs font-bold text-solar-navy hover:text-solar-yellow-active transition-colors mt-3"
+                @click="markSingleAsRead(item)"
               >
                 <span>{{ item.actionLabel }}</span>
                 <ArrowLeft class="size-3" />
@@ -247,46 +265,6 @@ function showToast(msg: string) {
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- الترقيم والتنقل (Pagination) -->
-    <div class="mt-4 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-solar-border-card/60 pt-4 text-xs text-solar-text-muted">
-      <div class="flex items-center justify-center gap-1.5 self-center sm:self-auto">
-        <button
-          type="button"
-          class="flex items-center gap-1 rounded-lg border border-solar-border-card px-2.5 py-1.5 text-xs font-semibold text-solar-text-body hover:border-solar-navy disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          disabled
-        >
-          <ChevronRight class="size-3.5" />
-          <span>السابق</span>
-        </button>
-
-        <button
-          type="button"
-          class="size-8 rounded-lg border border-solar-navy-dark bg-solar-navy-dark text-xs font-bold text-white"
-        >
-          1
-        </button>
-
-        <button
-          type="button"
-          class="size-8 rounded-lg border border-solar-border-card text-xs font-bold text-solar-text-body hover:border-solar-navy"
-        >
-          2
-        </button>
-
-        <button
-          type="button"
-          class="flex items-center gap-1 rounded-lg border border-solar-border-card px-2.5 py-1.5 text-xs font-semibold text-solar-text-body hover:border-solar-navy transition-colors"
-        >
-          <span>التالي</span>
-          <ChevronLeft class="size-3.5" />
-        </button>
-      </div>
-
-      <span class="text-center sm:text-right">
-        عرض 1 - 5 من إجمالي 6 إشعارات
-      </span>
     </div>
 
     <!-- Toast للتنبيهات -->

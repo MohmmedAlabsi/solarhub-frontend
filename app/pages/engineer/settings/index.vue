@@ -8,13 +8,15 @@ import {
   EyeOff,
   FileText,
   Info,
+  Loader2,
   Lock,
   Phone,
   Shield,
+  Upload,
   User,
 } from 'lucide-vue-next'
 import AppToast from '~/components/common/AppToast.vue'
-import { governoratesList } from '~~/app/composables/useEngineerProjects'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'engineer' })
 useSeoMeta({
@@ -22,17 +24,44 @@ useSeoMeta({
   description: 'إدارة بيانات الحساب الشخصية وإعدادات الأمان الخاصة بالمهندس المعتمد.',
 })
 
+const { $api } = useNuxtApp()
+const config = useRuntimeConfig()
+const authStore = useAuthStore()
+
 const toastMessage = ref('')
+const isSaving = ref(false)
+const isUploadingCv = ref(false)
+const cvFileInput = ref<HTMLInputElement | null>(null)
+
+interface CvInfo {
+  path: string
+  url: string
+  name: string
+}
+
+const cvData = ref<CvInfo | null>(null)
+
+const governoratesList = ref<{ id: number; name: string }[]>([
+  { id: 1, name: 'صنعاء' },
+  { id: 2, name: 'أمانة العاصمة' },
+  { id: 3, name: 'تعز' },
+  { id: 4, name: 'الحديدة' },
+  { id: 5, name: 'إب' },
+  { id: 7, name: 'حضرموت' },
+  { id: 9, name: 'مأرب' },
+])
 
 const form = reactive({
-  fullName: 'أحمد بن عبد الله الشمري',
-  phone: '+966 54 892 1045',
-  email: 'ahmed.shammari@solarhub.sa',
-  governorate: 'riyadh',
+  fullName: authStore.user?.name || '',
+  phone: authStore.user?.phone || '',
+  email: authStore.user?.email || '',
+  governorate: (authStore.user as any)?.governorate_id || (authStore.user as any)?.governorate?.id || 1,
   currentPassword: '',
   newPassword: '',
   confirmPassword: '',
 })
+
+const initialForm = ref({ ...form })
 
 const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
@@ -45,11 +74,197 @@ function showToast(msg: string) {
   }, 3500)
 }
 
-function handleSave() {
-  showToast('تم حفظ التعديلات بنجاح!')
+function resolveUrl(path: string | null | undefined): string {
+  if (!path) return ''
+  if (path.startsWith('http')) return path
+  const base = config.public.apiBase ? config.public.apiBase.replace(/\/api$/, '') : 'http://127.0.0.1:8000'
+  return `${base}/storage/${path.replace(/^\//, '')}`
+}
+
+function syncUser() {
+  if (authStore.user) {
+    if (authStore.user.name) form.fullName = authStore.user.name
+    if (authStore.user.phone) form.phone = authStore.user.phone
+    if (authStore.user.email) form.email = authStore.user.email
+    if ((authStore.user as any).governorate_id) form.governorate = (authStore.user as any).governorate_id
+    initialForm.value = { ...form }
+  }
+}
+
+watch(() => authStore.user, () => syncUser(), { immediate: true })
+
+async function loadGovernorates() {
+  try {
+    const res = await $api<any>('/governorates')
+    const items = res?.data || res
+    if (Array.isArray(items) && items.length > 0) {
+      governoratesList.value = items.map((g: any) => ({
+        id: g.id,
+        name: g.name_ar || g.name,
+      }))
+    }
+  } catch {
+    // Keep fallback list
+  }
+}
+
+async function loadEngineerProfile() {
+  try {
+    const res = await $api<any>('/engineer/profile')
+    const data = res?.data || res
+    if (data?.cv_path || data?.cv_url) {
+      const path = data.cv_path || ''
+      cvData.value = {
+        path,
+        url: data.cv_url || resolveUrl(path),
+        name: path.split('/').pop() || 'السيرة_الذاتية.pdf',
+      }
+    }
+  } catch {
+    // CV remains null if not uploaded yet
+  }
+}
+
+function triggerCvUpload() {
+  cvFileInput.value?.click()
+}
+
+async function onCvSelected(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    showToast('يجب أن يكون ملف السيرة الذاتية بصيغة PDF')
+    return
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('حجم ملف السيرة الذاتية يجب ألا يتجاوز 5 ميجابايت')
+    return
+  }
+
+  try {
+    isUploadingCv.value = true
+    const formData = new FormData()
+    formData.append('_method', 'PUT')
+    formData.append('cv', file)
+
+    const res = await $api<any>('/engineer/profile', {
+      method: 'POST',
+      body: formData,
+    })
+
+    const data = res?.data || res
+    if (data?.cv_path || data?.cv_url) {
+      const path = data.cv_path || ''
+      cvData.value = {
+        path,
+        url: data.cv_url || resolveUrl(path),
+        name: file.name || path.split('/').pop() || 'السيرة_الذاتية.pdf',
+      }
+    } else {
+      cvData.value = {
+        path: '',
+        url: '',
+        name: file.name,
+      }
+    }
+
+    showToast('تم تحديث السيرة الذاتية بنجاح!')
+  } catch (err: any) {
+    showToast(err?.data?.message || 'تعذر تحديث السيرة الذاتية')
+  } finally {
+    isUploadingCv.value = false
+    if (target) target.value = ''
+  }
+}
+
+function viewCv() {
+  if (cvData.value?.url) {
+    window.open(cvData.value.url, '_blank')
+  } else {
+    showToast('رابط السيرة الذاتية غير متاح للمعاينة')
+  }
+}
+
+function downloadCv() {
+  if (cvData.value?.url) {
+    window.open(cvData.value.url, '_blank')
+  } else {
+    showToast('رابط السيرة الذاتية غير متاح للتحميل')
+  }
+}
+
+onMounted(async () => {
+  loadGovernorates()
+  loadEngineerProfile()
+  if (!authStore.user) {
+    await authStore.fetchCurrentUser()
+  }
+  syncUser()
+})
+
+async function handleSave() {
+  if (!form.fullName.trim()) {
+    showToast('يرجى إدخال الاسم الكامل')
+    return
+  }
+
+  if (form.newPassword) {
+    if (form.newPassword.length < 8) {
+      showToast('يجب ألا تقل كلمة المرور الجديدة عن 8 أحرف')
+      return
+    }
+    if (form.newPassword !== form.confirmPassword) {
+      showToast('كلمة المرور الجديدة وتأكيدها غير متطابقين')
+      return
+    }
+    if (!form.currentPassword) {
+      showToast('يرجى إدخال كلمة المرور الحالية لتأكيد التغيير')
+      return
+    }
+  }
+
+  try {
+    isSaving.value = true
+    const payload: Record<string, any> = {
+      name: form.fullName,
+      phone: form.phone,
+      governorate_id: Number(form.governorate) || null,
+    }
+
+    if (form.newPassword) {
+      payload.current_password = form.currentPassword
+      payload.password = form.newPassword
+      payload.password_confirmation = form.confirmPassword
+    }
+
+    await $api('/my/profile', {
+      method: 'PUT',
+      body: payload,
+    })
+
+    form.currentPassword = ''
+    form.newPassword = ''
+    form.confirmPassword = ''
+
+    await authStore.fetchCurrentUser()
+    syncUser()
+    showToast('تم حفظ التعديلات بنجاح!')
+  } catch (err: any) {
+    const errorMsg = err?.data?.message || err?.message || 'حدث خطأ أثناء حفظ التعديلات'
+    showToast(errorMsg)
+  } finally {
+    isSaving.value = false
+  }
 }
 
 function handleCancel() {
+  Object.assign(form, initialForm.value)
+  form.currentPassword = ''
+  form.newPassword = ''
+  form.confirmPassword = ''
   showToast('تم إلغاء التعديلات')
 }
 </script>
@@ -166,26 +381,38 @@ function handleCancel() {
         <!-- السيرة الذاتية (CV) -->
         <div class="pt-2">
           <div class="flex items-center justify-between mb-2">
-            <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
+            <span v-if="cvData" class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
               <CheckCircle2 class="size-3" />
-              معتمدة وموثقة
+              معتمدة ومرفوعة
+            </span>
+            <span v-else class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">
+              بانتظار الرفع
             </span>
             <label class="text-xs font-bold text-solar-text-heading">
               السيرة الذاتية (CV) <span class="text-red-500">*</span>
             </label>
           </div>
 
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl border border-solar-border-card bg-solar-bg-subtle/40 p-3.5">
+          <input
+            ref="cvFileInput"
+            type="file"
+            accept=".pdf"
+            class="hidden"
+            @change="onCvSelected"
+          />
+
+          <!-- بطاقة الـ CV إن وجد -->
+          <div v-if="cvData" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl border border-solar-border-card bg-solar-bg-subtle/40 p-3.5">
             <div class="flex items-center gap-3">
               <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
                 <FileText class="size-5" />
               </div>
               <div class="text-right">
-                <p class="text-xs font-bold text-solar-text-heading">
-                  CV_Eng_Ahmed_Alshammari_Solar.pdf
+                <p class="text-xs font-bold text-solar-text-heading font-mono" dir="ltr">
+                  {{ cvData.name }}
                 </p>
                 <p class="text-[10px] text-solar-text-muted mt-0.5">
-                  2.4 MB بصيغة PDF معتمدة وموثقة
+                  ملف PDF معتمد ومحفوظ في النظام
                 </p>
               </div>
             </div>
@@ -194,7 +421,7 @@ function handleCancel() {
               <button
                 type="button"
                 class="flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-semibold text-solar-text-body hover:border-solar-navy transition-colors"
-                @click="showToast('معاينة السيرة الذاتية')"
+                @click="viewCv"
               >
                 <Eye class="size-3.5" />
                 <span>معاينة</span>
@@ -202,12 +429,46 @@ function handleCancel() {
               <button
                 type="button"
                 class="flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-semibold text-solar-text-body hover:border-solar-navy transition-colors"
-                @click="showToast('تحميل السيرة الذاتية')"
+                @click="downloadCv"
               >
                 <Download class="size-3.5" />
                 <span>تحميل</span>
               </button>
+              <button
+                type="button"
+                :disabled="isUploadingCv"
+                class="flex items-center gap-1.5 rounded-lg border border-solar-yellow bg-solar-yellow/20 px-3 py-1.5 text-xs font-bold text-solar-navy-dark hover:bg-solar-yellow/30 transition-colors disabled:opacity-50"
+                @click="triggerCvUpload"
+              >
+                <Loader2 v-if="isUploadingCv" class="size-3.5 animate-spin" />
+                <Upload v-else class="size-3.5" />
+                <span>{{ isUploadingCv ? 'جاري الرفع...' : 'تحديث' }}</span>
+              </button>
             </div>
+          </div>
+
+          <!-- حالة عدم وجود CV -->
+          <div v-else class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl border border-dashed border-solar-border-card bg-solar-bg-subtle/30 p-4">
+            <div class="flex items-center gap-3">
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
+                <FileText class="size-5" />
+              </div>
+              <div class="text-right">
+                <p class="text-xs font-bold text-solar-text-heading">لم يتم رفع سيرة ذاتية بعد</p>
+                <p class="text-[10px] text-solar-text-muted mt-0.5">يمكنك رفع ملف PDF لا يتجاوز 5MB لإبراز خبراتك</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              :disabled="isUploadingCv"
+              class="flex items-center justify-center gap-1.5 rounded-lg border border-solar-yellow bg-solar-yellow/20 px-4 py-2 text-xs font-bold text-solar-navy-dark hover:bg-solar-yellow/30 transition-colors disabled:opacity-50"
+              @click="triggerCvUpload"
+            >
+              <Loader2 v-if="isUploadingCv" class="size-3.5 animate-spin" />
+              <Upload v-else class="size-3.5" />
+              <span>{{ isUploadingCv ? 'جاري الرفع...' : 'رفع السيرة الذاتية (PDF)' }}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -314,10 +575,12 @@ function handleCancel() {
     <div class="flex items-center justify-start gap-3 pt-2">
       <button
         type="button"
-        class="btn-primary px-8 text-xs sm:text-sm font-bold"
+        :disabled="isSaving"
+        class="btn-primary px-8 text-xs sm:text-sm font-bold flex items-center gap-2"
         @click="handleSave"
       >
-        حفظ التعديلات
+        <Loader2 v-if="isSaving" class="size-4 animate-spin" />
+        <span>{{ isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات' }}</span>
       </button>
       <button
         type="button"

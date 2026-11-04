@@ -1,5 +1,4 @@
-// بيانات تجريبية لتقييمات المهندس وآراء العملاء
-// TODO: استبدل بـ useFetch('/api/engineer/reviews')
+import { computed, onMounted, ref } from 'vue'
 
 export interface ReviewItem {
   id: number
@@ -10,56 +9,66 @@ export interface ReviewItem {
   comment: string
 }
 
-const mockReviews: ReviewItem[] = [
-  {
-    id: 1,
-    client_name: 'سعود بن حمد الشمري',
-    client_initials: 'س.ح',
-    date: '02 يونيو 2024',
-    rating: 5,
-    comment: 'قام المهندس أحمد بإعداد دراسة الجدوى وتصميم المخططات الهندسية لمنظومة الطاقة الكهروضوئية لمشروع مزرعة القصيم 150kWp باحترافية عالية ودقة متناهية. تم اعتماد المخططات لدى شركة الكهرباء خلال 48 ساعة فقط. مهندس متمكن ومتعاون جداً.',
-  },
-  {
-    id: 2,
-    client_name: 'م. عبدالمجيد السالم',
-    client_initials: 'م.ع',
-    date: '28 مايو 2024',
-    rating: 5,
-    comment: 'استشارة هندسية ممتازة لحساب الأحمال واختيار السعات المناسبة للإنفرترات الهجينة والبطاريات. فحص دقيق للموقع وتوافق كامل مع كود البناء السعودي SBC. نوصي بالتعامل معه لكافة المشاريع الكهروضوئية.',
-  },
-  {
-    id: 3,
-    client_name: 'فيصل القحطاني',
-    client_initials: 'ف.ق',
-    date: '19 مايو 2024',
-    rating: 5,
-    comment: 'إشراف هندسي ميداني متميز على تركيب محطة الطاقة السكنية واختبار العزل الحراري والربط. تقارير فنية أسبوعية مفصلة وواضحة ساعدتنا على استلام المشروع بجودة استثنائية وبدون أي ملاحظات.',
-  },
-  {
-    id: 4,
-    client_name: 'طارق منصور العمري',
-    client_initials: 'ط.م',
-    date: '14 مايو 2024',
-    rating: 5,
-    comment: 'دقة واحترافية في إجراء المحاكاة عبر PVsyst وتقديم حسابات العائد على الاستثمار للمصنع بدقة متناهية. ساعدنا في توفير تكاليف المنظومة واختيار مكونات Tier-1 بأفضل كفاءة.',
-  },
-  {
-    id: 5,
-    client_name: 'نواف الدوسري',
-    client_initials: 'ن.د',
-    date: '06 مايو 2024',
-    rating: 5,
-    comment: 'مهندس خبير ومتمكن جداً في أنظمة الضخ الشمسي الزراعي. قام ببرمجة مضخات Grundfos وربطها بالألواح الكهروضوئية وتأكد من عمل المنظومة بأعلى تدفق مائي في أوقات الذروة.',
-  },
-]
+function getInitials(name: string): string {
+  if (!name) return 'ع'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2)
+  return parts.slice(0, 2).map(p => p[0]).join('.')
+}
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'مؤخراً'
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })
+  } catch {
+    return dateStr
+  }
+}
 
 export function useEngineerReviews() {
-  const reviews = ref<ReviewItem[]>([...mockReviews])
+  const { $api } = useNuxtApp()
+
+  const allReviews = ref<ReviewItem[]>([])
+  const isLoading = ref(false)
+  const error = ref<string | null>(null)
   const currentPage = ref(1)
-  const totalReviews = ref(145) // كما يظهر في التصميم
   const pageSize = 5
 
-  const totalPages = computed(() => Math.ceil(totalReviews.value / pageSize))
+  async function fetchReviews() {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const res = await $api<any>('/engineer/ratings')
+      const items = res?.data || res
+      if (Array.isArray(items)) {
+        allReviews.value = items.map((item: any) => ({
+          id: item.id,
+          client_name: item.customer?.name || 'عميل في منصة SolarHub',
+          client_initials: getInitials(item.customer?.name || 'عميل'),
+          date: formatDate(item.created_at),
+          rating: Number(item.rating) || 5,
+          comment: item.comment || 'تقييم بدون تعليق مكتوب.',
+        }))
+      } else {
+        allReviews.value = []
+      }
+    } catch (err: any) {
+      error.value = err?.data?.message || 'تعذر تحميل التقييمات الهندسية'
+      allReviews.value = []
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const totalReviews = computed(() => allReviews.value.length)
+  const totalPages = computed(() => Math.max(1, Math.ceil(totalReviews.value / pageSize)))
+
+  const paginatedReviews = computed(() => {
+    const start = (currentPage.value - 1) * pageSize
+    return allReviews.value.slice(start, start + pageSize)
+  })
 
   function setPage(page: number) {
     if (page >= 1 && page <= totalPages.value) {
@@ -67,12 +76,20 @@ export function useEngineerReviews() {
     }
   }
 
+  onMounted(() => {
+    fetchReviews()
+  })
+
   return {
-    reviews,
+    reviews: paginatedReviews,
+    allReviews,
+    isLoading,
+    error,
     currentPage,
     totalReviews,
     totalPages,
     pageSize,
     setPage,
+    fetchReviews,
   }
 }

@@ -16,6 +16,7 @@ const accountButton = ref<HTMLButtonElement>()
 const route = useRoute()
 
 // اسم المهندس من الـ store أو بيانات تجريبية
+// TODO: استبدل بـ useFetch('/api/engineer/me') عند ربط الـ API
 const engineerName = computed(() => authStore.user?.name ?? 'م. أحمد الشمري')
 
 function closeAccountMenu(event: PointerEvent) {
@@ -109,7 +110,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
           <hr class="my-1 border-solar-border-card" />
           <button
             type="button"
-            class="block w-full rounded-lg px-3 py-2 text-right text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+            class="block w-full rounded-lg px-3 py-2 text-right text-xs font-semibold text-red-600 hover:bg-red-50"
             @click="isUserMenuOpen = false; emit('unavailable', 'تسجيل الخروج')"
           >
             تسجيل الخروج

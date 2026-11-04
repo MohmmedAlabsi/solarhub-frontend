@@ -1,18 +1,31 @@
 <script setup lang="ts">
-import { CheckCircle2, FileUp, ImagePlus, PlusCircle, X } from 'lucide-vue-next'
-import {
-  governoratesList,
-  serviceTypesList,
-  type NewProjectPayload,
+import { CheckCircle2, Edit3, FileUp, ImagePlus, PlusCircle, X } from 'lucide-vue-next'
+import type {
+  EngineerProjectItem,
+  GovernorateOption,
+  NewProjectPayload,
+  SelectOption,
 } from '~~/app/composables/useEngineerProjects'
 
-const props = defineProps<{
-  modelValue: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean
+    editProject?: EngineerProjectItem | null
+    serviceTypesList?: SelectOption[]
+    governoratesList?: GovernorateOption[]
+    submitAction?: (payload: NewProjectPayload, isEdit: boolean, id?: number) => Promise<any>
+  }>(),
+  {
+    editProject: null,
+    serviceTypesList: () => [],
+    governoratesList: () => [],
+    submitAction: undefined,
+  }
+)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', val: boolean): void
-  (e: 'submit', payload: NewProjectPayload): void
+  (e: 'submit', payload: NewProjectPayload, isEdit: boolean, id?: number): void
 }>()
 
 const form = reactive<NewProjectPayload>({
@@ -32,6 +45,44 @@ const isSubmitting = ref(false)
 const imageInput = ref<HTMLInputElement>()
 const fileInput = ref<HTMLInputElement>()
 
+function populateFromEdit() {
+  if (props.editProject) {
+    form.project_title = props.editProject.project_title || ''
+    form.service_type_id = props.editProject.service_type_id || ''
+    form.system_capacity = props.editProject.raw_capacity !== undefined && props.editProject.raw_capacity !== null
+      ? String(props.editProject.raw_capacity)
+      : props.editProject.system_capacity.replace(/[^\d.]/g, '')
+    form.governorate_id = props.editProject.governorate_id || ''
+    form.address_text = props.editProject.address_text || ''
+    form.description = props.editProject.description || ''
+    form.image_file = null
+    form.file_attachment = null
+  } else {
+    resetForm()
+  }
+  Object.keys(errors).forEach(k => delete errors[k])
+}
+
+watch(
+  () => props.modelValue,
+  (isOpen) => {
+    if (isOpen) {
+      populateFromEdit()
+    } else {
+      resetForm()
+    }
+  }
+)
+
+watch(
+  () => props.editProject,
+  () => {
+    if (props.modelValue) {
+      populateFromEdit()
+    }
+  }
+)
+
 function close() {
   emit('update:modelValue', false)
   resetForm()
@@ -42,22 +93,18 @@ function resetForm() {
   form.service_type_id = ''
   form.system_capacity = ''
   form.governorate_id = ''
-  addressTextReset()
+  form.address_text = ''
   form.description = ''
   form.image_file = null
   form.file_attachment = null
   Object.keys(errors).forEach(k => delete errors[k])
 }
 
-function addressTextReset() {
-  form.address_text = ''
-}
-
 function handleImageChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (file) {
     if (file.size > 5 * 1024 * 1024) {
-      errors.image = 'حجم الصورة يجب أن لا يتجاوز 5 ميجابايت'
+      errors.image = 'حجم الصورة يجب ألا يتجاوز 5 ميجابايت'
       return
     }
     delete errors.image
@@ -68,8 +115,8 @@ function handleImageChange(e: Event) {
 function handleFileChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (file) {
-    if (file.size > 15 * 1024 * 1024) {
-      errors.file = 'حجم الملف يجب أن لا يتجاوز 15 ميجابايت'
+    if (file.size > 10 * 1024 * 1024) {
+      errors.file = 'حجم الملف يجب ألا يتجاوز 10 ميجابايت'
       return
     }
     delete errors.file
@@ -94,10 +141,21 @@ async function handleSubmit() {
 
   isSubmitting.value = true
   try {
-    // محاكاة إرسال الطلب
-    await new Promise(resolve => setTimeout(resolve, 600))
-    emit('submit', { ...form })
+    if (props.submitAction) {
+      await props.submitAction({ ...form }, !!props.editProject, props.editProject?.id)
+    } else {
+      emit('submit', { ...form }, !!props.editProject, props.editProject?.id)
+    }
     close()
+  } catch (err: any) {
+    const backendErrors = err?.data?.errors
+    if (backendErrors && typeof backendErrors === 'object') {
+      for (const [key, msgs] of Object.entries(backendErrors)) {
+        errors[key] = Array.isArray(msgs) ? msgs[0] : String(msgs)
+      }
+    } else {
+      errors.general = err?.data?.message || err?.message || 'تعذر حفظ بيانات المشروع، يرجى مراجعة المدخلات'
+    }
   } finally {
     isSubmitting.value = false
   }
@@ -128,10 +186,11 @@ async function handleSubmit() {
           <div class="flex items-center justify-between gap-4 border-b border-solar-border-card px-6 py-4 shrink-0">
             <div class="flex items-center gap-2.5">
               <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-solar-yellow text-solar-navy-dark shadow-xs">
-                <PlusCircle class="size-5" />
+                <Edit3 v-if="editProject" class="size-5" />
+                <PlusCircle v-else class="size-5" />
               </div>
               <h3 class="text-base font-black text-solar-text-heading">
-                إضافة مشروع جديد إلى أعمالي السابقة
+                {{ editProject ? 'تعديل بيانات المشروع في أعمالي السابقة' : 'إضافة مشروع جديد إلى أعمالي السابقة' }}
               </h3>
             </div>
             <button
@@ -143,12 +202,17 @@ async function handleSubmit() {
             </button>
           </div>
 
+          <!-- رسالة خطأ عامة إن وجدت -->
+          <div v-if="errors.general" class="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+            {{ errors.general }}
+          </div>
+
           <!-- جسم النموذج -->
           <form class="flex-1 overflow-y-auto p-6 space-y-4" @submit.prevent="handleSubmit">
             <!-- عنوان المشروع -->
             <div>
               <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                عنوان المشروع (project_title) <span class="text-red-500">*</span>
+                عنوان المشروع <span class="text-red-500">*</span>
               </label>
               <input
                 v-model="form.project_title"
@@ -164,11 +228,11 @@ async function handleSubmit() {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                  نوع الخدمة (service_type_id) <span class="text-red-500">*</span>
+                  نوع الخدمة <span class="text-red-500">*</span>
                 </label>
                 <select
                   v-model="form.service_type_id"
-                  class="w-full rounded-lg border border-solar-border-input bg-white px-3.5 py-2.5 text-xs text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-1 focus:ring-solar-yellow"
+                  class="w-full rounded-lg border border-solar-border-input bg-white px-3.5 py-2.5 text-xs text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-1 focus:ring-solar-yellow cursor-pointer"
                   :class="{ 'border-red-400': errors.service_type_id }"
                 >
                   <option value="" disabled>اختر نوع الخدمة...</option>
@@ -181,13 +245,13 @@ async function handleSubmit() {
 
               <div>
                 <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                  سعة النظام (system_capacity) <span class="text-red-500">*</span>
+                  سعة النظام <span class="text-red-500">*</span>
                 </label>
                 <div class="relative">
                   <input
                     v-model="form.system_capacity"
                     type="text"
-                    placeholder="150 kWp"
+                    placeholder="150"
                     class="w-full rounded-lg border border-solar-border-input bg-white px-3.5 py-2.5 pl-12 text-xs text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-1 focus:ring-solar-yellow"
                     :class="{ 'border-red-400': errors.system_capacity }"
                   />
@@ -201,11 +265,11 @@ async function handleSubmit() {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                  المحافظة (governorate_id) <span class="text-red-500">*</span>
+                  المحافظة <span class="text-red-500">*</span>
                 </label>
                 <select
                   v-model="form.governorate_id"
-                  class="w-full rounded-lg border border-solar-border-input bg-white px-3.5 py-2.5 text-xs text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-1 focus:ring-solar-yellow"
+                  class="w-full rounded-lg border border-solar-border-input bg-white px-3.5 py-2.5 text-xs text-solar-text-heading focus:border-solar-yellow focus:outline-none focus:ring-1 focus:ring-solar-yellow cursor-pointer"
                   :class="{ 'border-red-400': errors.governorate_id }"
                 >
                   <option value="" disabled>اختر المحافظة...</option>
@@ -218,7 +282,7 @@ async function handleSubmit() {
 
               <div>
                 <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                  عنوان الموقع التفصيلي (address_text)
+                  عنوان الموقع التفصيلي
                 </label>
                 <input
                   v-model="form.address_text"
@@ -232,7 +296,7 @@ async function handleSubmit() {
             <!-- وصف ومواصفات المشروع -->
             <div>
               <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                وصف ومواصفات المشروع (description) <span class="text-red-500">*</span>
+                وصف ومواصفات المشروع <span class="text-red-500">*</span>
               </label>
               <textarea
                 v-model="form.description"
@@ -249,7 +313,7 @@ async function handleSubmit() {
               <!-- صورة المشروع -->
               <div>
                 <span class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                  صورة المشروع (image_path)
+                  صورة المشروع
                 </span>
                 <div
                   class="flex flex-col items-center justify-center rounded-xl border border-dashed border-solar-border-input bg-solar-bg-subtle p-5 text-center cursor-pointer hover:border-solar-yellow transition-colors"
@@ -257,9 +321,11 @@ async function handleSubmit() {
                 >
                   <ImagePlus class="size-6 text-solar-text-muted mb-2" />
                   <p class="text-xs font-bold text-solar-text-heading">
-                    {{ form.image_file ? form.image_file.name : 'رفع صورة المشروع الرئيسية' }}
+                    <span v-if="form.image_file">{{ form.image_file.name }}</span>
+                    <span v-else-if="editProject?.image_url">تغيير الصورة الحالية</span>
+                    <span v-else>رفع صورة المشروع الرئيسية</span>
                   </p>
-                  <span class="text-[10px] text-solar-text-muted mt-0.5">JPG, PNG بحد أقصى 5MB</span>
+                  <span class="text-[10px] text-solar-text-muted mt-0.5">JPG, PNG, WebP بحد أقصى 5MB</span>
                   <input
                     ref="imageInput"
                     type="file"
@@ -274,7 +340,7 @@ async function handleSubmit() {
               <!-- ملف المشروع -->
               <div>
                 <span class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                  ملف المشروع أو المخطط المعتمد (file_path)
+                  ملف المخطط التنفيذي (PDF)
                 </span>
                 <div
                   class="flex flex-col items-center justify-center rounded-xl border border-dashed border-solar-border-input bg-solar-bg-subtle p-5 text-center cursor-pointer hover:border-solar-yellow transition-colors"
@@ -282,9 +348,11 @@ async function handleSubmit() {
                 >
                   <FileUp class="size-6 text-solar-text-muted mb-2" />
                   <p class="text-xs font-bold text-solar-text-heading">
-                    {{ form.file_attachment ? form.file_attachment.name : 'إرفاق ملف المخطط التنفيذي (PDF)' }}
+                    <span v-if="form.file_attachment">{{ form.file_attachment.name }}</span>
+                    <span v-else-if="editProject?.file_name">استبدال المخطط: {{ editProject.file_name }}</span>
+                    <span v-else>إرفاق ملف المخطط التنفيذي (PDF)</span>
                   </p>
-                  <span class="text-[10px] text-solar-text-muted mt-0.5">PDF بحد أقصى 15MB</span>
+                  <span class="text-[10px] text-solar-text-muted mt-0.5">PDF بحد أقصى 10MB</span>
                   <input
                     ref="fileInput"
                     type="file"
@@ -315,7 +383,7 @@ async function handleSubmit() {
               @click="handleSubmit"
             >
               <CheckCircle2 class="size-4" />
-              <span>{{ isSubmitting ? 'جارٍ الحفظ...' : 'حفظ وإضافة المشروع' }}</span>
+              <span>{{ isSubmitting ? 'جارٍ الحفظ...' : (editProject ? 'حفظ التعديلات' : 'حفظ وإضافة المشروع') }}</span>
             </button>
           </div>
         </div>
