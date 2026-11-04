@@ -1,3 +1,4 @@
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '~~/app/stores/auth'
 
 export type OfferStatus = 'pending_review' | 'approved' | 'rejected'
@@ -70,13 +71,14 @@ export function useEngineerOffers() {
         const rawReqId = Number(item.service_request_id || 0)
         const proposal = item.technical_proposal || ''
         const lines = proposal.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+        const reqTitle = item.service_request?.title || `طلب خدمة #${rawReqId}`
 
         return {
           id: `OF-2025-${rawId}`,
           rawId,
           requestId: `SR-2025-${rawReqId}`,
           rawRequestId: rawReqId,
-          requestTitle: `طلب خدمة #${rawReqId}\nSR-2025-${rawReqId}`,
+          requestTitle: `${reqTitle}\nSR-2025-${rawReqId}`,
           totalCost: Number(item.proposed_cost || 0),
           durationDays: Number(item.execution_time_days || 1),
           submittedAt: formatDate(item.created_at),
@@ -85,7 +87,7 @@ export function useEngineerOffers() {
           methodologyPoints: lines.length > 1 ? lines.slice(1) : undefined,
           attachmentName: item.proposal_file ? item.proposal_file.split('/').pop() : undefined,
           attachmentSize: item.proposal_file ? 'وثيقة هندسية معتمدة' : undefined,
-          attachmentUrl: item.proposal_file || undefined,
+          attachmentUrl: item.proposal_file_url || item.proposal_file || undefined,
         }
       })
     } catch (err: any) {

@@ -30,7 +30,7 @@ const fileInput = ref<HTMLInputElement>()
 function onFileChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (file) {
-    if (file.size > 15 * 1024 * 1024) {
+    if (file.size > 10 * 1024 * 1024) {
       errors.attachmentFile = 'حجم الملف يجب أن يكون أقل من 15 ميجابايت'
       return
     }
@@ -267,7 +267,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
               </div>
 
               <p v-if="errors.attachmentFile" class="text-xs text-red-500">{{ errors.attachmentFile }}</p>
-              <input ref="fileInput" type="file" accept=".pdf,.zip" class="hidden" @change="onFileChange" />
+              <input ref="fileInput" type="file" accept=".pdf,application/pdf" class="hidden" @change="onFileChange" />
             </div>
 
             <!-- رسالة النجاح -->

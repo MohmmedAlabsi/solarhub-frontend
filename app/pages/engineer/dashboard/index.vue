@@ -11,7 +11,7 @@ useSeoMeta({
 
 const { stats, workItems, isLoading } = useEngineerDashboard()
 const authStore = useAuthStore()
-const engineerName = computed(() => authStore.user?.name || 'م. أحمد الشمري')
+const engineerName = computed(() => authStore.user?.name || 'مهندسنا العزيز')
 </script>
 
 <template>

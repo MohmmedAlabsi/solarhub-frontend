@@ -21,6 +21,7 @@ const {
   setPage,
   statusLabels,
   statusClasses,
+  fetchOffers,
 } = useEngineerOffers()
 
 // حالة المودال
@@ -172,6 +173,10 @@ const filterOptions = [
     </div>
 
     <!-- مودال تفاصيل العرض -->
-    <OfferDetailModal v-model="showDetailModal" :offer="selectedOffer" />
+    <OfferDetailModal
+      v-model="showDetailModal"
+      :offer="selectedOffer"
+      @withdrawn="fetchOffers"
+    />
   </div>
 </template>

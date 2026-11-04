@@ -5,6 +5,7 @@ import {
   Edit,
   Eye,
   FileText,
+  Image as ImageIcon,
   Layers,
   MapPin,
   X,
@@ -20,11 +21,23 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', val: boolean): void
   (e: 'edit', project: EngineerProjectItem): void
-  (e: 'unavailable', label: string): void
 }>()
 
 function close() {
   emit('update:modelValue', false)
+}
+
+function handleEdit() {
+  if (props.project) {
+    emit('edit', props.project)
+    close()
+  }
+}
+
+function openFile() {
+  if (props.project?.file_url) {
+    window.open(props.project.file_url, '_blank')
+  }
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -79,16 +92,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
           <!-- جسم النافذة القابل للتمرير -->
           <div class="flex-1 overflow-y-auto p-6 space-y-6">
             <!-- الصورة البانورامية مع العنوان -->
-            <div class="relative h-56 w-full overflow-hidden rounded-xl bg-solar-bg-subtle shadow-inner">
+            <div class="relative h-56 w-full overflow-hidden rounded-xl bg-solar-bg-subtle shadow-inner flex items-center justify-center">
               <img
-                :src="project.image_path"
+                v-if="project.image_url || project.image_path"
+                :src="project.image_url || project.image_path || ''"
                 :alt="project.project_title"
                 class="h-full w-full object-cover"
               />
-              <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              <div v-else class="flex flex-col items-center justify-center text-solar-text-muted gap-2">
+                <ImageIcon class="size-12 opacity-40 text-solar-navy" />
+                <span class="text-xs font-semibold">لا توجد صورة مرفقة للمشروع</span>
+              </div>
+              <div v-if="project.image_url || project.image_path" class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
               <!-- شارة السعة -->
-              <span class="absolute top-4 left-4 flex items-center gap-1 rounded-lg bg-solar-yellow px-3 py-1 text-xs font-black text-solar-navy-dark shadow-sm">
+              <span
+                v-if="project.system_capacity"
+                class="absolute top-4 left-4 flex items-center gap-1 rounded-lg bg-solar-yellow px-3 py-1 text-xs font-black text-solar-navy-dark shadow-sm"
+              >
                 <Zap class="size-3.5 fill-current" />
                 {{ project.system_capacity }}
               </span>
@@ -101,35 +122,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
               </div>
             </div>
 
-            <!-- شبكة تفاصيل ومواصفات المشروع (4 خلايا) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <!-- سعة المنظومة -->
-              <div class="flex items-center justify-between rounded-xl bg-solar-bg-subtle/80 p-3.5 border border-solar-border-card/50">
-                <div class="text-right">
-                  <span class="block text-[11px] text-solar-text-muted font-medium">سعة المنظومة</span>
-                  <span class="text-sm font-black text-solar-text-heading">{{ project.system_capacity }}</span>
-                </div>
-                <div class="flex size-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
-                  <Zap class="size-4" />
-                </div>
-              </div>
-
+            <!-- بطاقات المعلومات التقنية السريعة -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <!-- نوع الخدمة -->
               <div class="flex items-center justify-between rounded-xl bg-solar-bg-subtle/80 p-3.5 border border-solar-border-card/50">
                 <div class="text-right">
                   <span class="block text-[11px] text-solar-text-muted font-medium">نوع الخدمة</span>
                   <span class="text-sm font-bold text-solar-text-heading">{{ project.service_type_label }}</span>
                 </div>
-                <div class="flex size-8 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
+                <div class="flex size-8 items-center justify-center rounded-lg bg-blue-100 text-blue-800">
                   <Layers class="size-4" />
                 </div>
               </div>
 
-              <!-- المحافظة والموقع -->
+              <!-- المحافظة -->
               <div class="flex items-center justify-between rounded-xl bg-solar-bg-subtle/80 p-3.5 border border-solar-border-card/50">
                 <div class="text-right">
                   <span class="block text-[11px] text-solar-text-muted font-medium">المحافظة والموقع</span>
-                  <span class="text-sm font-bold text-solar-text-heading">{{ project.governorate_name }}</span>
+                  <span class="text-sm font-bold text-solar-text-heading">{{ project.governorate_name || 'غير محددة' }}</span>
                 </div>
                 <div class="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
                   <MapPin class="size-4" />
@@ -140,7 +150,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
               <div class="flex items-center justify-between rounded-xl bg-solar-bg-subtle/80 p-3.5 border border-solar-border-card/50">
                 <div class="text-right truncate max-w-[200px]">
                   <span class="block text-[11px] text-solar-text-muted font-medium">العنوان التفصيلي</span>
-                  <span class="text-xs font-semibold text-solar-text-heading truncate block">{{ project.address_text }}</span>
+                  <span class="text-xs font-semibold text-solar-text-heading truncate block">{{ project.address_text || '-' }}</span>
                 </div>
                 <div class="flex size-8 items-center justify-center rounded-lg bg-purple-100 text-purple-800 shrink-0">
                   <Building2 class="size-4" />
@@ -149,7 +159,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
             </div>
 
             <!-- وصف المشروع والمواصفات الفنية -->
-            <div class="text-right">
+            <div v-if="project.description" class="text-right">
               <h5 class="text-xs font-bold text-solar-text-heading mb-2">
                 وصف المشروع والمواصفات الفنية:
               </h5>
@@ -161,7 +171,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
             </div>
 
             <!-- المرفقات والمخططات المعتمدة -->
-            <div v-if="project.file_path" class="text-right">
+            <div v-if="project.file_url || project.file_path" class="text-right">
               <h5 class="text-xs font-bold text-solar-text-heading mb-2">
                 المرفقات والمخططات المعتمدة:
               </h5>
@@ -171,16 +181,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
                     <FileText class="size-5" />
                   </div>
                   <div class="text-right">
-                    <p class="text-xs font-bold text-solar-text-heading">{{ project.file_path }}</p>
-                    <p class="text-[11px] text-solar-text-muted">{{ project.file_size_pages }}</p>
+                    <p class="text-xs font-bold text-solar-text-heading">{{ project.file_name || 'مخطط_تنفيذي.pdf' }}</p>
+                    <p class="text-[11px] text-solar-text-muted">مستند معتمد (PDF)</p>
                   </div>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div v-if="project.file_url" class="flex items-center gap-2">
                   <button
                     type="button"
                     class="flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-semibold text-solar-text-body hover:border-solar-navy transition-colors"
-                    @click="emit('unavailable', 'معاينة المخطط')"
+                    @click="openFile"
                   >
                     <Eye class="size-3.5" />
                     معاينة
@@ -188,7 +198,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
                   <button
                     type="button"
                     class="flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3 py-1.5 text-xs font-semibold text-solar-text-body hover:border-solar-navy transition-colors"
-                    @click="emit('unavailable', 'تحميل المخطط')"
+                    @click="openFile"
                   >
                     <Download class="size-3.5" />
                     تحميل
@@ -211,7 +221,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
             <button
               type="button"
               class="btn-primary flex items-center gap-2 text-xs"
-              @click="emit('edit', project)"
+              @click="handleEdit"
             >
               <Edit class="size-4" />
               تعديل بيانات المشروع

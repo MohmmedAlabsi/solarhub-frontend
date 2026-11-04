@@ -1,28 +1,12 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import type { EngineerProfile, EngineerProfileTab } from '../../types/engineer'
-import { visitorEngineers } from '~~/app/data/visitor-mock'
 
-export function getEngineerProfile(id: number): EngineerProfile | undefined {
-  const base = visitorEngineers.find(item => item.id === String(id)) || visitorEngineers[0]
-  if (!base) return undefined
-  return {
-    id,
-    name: base.name,
-    title: base.title,
-    specialty: base.specialty,
-    city: base.city,
-    licenseNumber: base.license || `YE-${id * 1420}`,
-    experienceYears: base.experience ? parseInt(base.experience) || 5 : 5,
-    responseTime: base.responseSpeed || 'ساعتان',
-    professionalBio: base.bio || '',
-    rating: base.rating,
-    reviewsCount: base.reviewsCount,
-    verified: base.verified,
-    avatar: base.avatar,
-    expertise: base.specialties || [],
-    certificates: [],
-    projects: [],
-  } as unknown as EngineerProfile
+/**
+ * دالة مساعدة للتوافق العكسي فقط — لا تُستخدم في الصفحات الجديدة.
+ * الصفحات الجديدة تستدعي API مباشرة عبر useEngineerProfile().loadProfile()
+ */
+export function getEngineerProfile(_id: number): EngineerProfile | undefined {
+  return undefined
 }
 
 function routeId(value: string | string[] | undefined) {
@@ -62,9 +46,10 @@ export function useEngineerProfile() {
     error.value = null
 
     try {
-      const [profileRes, portfolioRes] = await Promise.allSettled([
+      const [profileRes, portfolioRes, ratingsRes] = await Promise.allSettled([
         $api(`/engineers/${id}`),
         $api(`/engineers/${id}/portfolio-items`),
+        $api(`/engineers/${id}/ratings`),
       ])
 
       if (profileRes.status === 'rejected') {
@@ -73,7 +58,12 @@ export function useEngineerProfile() {
 
       const raw = profileRes.value as any
       const data = raw?.data || raw
-      const portfolioData = portfolioRes.status === 'fulfilled' ? ((portfolioRes.value as any)?.data || portfolioRes.value || []) : []
+      const portfolioData = portfolioRes.status === 'fulfilled'
+        ? ((portfolioRes.value as any)?.data || portfolioRes.value || [])
+        : []
+      const ratingsData = ratingsRes.status === 'fulfilled'
+        ? ((ratingsRes.value as any)?.data || ratingsRes.value || [])
+        : []
 
       const specs = data.specializations || []
       const specialtyText = specs.map((s: any) => s.name).join('، ') || 'هندسة نظم كهروضوئية'
@@ -97,7 +87,8 @@ export function useEngineerProfile() {
             id: String(p.id),
             title: p.project_title || 'مشروع طاقة شمسية',
             description: p.description || 'تنفيذ وإشراف هندسي متكامل للمنظومة.',
-            image: p.image_path || '/images/hero-solar.png',
+            // استخدام image_url (رابط Supabase الكامل) أولاً، ثم image_path كاحتياط
+            image: p.image_url || p.image_path || '/images/hero-solar.png',
             statusLabel: p.service_type?.name || 'مكتمل ومفحوص',
             capacityLabel: p.system_capacity ? `${p.system_capacity} kW` : 'منظومة طاقة شمسية',
             location: p.address_text || p.governorate?.name_ar || 'اليمن',
@@ -106,59 +97,62 @@ export function useEngineerProfile() {
           }))
         : []
 
+      // بناء قائمة التقييمات الحقيقية من API
+      const realComments = Array.isArray(ratingsData)
+        ? ratingsData.slice(0, 5).map((r: any, idx: number) => ({
+            id: `c${r.id || idx}`,
+            author: r.customer?.name || 'عميل SolarHub',
+            project: 'مشروع طاقة شمسية',
+            rating: (Math.min(5, Math.max(1, Math.round(Number(r.rating) || 5)))) as 1 | 2 | 3 | 4 | 5,
+            relativeDate: r.created_at
+              ? new Date(r.created_at).toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })
+              : 'مؤخراً',
+            comment: r.comment || 'تقييم إيجابي.',
+          }))
+        : []
+
+      // توزيع التقييمات الحقيقي
+      const dist: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+      if (Array.isArray(ratingsData)) {
+        ratingsData.forEach((r: any) => {
+          const star = Math.min(5, Math.max(1, Math.round(Number(r.rating) || 5)))
+          dist[star] = (dist[star] || 0) + 1
+        })
+      }
+
+      const avgRating = Array.isArray(ratingsData) && ratingsData.length > 0
+        ? ratingsData.reduce((sum: number, r: any) => sum + (Number(r.rating) || 5), 0) / ratingsData.length
+        : Number(data.rating_average) || 5.0
+
       engineer.value = {
         id: data.id,
         name: data.user?.name || 'مهندس معتمد',
-        image: data.profile_photo_path || '/images/consultant-1.png',
+        // استخدام profile_photo_url (رابط Supabase الكامل) بدلاً من profile_photo_path
+        image: data.profile_photo_url || data.profile_photo_path || '/images/consultant-1.png',
         specialty: specialtyText,
         specialtyKey: primarySpec?.id ? String(primarySpec.id) : 'photovoltaic',
-        city: data.user?.governorate?.name_ar || 'صنعاء',
-        rating: 5.0,
+        city: data.user?.governorate?.name_ar || data.governorate?.name_ar || 'صنعاء',
+        rating: Math.round(avgRating * 10) / 10,
         completedProjects: projectsList.length || (expYears * 3),
         serviceTitle: primarySpec?.name || 'تصميم وإشراف أنظمة الطاقة الشمسية',
         bio: data.bio || 'مهندس واستشاري معتمد لدى منصة SolarHub لتقديم الحلول والدراسات الهندسية.',
         isVerified: data.approval_status === 'approved',
         licenseNumber: data.license_number || 'ENG-YE-2024',
         experienceYears: expYears,
-        verifiedReviews: 20,
+        verifiedReviews: ratingsData.length || 0,
         responseTime: 'ساعتان',
-        professionalBio: data.bio || `مهندس استشاري معتمد ومصنف لدى منصة SolarHub بخبرة تفوق ${expYears} سنوات في قطاع الطاقة المتجددة والهندسة الكهروضوئية في اليمن. متخصص في تصميم الأنظمة ودراسات الجدوى الفنية والاقتصادية ومخططات التنفيذ للمشاريع السكنية والتجارية والزراعية.`,
+        professionalBio: data.bio || `مهندس استشاري معتمد ومصنف لدى منصة SolarHub بخبرة تفوق ${expYears} سنوات في قطاع الطاقة المتجددة والهندسة الكهروضوئية في اليمن.`,
         expertise: expertiseList,
         projects: projectsList,
-        certificates: [
-          {
-            id: 'cert-1',
-            title: 'ترخيص مزاولة المهنة الهندسية',
-            issuer: 'نقابة المهندسين اليمنيين',
-            credentialNumber: data.license_number || 'ENG-YE-019',
-            status: 'verified',
-            icon: 'shield',
-          },
-          {
-            id: 'cert-2',
-            title: 'اعتماد تصميم أنظمة الطاقة الشمسية',
-            issuer: 'منصة SolarHub للحلول المتجددة',
-            credentialNumber: `SH-ENG-${data.id}`,
-            status: 'verified',
-            icon: 'award',
-          },
-        ],
+        // شهادات حقيقية من البيانات (قائمة فارغة إذا لم تكن متاحة عبر هذا الـ endpoint)
+        certificates: [],
         reviews: {
-          distribution: { 5: 18, 4: 2, 3: 0, 2: 0, 1: 0 },
-          comments: [
-            {
-              id: 'c1',
-              author: 'عميل SolarHub',
-              project: 'مشروع منظومة شمسية هجينة',
-              rating: 5,
-              relativeDate: 'مؤخراً',
-              comment: 'مهندس متمكن وذو خبرة عالية في حساب الأحمال وتحديد زوايا الميلان المناسبة. تم إنجاز المخطط بدقة واحترافية.',
-            },
-          ],
+          distribution: dist as any,
+          comments: realComments,
         },
       }
     } catch (err: any) {
-      console.error(`Failed to load engineer #${id}:`, err)
+      console.error(`Failed to load engineer #${engineerId.value}:`, err)
       error.value = 'تعذر تحميل بيانات المهندس أو أن الحساب غير متاح حالياً.'
     } finally {
       isLoading.value = false
@@ -192,7 +186,7 @@ export function useEngineerProfile() {
 
   function sendMessage() {
     if (engineer.value) {
-      showTemporaryNotice(`المراسلة المباشرة مع المهندس ستتاح في التحديث القادم، يمكنك الآن إرسال طلب خدمة للحصول على عرضه الفني.`)
+      showTemporaryNotice('المراسلة المباشرة مع المهندس ستتاح في التحديث القادم، يمكنك الآن إرسال طلب خدمة للحصول على عرضه الفني.')
     }
   }
 

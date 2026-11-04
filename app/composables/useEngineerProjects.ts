@@ -6,13 +6,16 @@ export interface EngineerProjectItem {
   service_type_id: string
   service_type_label: string
   system_capacity: string
+  raw_capacity?: number | null
   governorate_id: string
   governorate_name: string
   address_text: string
   description: string
-  image_path: string
-  file_path?: string
-  file_size_pages?: string
+  image_path?: string | null
+  image_url?: string | null
+  file_path?: string | null
+  file_url?: string | null
+  file_name?: string | null
 }
 
 export interface NewProjectPayload {
@@ -22,8 +25,8 @@ export interface NewProjectPayload {
   governorate_id: string
   address_text: string
   description: string
-  image_file: File | null
-  file_attachment: File | null
+  image_file?: File | null
+  file_attachment?: File | null
 }
 
 export interface SelectOption {
@@ -41,20 +44,8 @@ export function useEngineerProjects() {
   const authStore = useAuthStore()
 
   const projects = ref<EngineerProjectItem[]>([])
-  const serviceTypesList = ref<SelectOption[]>([
-    { id: '1', label: 'تصميم محطات كهروضوئية' },
-    { id: '2', label: 'دراسات جدوى واستشارات' },
-    { id: '3', label: 'فحص واعتماد كود البناء السعودي' },
-    { id: '4', label: 'أنظمة هجينة وبطاريات' },
-  ])
-  const governoratesList = ref<GovernorateOption[]>([
-    { id: '1', name: 'الرياض (منطقة الرياض)' },
-    { id: '2', name: 'مكة المكرمة (جدة / مكة)' },
-    { id: '3', name: 'المنطقة الشرقية (الدمام / الخبر)' },
-    { id: '4', name: 'القصيم (بريدة / عنيزة)' },
-    { id: '5', name: 'عسير (أبها / خميس مشيط)' },
-    { id: '6', name: 'المدينة المنورة (ينبع / المدينة)' },
-  ])
+  const serviceTypesList = ref<SelectOption[]>([])
+  const governoratesList = ref<GovernorateOption[]>([])
 
   const search = ref('')
   const serviceTypeFilter = ref('all')
@@ -70,25 +61,21 @@ export function useEngineerProjects() {
 
       if (typesRes.status === 'fulfilled' && typesRes.value?.data) {
         const items = Array.isArray(typesRes.value.data) ? typesRes.value.data : []
-        if (items.length > 0) {
-          serviceTypesList.value = items.map((t: any) => ({
-            id: String(t.id),
-            label: t.name || t.name_ar || t.label,
-          }))
-        }
+        serviceTypesList.value = items.map((t: any) => ({
+          id: String(t.id),
+          label: t.name || t.name_ar || t.label,
+        }))
       }
 
       if (govsRes.status === 'fulfilled' && govsRes.value?.data) {
         const govs = Array.isArray(govsRes.value.data) ? govsRes.value.data : []
-        if (govs.length > 0) {
-          governoratesList.value = govs.map((g: any) => ({
-            id: String(g.id),
-            name: g.name_ar || g.name || g.label,
-          }))
-        }
+        governoratesList.value = govs.map((g: any) => ({
+          id: String(g.id),
+          name: g.name_ar || g.name || g.label,
+        }))
       }
     } catch {
-      // Keep sensible default lists
+      // Graceful handling if master data fails
     }
   }
 
@@ -102,23 +89,26 @@ export function useEngineerProjects() {
       const items = Array.isArray(res?.data) ? res.data : []
 
       projects.value = items.map((item: any) => {
-        const servName = item.service_type?.name || 'تصميم محطات كهروضوئية'
-        const govName = item.governorate?.name || item.governorate?.name_ar || 'المملكة'
-        const capacityNum = item.system_capacity ? `${item.system_capacity} kWp` : 'غير محددة'
+        const servName = item.service_type?.name || 'خدمة هندسية'
+        const govName = item.governorate?.name_ar || item.governorate?.name || ''
+        const capacityNum = item.system_capacity ? `${item.system_capacity} kWp` : ''
 
         return {
           id: Number(item.id),
-          project_title: item.project_title || 'مشروع هندسي معتمد',
-          service_type_id: String(item.service_type?.id || '1'),
+          project_title: item.project_title || '',
+          service_type_id: String(item.service_type?.id || ''),
           service_type_label: servName,
           system_capacity: capacityNum,
-          governorate_id: String(item.governorate?.id || '1'),
+          raw_capacity: item.system_capacity ? Number(item.system_capacity) : null,
+          governorate_id: String(item.governorate?.id || ''),
           governorate_name: govName,
           address_text: item.address_text || govName,
-          description: item.description || 'إعداد المخططات الهندسية المعتمدة للمنظومة الكهروضوئية.',
-          image_path: item.image_path || 'https://images.unsplash.com/photo-1509391365360-2e959784a276?auto=format&fit=crop&w=800&q=80',
-          file_path: item.file_path ? item.file_path.split('/').pop() : 'مخطط_تنفيذي_معتمد.pdf',
-          file_size_pages: 'وثيقة ومخطط معتمد',
+          description: item.description || '',
+          image_path: item.image_path || null,
+          image_url: item.image_url || null,
+          file_path: item.file_path || null,
+          file_url: item.file_url || null,
+          file_name: item.file_path ? item.file_path.split('/').pop() : null,
         }
       })
     } catch (err: any) {
@@ -128,40 +118,65 @@ export function useEngineerProjects() {
     }
   }
 
-  async function addProject(payload: NewProjectPayload) {
+  function buildFormData(payload: NewProjectPayload, isUpdate = false): FormData {
     const formData = new FormData()
-    formData.append('project_title', payload.project_title.trim())
-    formData.append('service_type_id', payload.service_type_id)
+    if (isUpdate) {
+      formData.append('_method', 'PUT')
+    }
+
+    if (payload.project_title) {
+      formData.append('project_title', payload.project_title.trim())
+    }
+    if (payload.service_type_id) {
+      formData.append('service_type_id', payload.service_type_id)
+    }
 
     if (payload.governorate_id) {
       formData.append('governorate_id', payload.governorate_id)
     }
 
-    if (payload.system_capacity) {
-      // Remove any non-numeric characters for backend numeric validation
-      const numericCapacity = payload.system_capacity.replace(/[^\d.]/g, '')
+    if (payload.system_capacity !== undefined && payload.system_capacity !== null && payload.system_capacity !== '') {
+      const numericCapacity = String(payload.system_capacity).replace(/[^\d.]/g, '')
       if (numericCapacity) {
         formData.append('system_capacity', numericCapacity)
       }
     }
 
-    if (payload.description) {
+    if (payload.description !== undefined && payload.description !== null) {
       formData.append('description', payload.description.trim())
     }
 
-    if (payload.address_text) {
+    if (payload.address_text !== undefined && payload.address_text !== null) {
       formData.append('address_text', payload.address_text.trim())
     }
 
-    if (payload.image_file) {
+    if (payload.image_file instanceof File) {
       formData.append('image', payload.image_file)
     }
 
-    if (payload.file_attachment) {
+    if (payload.file_attachment instanceof File) {
       formData.append('file', payload.file_attachment)
     }
 
+    return formData
+  }
+
+  async function addProject(payload: NewProjectPayload) {
+    const formData = buildFormData(payload, false)
+
     const res = await $api<{ status: string; data: any }>('/engineer/portfolio-items', {
+      method: 'POST',
+      body: formData,
+    })
+
+    await fetchProjects()
+    return res
+  }
+
+  async function updateProject(id: number, payload: NewProjectPayload) {
+    const formData = buildFormData(payload, true)
+
+    const res = await $api<{ status: string; data: any }>(`/engineer/portfolio-items/${id}`, {
       method: 'POST',
       body: formData,
     })
@@ -207,6 +222,7 @@ export function useEngineerProjects() {
     error,
     fetchProjects,
     addProject,
+    updateProject,
     deleteProject,
   }
 }

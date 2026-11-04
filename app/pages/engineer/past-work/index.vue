@@ -18,22 +18,33 @@ useSeoMeta({
 })
 
 const {
+  projects,
   filteredProjects,
   search,
   serviceTypeFilter,
   serviceTypesList,
   governoratesList,
+  isLoading,
+  error,
   addProject,
+  updateProject,
   deleteProject,
 } = useEngineerProjects()
 
-const isAddModalOpen = ref(false)
+const isProjectModalOpen = ref(false)
 const isDetailModalOpen = ref(false)
 const selectedProject = ref<EngineerProjectItem | null>(null)
+const editingProject = ref<EngineerProjectItem | null>(null)
 const toastMessage = ref('')
 
 function openAddModal() {
-  isAddModalOpen.value = true
+  editingProject.value = null
+  isProjectModalOpen.value = true
+}
+
+function openEditModal(project: EngineerProjectItem) {
+  editingProject.value = project
+  isProjectModalOpen.value = true
 }
 
 function openDetailModal(project: EngineerProjectItem) {
@@ -41,29 +52,24 @@ function openDetailModal(project: EngineerProjectItem) {
   isDetailModalOpen.value = true
 }
 
-function handleEditProject(project: EngineerProjectItem) {
-  isDetailModalOpen.value = false
-  // للتبسيط، نفتح رسالة أو نعدل
-  showToast(`تعديل مشروع: ${project.project_title}`)
-}
-
 async function handleDeleteProject(id: number) {
-  if (confirm('هل أنت متأكد من حذف هذا المشروع من أعمالك السابقة؟')) {
-    try {
-      await deleteProject(id)
-      showToast('تم حذف المشروع بنجاح')
-    } catch (err: any) {
-      showToast(err?.data?.message || 'تعذر حذف المشروع')
-    }
+  if (!confirm('هل أنت متأكد من حذف هذا المشروع من أعمالك السابقة؟')) return
+
+  try {
+    await deleteProject(id)
+    showToast('تم حذف المشروع بنجاح')
+  } catch (err: any) {
+    showToast(err?.data?.message || 'تعذر حذف المشروع')
   }
 }
 
-async function handleProjectCreated(payload: NewProjectPayload) {
-  try {
+async function handleProjectSubmit(payload: NewProjectPayload, isEdit: boolean, id?: number) {
+  if (isEdit && id) {
+    await updateProject(id, payload)
+    showToast('تم تحديث بيانات المشروع بنجاح!')
+  } else {
     await addProject(payload)
     showToast('تمت إضافة المشروع الجديد بنجاح!')
-  } catch (err: any) {
-    showToast(err?.data?.message || 'تعذر إضافة المشروع، يرجى التحقق من البيانات')
   }
 }
 
@@ -126,35 +132,50 @@ function showToast(msg: string) {
       </div>
     </div>
 
+    <!-- مؤشر التحميل -->
+    <div v-if="isLoading" class="flex items-center justify-center py-16 text-solar-navy">
+      <div class="size-8 animate-spin rounded-full border-4 border-solar-navy border-t-transparent" />
+    </div>
+
     <!-- شبكة بطاقات المشاريع المنجزة -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
       <!-- بطاقات المشاريع الحالية -->
       <ProjectCard
         v-for="project in filteredProjects"
         :key="project.id"
         :project="project"
         @view="openDetailModal"
-        @edit="openDetailModal"
+        @edit="openEditModal"
         @delete="handleDeleteProject"
-        @unavailable="showToast"
       />
 
       <!-- بطاقة إضافة نموذج عمل جديد التفاعلية المفرغة -->
       <AddProjectCard @add="openAddModal" />
     </div>
 
-    <!-- حالة عدم وجود نتائج عند البحث -->
+    <!-- حالة عدم وجود نتائج عند البحث أو قائمة فارغة -->
     <div
-      v-if="filteredProjects.length === 0"
+      v-if="!isLoading && filteredProjects.length === 0"
       class="rounded-2xl border border-dashed border-solar-border-card bg-white p-12 text-center"
     >
-      <p class="text-sm font-semibold text-solar-text-heading">لا توجد مشاريع تطابق شروط البحث الحالية</p>
+      <p class="text-sm font-semibold text-solar-text-heading">
+        {{ search || serviceTypeFilter !== 'all' ? 'لا توجد مشاريع تطابق شروط البحث الحالية' : 'لم تقم بإضافة نماذج أعمال سابقة بعد' }}
+      </p>
       <button
+        v-if="search || serviceTypeFilter !== 'all'"
         type="button"
         class="mt-3 text-xs font-bold text-solar-yellow hover:underline"
         @click="search = ''; serviceTypeFilter = 'all'"
       >
         إعادة ضبط الفلاتر
+      </button>
+      <button
+        v-else
+        type="button"
+        class="mt-3 text-xs font-bold text-solar-navy hover:underline"
+        @click="openAddModal"
+      >
+        أضف أول نموذج عمل الآن
       </button>
     </div>
 
@@ -162,16 +183,16 @@ function showToast(msg: string) {
     <ProjectDetailModal
       v-model="isDetailModalOpen"
       :project="selectedProject"
-      @edit="handleEditProject"
-      @unavailable="showToast"
+      @edit="openEditModal"
     />
 
-    <!-- نافذة إضافة مشروع جديد (Modal) -->
+    <!-- نافذة إضافة وتعديل مشروع (Modal) -->
     <AddProjectModal
-      v-model="isAddModalOpen"
+      v-model="isProjectModalOpen"
+      :edit-project="editingProject"
       :service-types-list="serviceTypesList"
       :governorates-list="governoratesList"
-      @submit="handleProjectCreated"
+      :submit-action="handleProjectSubmit"
     />
 
     <!-- Toast للتنبيهات السريعة -->
