@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckCircle, Download, Eye, FileText, X } from 'lucide-vue-next'
+import { CheckCircle, Download, Eye, FileText, Loader2, Trash2, X } from 'lucide-vue-next'
 import type { EngineerOffer } from '~~/app/composables/useEngineerOffers'
 
 const props = defineProps<{
@@ -9,13 +9,40 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
+  (e: 'withdrawn', offerId: number): void
 }>()
+
+const { $api } = useNuxtApp()
+const isWithdrawing = ref(false)
 
 function close() { emit('update:modelValue', false) }
 
 function handleKeydown(event: KeyboardEvent) {
   if (props.modelValue && event.key === 'Escape') close()
 }
+
+function openAttachment() {
+  if (props.offer?.attachmentUrl) {
+    window.open(props.offer.attachmentUrl, '_blank')
+  }
+}
+
+async function handleWithdraw() {
+  if (!props.offer) return
+  if (!confirm(`هل أنت متأكد من رغبتك في سحب العرض ${props.offer.id}؟`)) return
+
+  try {
+    isWithdrawing.value = true
+    await $api(`/offers/${props.offer.rawId}`, { method: 'DELETE' })
+    emit('withdrawn', props.offer.rawId)
+    close()
+  } catch (err: any) {
+    alert(err?.data?.message || 'تعذر سحب العرض')
+  } finally {
+    isWithdrawing.value = false
+  }
+}
+
 onMounted(() => window.addEventListener('keydown', handleKeydown))
 onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 </script>
@@ -87,7 +114,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
             </section>
 
             <!-- ملف العرض الفني المرفق -->
-            <section v-if="offer.attachmentName">
+            <section v-if="offer.attachmentName || offer.attachmentUrl">
               <div class="mb-3 flex items-center gap-2 text-sm font-bold text-solar-text-heading">
                 <FileText class="size-4 text-solar-text-muted" aria-hidden="true" />
                 ملف العرض الفني المرفق
@@ -98,36 +125,52 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
                     <FileText class="size-5 text-red-600" aria-hidden="true" />
                   </div>
                   <div>
-                    <p class="text-xs font-semibold text-solar-text-heading">{{ offer.attachmentName }}</p>
+                    <p class="text-xs font-semibold text-solar-text-heading">{{ offer.attachmentName || 'ملف العرض الفني' }}</p>
                     <p v-if="offer.attachmentSize" class="text-[11px] text-solar-text-muted">{{ offer.attachmentSize }}</p>
                   </div>
                 </div>
-                <div class="flex items-center gap-2">
+                <div v-if="offer.attachmentUrl" class="flex items-center gap-2">
                   <button
                     type="button"
                     class="flex items-center gap-1 rounded-lg border border-solar-border-card bg-white px-2.5 py-1.5 text-xs font-semibold text-solar-text-body hover:border-solar-navy transition-colors"
+                    @click="openAttachment"
                   >
                     <Eye class="size-3.5" aria-hidden="true" />
                     معاينة
                   </button>
-                  <button
-                    type="button"
+                  <a
+                    :href="offer.attachmentUrl"
+                    target="_blank"
+                    download
                     class="flex items-center gap-1 rounded-lg border border-solar-border-card bg-white px-2.5 py-1.5 text-xs font-semibold text-solar-text-body hover:border-solar-navy transition-colors"
                   >
                     <Download class="size-3.5" aria-hidden="true" />
                     تحميل
-                  </button>
+                  </a>
                 </div>
               </div>
             </section>
           </div>
 
           <!-- فوتر المودال -->
-          <div class="border-t border-solar-border-card px-6 py-4 shrink-0">
+          <div class="border-t border-solar-border-card px-6 py-4 shrink-0 flex items-center justify-between gap-3">
+            <button
+              v-if="offer.status === 'pending_review'"
+              type="button"
+              :disabled="isWithdrawing"
+              class="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs sm:text-sm font-bold text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+              @click="handleWithdraw"
+            >
+              <Loader2 v-if="isWithdrawing" class="size-4 animate-spin" />
+              <Trash2 v-else class="size-4" />
+              <span>{{ isWithdrawing ? 'جاري السحب...' : 'سحب العرض' }}</span>
+            </button>
+            <div v-else />
+
             <button
               type="button"
               @click="close"
-              class="w-full rounded-lg border border-solar-border-card px-4 py-2.5 text-sm font-semibold text-solar-text-body hover:bg-solar-bg-subtle transition-colors"
+              class="rounded-lg border border-solar-border-card px-5 py-2 text-xs sm:text-sm font-semibold text-solar-text-body hover:bg-solar-bg-subtle transition-colors"
             >
               إغلاق
             </button>

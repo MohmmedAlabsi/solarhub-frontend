@@ -30,7 +30,7 @@ const config = useRuntimeConfig()
 const authStore = useAuthStore()
 
 function resolveUrl(path: string | null | undefined): string {
-  if (!path) return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
+  if (!path) return '/images/consultant-1.png'
   if (path.startsWith('http')) return path
   const base = config.public.apiBase ? config.public.apiBase.replace(/\/api$/, '') : 'http://127.0.0.1:8000'
   return `${base}/storage/${path.replace(/^\//, '')}`
@@ -52,22 +52,32 @@ interface CertDisplay {
   url: string
 }
 
+interface SpecialtyDisplay {
+  id: number
+  title: string
+  desc: string
+  icon: any
+  active: boolean
+}
+
 const profileData = reactive({
-  name: authStore.user?.name || 'م. أحمد الشمري',
+  name: authStore.user?.name || 'مهندس معتمد',
   title: 'مهندس استشاري طاقة كهروضوئية',
-  licenseNumber: 'SCE-748921',
-  experienceYears: '8',
-  bio: 'مهندس استشاري معتمد لدى الهيئة السعودية للمهندسين متخصص في تصميم وتدقيق محطات الطاقة الشمسية الكهروضوئية (PV) للقطاعات السكنية والتجارية والصناعية.',
-  image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+  licenseNumber: '',
+  experienceYears: '5',
+  bio: '',
+  image: '/images/consultant-1.png',
 })
 
 const initialProfile = ref<Record<string, any>>({})
 
-const specialties = ref([
+const defaultIcons = [Zap, Battery, Droplets, FileCheck]
+
+const fallbackSpecialties = [
   {
     id: 1,
     title: 'تصميم محطات كهروضوئية متصلة بالشبكة (On-Grid)',
-    desc: 'أنظمة متصلة بالشبكة ومطابقة لكود البناء السعودي واشتراطات هيئة تنظيم المياه والكهرباء.',
+    desc: 'أنظمة متصلة بالشبكة ومطابقة للاشتراطات الفنية المعتمدة لشركات الكهرباء.',
     icon: Zap,
     active: true,
   },
@@ -87,29 +97,15 @@ const specialties = ref([
   },
   {
     id: 4,
-    title: 'فحص الجودة والتوافق مع كود البناء السعودي (SBC Compliance & Inspection)',
+    title: 'فحص الجودة والتوافق الهندسي والمطابقة (Inspection & Quality)',
     desc: 'اختبارات الأداء الميداني ومنحنيات I-V والفحص الحراري واعتماد شهادات المطابقة.',
     icon: FileCheck,
     active: true,
   },
-])
+]
 
-const certificates = ref<CertDisplay[]>([
-  {
-    id: 1,
-    title: 'رخصة مهنية معتمدة - الهيئة السعودية للمهندسين (SCE)',
-    meta: 'ملف PDF · تاريخ التوثيق: 15 يناير 2024 - صالحة حتى 2026',
-    type: 'pdf',
-    url: '#',
-  },
-  {
-    id: 2,
-    title: 'شهادة مهندس معتمد في تصميم محطات الطاقة الشمسية الكهروضوئية (PVsyst Professional Certified)',
-    meta: 'ملف PDF · تاريخ الاعتماد: 08 مارس 2023 - اعتماد دولي',
-    type: 'pdf',
-    url: '#',
-  },
-])
+const specialties = ref<SpecialtyDisplay[]>([...fallbackSpecialties])
+const certificates = ref<CertDisplay[]>([])
 
 function toggleSpecialty(id: number) {
   const item = specialties.value.find(s => s.id === id)
@@ -123,24 +119,60 @@ function showToast(msg: string) {
   }, 3500)
 }
 
-async function loadProfile() {
+async function loadProfileAndSpecializations() {
   try {
     isLoading.value = true
-    const res = await $api<any>('/engineer/profile')
-    const data = res?.data || res
-    if (data) {
-      if (data.user?.name) profileData.name = data.user.name
-      if (data.license_number) profileData.licenseNumber = data.license_number
-      if (data.years_of_experience !== undefined && data.years_of_experience !== null) {
-        profileData.experienceYears = String(data.years_of_experience)
-      }
-      if (data.bio) profileData.bio = data.bio
-      if (data.profile_photo_path) profileData.image = resolveUrl(data.profile_photo_path)
 
-      initialProfile.value = { ...profileData }
+    const [specRes, profileRes] = await Promise.allSettled([
+      $api<any>('/specializations'),
+      $api<any>('/engineer/profile'),
+    ])
+
+    let availableSpecs: any[] = []
+    if (specRes.status === 'fulfilled') {
+      const raw = (specRes.value as any)?.data || specRes.value
+      if (Array.isArray(raw) && raw.length > 0) {
+        availableSpecs = raw
+      }
+    }
+
+    let assignedSpecIds: number[] = []
+
+    if (profileRes.status === 'fulfilled') {
+      const pData = (profileRes.value as any)?.data || profileRes.value
+      if (pData) {
+        if (pData.user?.name) profileData.name = pData.user.name
+        if (pData.license_number) profileData.licenseNumber = pData.license_number
+        if (pData.years_of_experience !== undefined && pData.years_of_experience !== null) {
+          profileData.experienceYears = String(pData.years_of_experience)
+        }
+        if (pData.bio) profileData.bio = pData.bio
+        if (pData.profile_photo_url || pData.profile_photo_path) {
+          profileData.image = pData.profile_photo_url || resolveUrl(pData.profile_photo_path)
+        }
+        if (Array.isArray(pData.specializations)) {
+          assignedSpecIds = pData.specializations.map((s: any) => s.id)
+        }
+        initialProfile.value = { ...profileData }
+      }
+    }
+
+    if (availableSpecs.length > 0) {
+      specialties.value = availableSpecs.map((s, idx) => ({
+        id: s.id,
+        title: s.name,
+        desc: s.description || 'تخصص معتمد لدى منصة SolarHub لتصميم وتنفيذ ودراسة مشاريع الطاقة المتجددة.',
+        icon: defaultIcons[idx % defaultIcons.length],
+        active: assignedSpecIds.length > 0 ? assignedSpecIds.includes(s.id) : idx === 0,
+      }))
+    } else if (assignedSpecIds.length > 0) {
+      specialties.value = specialties.value.map(s => ({
+        ...s,
+        active: assignedSpecIds.includes(s.id),
+      }))
     }
   } catch (err: any) {
-    // Keep fallback defaults if not loaded
+    // Keep fallback safe data on error
   } finally {
     isLoading.value = false
   }
@@ -150,7 +182,7 @@ async function loadCertificates() {
   try {
     const res = await $api<any>('/engineer/certificates')
     const items = res?.data || res
-    if (Array.isArray(items) && items.length > 0) {
+    if (Array.isArray(items)) {
       certificates.value = items.map((c: any, index: number) => {
         const path = c.file_path || ''
         const fileName = path.split('/').pop() || `شهادة اعتماد مهني ${index + 1}`
@@ -161,12 +193,13 @@ async function loadCertificates() {
           title: fileName,
           meta: `${isPdf ? 'ملف PDF' : 'صورة'} · تاريخ الرفع: ${createdDate}`,
           type: isPdf ? 'pdf' : 'image',
-          url: resolveUrl(c.file_path),
+          url: c.file_url || resolveUrl(c.file_path),
         }
       })
     }
   } catch (err: any) {
-    // Keep initial certificates on error
+    // If certificates fetch fails, keep empty array
+    certificates.value = []
   }
 }
 
@@ -179,8 +212,8 @@ async function onPhotoSelected(event: Event) {
   const file = target.files?.[0]
   if (!file) return
 
-  if (file.size > 5 * 1024 * 1024) {
-    showToast('حجم الصورة يجب ألا يتجاوز 5 ميجابايت')
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('حجم الصورة يجب ألا يتجاوز 2 ميجابايت')
     return
   }
 
@@ -188,18 +221,20 @@ async function onPhotoSelected(event: Event) {
     const formData = new FormData()
     formData.append('_method', 'PUT')
     formData.append('profile_photo', file)
-    
+
     const res = await $api<any>('/engineer/profile', {
       method: 'POST',
       body: formData,
     })
     const data = res?.data || res
-    if (data?.profile_photo_path) {
-      profileData.image = resolveUrl(data.profile_photo_path)
+    if (data?.profile_photo_url || data?.profile_photo_path) {
+      profileData.image = data.profile_photo_url || resolveUrl(data.profile_photo_path)
     }
     showToast('تم تحديث الصورة المهنية بنجاح!')
   } catch (err: any) {
     showToast(err?.data?.message || 'تعذر تحديث الصورة المهنية')
+  } finally {
+    if (target) target.value = ''
   }
 }
 
@@ -255,7 +290,7 @@ function viewCertificate(url: string) {
   if (url && url !== '#') {
     window.open(url, '_blank')
   } else {
-    showToast('معاينة الشهادة')
+    showToast('رابط الشهادة غير متاح للمعاينة')
   }
 }
 
@@ -263,10 +298,13 @@ async function handleSave() {
   try {
     isSaving.value = true
     const expNum = parseInt(profileData.experienceYears, 10)
+    const selectedSpecIds = specialties.value.filter(s => s.active).map(s => s.id)
+
     const payload: Record<string, any> = {
       license_number: profileData.licenseNumber || null,
       years_of_experience: isNaN(expNum) ? null : expNum,
       bio: profileData.bio || null,
+      specialization_ids: selectedSpecIds,
     }
 
     const res = await $api<any>('/engineer/profile', {
@@ -279,6 +317,7 @@ async function handleSave() {
       if (data.license_number) profileData.licenseNumber = data.license_number
       if (data.years_of_experience !== undefined) profileData.experienceYears = String(data.years_of_experience)
       if (data.bio) profileData.bio = data.bio
+      initialProfile.value = { ...profileData }
     }
 
     showToast('تم حفظ تعديلات الملف المهني بنجاح!')
@@ -298,7 +337,7 @@ function handleCancel() {
 }
 
 onMounted(() => {
-  loadProfile()
+  loadProfileAndSpecializations()
   loadCertificates()
 })
 </script>
@@ -326,11 +365,12 @@ onMounted(() => {
         <div class="flex flex-col lg:flex-row-reverse gap-6 items-start">
           <!-- بطاقة الصورة المهنية -->
           <div class="flex flex-col items-center justify-center rounded-2xl bg-solar-bg-subtle/50 p-6 border border-solar-border-card/60 w-full lg:w-72 shrink-0 text-center">
-            <div class="relative size-24 overflow-hidden rounded-2xl border-2 border-white shadow-md">
+            <div class="relative size-24 overflow-hidden rounded-2xl border-2 border-white shadow-md bg-white">
               <img
                 :src="profileData.image"
                 :alt="profileData.name"
                 class="h-full w-full object-cover"
+                onerror="this.src='/images/consultant-1.png'"
               />
             </div>
             <h3 class="mt-3 text-sm font-black text-solar-text-heading">
@@ -355,7 +395,7 @@ onMounted(() => {
               <Camera class="size-3.5" />
               <span>تحديث الصورة المهنية</span>
             </button>
-            <span class="text-[10px] text-solar-text-muted mt-1.5">PNG أو JPG بحد أقصى 5MB</span>
+            <span class="text-[10px] text-solar-text-muted mt-1.5">PNG أو JPG بحد أقصى 2MB</span>
           </div>
 
           <!-- تفاصيل الترخيص والخبرة والنبذة -->
@@ -368,15 +408,16 @@ onMounted(() => {
                 </label>
                 <div class="relative flex items-center rounded-lg border border-solar-border-input bg-solar-bg-subtle/40 overflow-hidden">
                   <span class="bg-solar-bg-subtle px-3 py-2 text-xs font-bold text-solar-text-muted border-l border-solar-border-input">
-                    SCE
+                    رقم الاعتماد
                   </span>
                   <input
                     v-model="profileData.licenseNumber"
                     type="text"
+                    placeholder="مثال: SCE-748921"
                     class="w-full bg-transparent px-3 py-2 text-xs font-mono font-bold text-solar-text-heading focus:outline-none"
                   />
                 </div>
-                <span class="text-[10px] text-solar-text-muted mt-1 block">الهيئة السعودية للمهندسين - معتمد رسمياً</span>
+                <span class="text-[10px] text-solar-text-muted mt-1 block">رقم رخصة مزاولة المهنة المعتمدة رسمياً</span>
               </div>
 
               <!-- سنوات الخبرة الميدانية -->
@@ -386,7 +427,8 @@ onMounted(() => {
                 </label>
                 <input
                   v-model="profileData.experienceYears"
-                  type="text"
+                  type="number"
+                  min="0"
                   class="w-full rounded-lg border border-solar-border-input bg-solar-bg-subtle/40 px-3.5 py-2 text-xs font-bold text-solar-text-heading focus:outline-none"
                 />
                 <span class="text-[10px] text-solar-text-muted mt-1 block">الخبرة الهندسية والاستشارية المعتمدة</span>
@@ -401,6 +443,7 @@ onMounted(() => {
               <textarea
                 v-model="profileData.bio"
                 rows="4"
+                placeholder="اكتب نبذة عن خبراتك المهنية والأنظمة الكهروضوئية التي تتقن تصميمها وإدارتها..."
                 class="w-full rounded-lg border border-solar-border-input bg-solar-bg-subtle/40 p-3 text-xs leading-relaxed text-solar-text-heading focus:border-solar-yellow focus:outline-none resize-none"
               />
             </div>
@@ -417,7 +460,7 @@ onMounted(() => {
           <h2>التخصصات الهندسية</h2>
         </div>
         <span class="rounded-lg bg-solar-yellow/20 px-2.5 py-1 text-xs font-bold text-solar-navy-dark">
-          4 تخصصات معتمدة
+          {{ specialties.filter(s => s.active).length }} تخصصات محددة
         </span>
       </div>
 
@@ -476,7 +519,27 @@ onMounted(() => {
         </button>
       </div>
 
-      <div class="space-y-3">
+      <!-- حالة عدم وجود شهادات -->
+      <div v-if="certificates.length === 0" class="rounded-xl border border-dashed border-solar-border-card bg-white p-8 text-center">
+        <div class="mx-auto flex size-12 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-text-muted mb-3">
+          <ShieldCheck class="size-6" />
+        </div>
+        <p class="text-sm font-bold text-solar-text-heading">لا توجد شهادات معتمدة مضافة حتى الآن</p>
+        <p class="text-xs text-solar-text-muted mt-1">
+          يمكنك رفع شهاداتك ورخصك المهنية (PDF أو صورة حتى 5MB) لتعزيز موثوقية ملفك الهندسي لدى العملاء.
+        </p>
+        <button
+          type="button"
+          class="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-solar-border-card bg-white px-3.5 py-1.5 text-xs font-bold text-solar-navy shadow-xs hover:border-solar-navy transition-all"
+          @click="triggerCertUpload"
+        >
+          <Plus class="size-3.5" />
+          <span>رفع أول شهادة</span>
+        </button>
+      </div>
+
+      <!-- قائمة الشهادات الحقيقية -->
+      <div v-else class="space-y-3">
         <div
           v-for="cert in certificates"
           :key="cert.id"

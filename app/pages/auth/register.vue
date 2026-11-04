@@ -246,7 +246,7 @@ async function handleSubmit() {
 
   const payload: any = {
     name: form.name.trim(),
-    email: form.email.trim(),
+    email: form.email.trim().toLowerCase(),
     phone: form.phone.trim(),
     password: form.password,
     password_confirmation: form.confirmPassword,
@@ -334,7 +334,7 @@ async function handleSubmit() {
             id="email"
             v-model="form.email"
             type="email"
-            placeholder="name@example.com"
+            placeholder="name@gmail.com"
             dir="ltr"
             class="h-12 w-full rounded-xl border border-solar-border-card bg-solar-bg-card dark:bg-solar-bg-subtle/50 px-3.5 text-xs font-medium text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-left"
           />

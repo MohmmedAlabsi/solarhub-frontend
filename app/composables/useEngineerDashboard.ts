@@ -99,20 +99,23 @@ export const useEngineerDashboard = () => {
       ])
 
       // 1. حساب العروض قيد المراجعة
-      if (offersRes.status === 'fulfilled' && offersRes.value?.data) {
-        const offers = Array.isArray(offersRes.value.data) ? offersRes.value.data : []
+      if (offersRes.status === 'fulfilled') {
+        const val = offersRes.value as any
+        const offers = Array.isArray(val?.data) ? val.data : (Array.isArray(val) ? val : [])
         pendingOffersCount.value = offers.filter((o: any) => o.status === 'pending').length
       }
 
       // 2. حساب طلبات الخدمات المفتوحة المتاحة
-      if (requestsRes.status === 'fulfilled' && requestsRes.value?.data) {
-        const requests = Array.isArray(requestsRes.value.data) ? requestsRes.value.data : []
+      if (requestsRes.status === 'fulfilled') {
+        const val = requestsRes.value as any
+        const requests = Array.isArray(val?.data) ? val.data : (Array.isArray(val) ? val : [])
         availableRequestsCount.value = requests.length
       }
 
       // 3. حساب نماذج الأعمال السابقة المنجزة
-      if (portfolioRes.status === 'fulfilled' && portfolioRes.value?.data) {
-        const items = Array.isArray(portfolioRes.value.data) ? portfolioRes.value.data : []
+      if (portfolioRes.status === 'fulfilled') {
+        const val = portfolioRes.value as any
+        const items = Array.isArray(val?.data) ? val.data : (Array.isArray(val) ? val : [])
         completedProjectsCount.value = items.length
       }
     } catch (err: any) {
