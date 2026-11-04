@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ChevronDown, Download, Eye, Loader2, RefreshCw, Trash2, UserPlus } from 'lucide-vue-next'
+import { ChevronDown, Download, Eye, Loader2, RefreshCw, Trash2 } from 'lucide-vue-next'
 import AdminSectionHeading from '../../../components/admin/workspace/AdminSectionHeading.vue'
 import AdminBadge from '../../../components/admin/common/AdminBadge.vue'
 import AdminModal from '../../../components/admin/common/AdminModal.vue'
 import AdminPagination from '../../../components/admin/common/AdminPagination.vue'
-import AdminDirectoryForm from '../../../components/admin/directory/AdminDirectoryForm.vue'
 import AdminEngineerDetails from '../../../components/admin/directory/AdminEngineerDetails.vue'
 import type { AdminEngineer } from '../../../../types/admin'
 import { approvalLabels } from '../../../composables/useAdminWorkspace'
@@ -33,7 +32,6 @@ async function handleRefresh() {
 }
 
 const status = ref(String(route.query.status ?? 'all'))
-const addOpen = ref(false)
 const detailsOpen = ref(false)
 const deleteOpen = ref(false)
 const selected = ref<AdminEngineer>()
@@ -90,10 +88,6 @@ function exportList() {
       <button class="btn-outline" @click="exportList">
         <Download class="size-4" />
         تصدير القائمة
-      </button>
-      <button class="btn-dark" @click="page = 1; addOpen = true">
-        <UserPlus class="size-4" />
-        إضافة مهندس
       </button>
     </AdminSectionHeading>
 
@@ -201,7 +195,6 @@ function exportList() {
       </div>
     </div>
 
-    <AdminDirectoryForm v-model="addOpen" kind="engineer" />
     <AdminEngineerDetails v-model="detailsOpen" :record="selected" />
 
     <AdminModal v-model="deleteOpen" title="تأكيد حذف المهندس" max-width="md">

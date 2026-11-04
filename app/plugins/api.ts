@@ -43,6 +43,8 @@ export default defineNuxtPlugin(() => {
     (config.public.apiBase as string) ||
     'http://127.0.0.1:8000/api'
 
+  let isRedirectingToLogin = false
+
   const apiFetcher = $fetch.create({
     baseURL,
     headers: {
@@ -66,9 +68,14 @@ export default defineNuxtPlugin(() => {
 
       // 401 Unauthorized: Session expired or invalid token
       if (status === 401) {
-        // Do NOT clear session or redirect if the request was an optional background permission check
+        // Do NOT clear session or redirect if the request was an optional background permission or auth check
         const reqUrl = response?.url || ''
-        if (reqUrl.includes('/permissions/users/') || reqUrl.includes('/permissions/admins')) {
+        if (
+          reqUrl.includes('/permissions/users/') ||
+          reqUrl.includes('/permissions/admins') ||
+          reqUrl.includes('/auth/me') ||
+          reqUrl.includes('/auth/otp')
+        ) {
           return
         }
 
@@ -83,9 +90,14 @@ export default defineNuxtPlugin(() => {
           }
 
           const route = useRoute()
-          // Only redirect if not already on auth pages
-          if (!route.path.startsWith('/auth/')) {
-            navigateTo('/auth/login')
+          // Only redirect if not already on auth pages and not already redirecting
+          if (!route.path.startsWith('/auth') && !isRedirectingToLogin) {
+            isRedirectingToLogin = true
+            navigateTo('/auth/login').finally(() => {
+              setTimeout(() => {
+                isRedirectingToLogin = false
+              }, 2000)
+            })
           }
         }
       }

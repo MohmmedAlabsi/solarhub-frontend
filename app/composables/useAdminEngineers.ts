@@ -20,22 +20,25 @@ export const useAdminEngineers = () => {
     error.value = null
 
     try {
-      // 1. جلب المهندسين المعتمدين
+      const [approvedSettled, pendingSettled] = await Promise.allSettled([
+        $api('/engineers?per_page=100'),
+        $api('/admin/engineers/pending'),
+      ])
+
       let approvedList: any[] = []
-      try {
-        const approvedRes: any = await $api('/engineers?per_page=100')
+      if (approvedSettled.status === 'fulfilled') {
+        const approvedRes: any = approvedSettled.value
         approvedList = Array.isArray(approvedRes) ? approvedRes : (approvedRes?.data || [])
-      } catch (err) {
-        console.warn('Could not fetch approved engineers:', err)
+      } else {
+        console.warn('Could not fetch approved engineers:', approvedSettled.reason)
       }
 
-      // 2. جلب المهندسين قيد المراجعة
       let pendingList: any[] = []
-      try {
-        const pendingRes: any = await $api('/admin/engineers/pending')
+      if (pendingSettled.status === 'fulfilled') {
+        const pendingRes: any = pendingSettled.value
         pendingList = Array.isArray(pendingRes) ? pendingRes : (pendingRes?.data || [])
-      } catch (err) {
-        console.warn('Could not fetch pending engineers:', err)
+      } else {
+        console.warn('Could not fetch pending engineers:', pendingSettled.reason)
       }
 
       // توحيد وتنسيق السجلات

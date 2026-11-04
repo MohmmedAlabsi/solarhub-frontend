@@ -4,9 +4,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   const path = to.path
 
-  // قائمة المسارات العامة المتاحة للزوار بدون تسجيل دخول
+  // تصنيف مسارات المصادقة بدقة لمنع حلقات التوجيه اللانهائية
+  const isVerifyEmailRoute = path.startsWith('/auth/verify-email')
+  const isPasswordResetRoute = path.startsWith('/auth/forgot-password') || path.startsWith('/auth/reset-password')
+  const isGuestOnlyAuthRoute = (path.startsWith('/auth/login') || path.startsWith('/auth/register')) && !isVerifyEmailRoute && !isPasswordResetRoute
   const isAuthRoute = path.startsWith('/auth')
-  const isLandingPage = path === '/'
 
   // المسارات المحمية التي تتطلب تسجيل الدخول إجبارياً
   const isAdminRoute = path.startsWith('/admin/') || path === '/admin'
@@ -17,59 +19,87 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   // 1. إذا كان المسار محمياً ولا يوجد توكن جلسة إطلاقاً
   if (isProtectedRoute && !token.value) {
-    return navigateTo('/auth/login', { replace: true })
+    if (path !== '/auth/login') {
+      return navigateTo('/auth/login', { replace: true })
+    }
+    return
   }
 
-  // 2. إذا كان المستخدم يحمل توكن جلسة ويزور صفحات تسجيل الدخول أو التسجيل
-  if (isAuthRoute && token.value) {
-    if (!user.value) {
-      await fetchCurrentUser()
-    }
+  // استرجاع بيانات المستخدم إذا كان التوكن موجوداً ولم يتم تحميله بعد
+  if (token.value && !user.value) {
+    await fetchCurrentUser().catch(() => {})
+  }
 
-    if (user.value) {
-      const role = (user.value.role || '').trim().toLowerCase()
-      if (role === 'admin') {
-        return navigateTo('/admin', { replace: true })
-      } else if (role === 'supplier') {
-        return navigateTo('/supplier/dashboard', { replace: true })
-      } else if (role === 'engineer') {
-        return navigateTo('/engineer/dashboard', { replace: true })
-      } else {
-        return navigateTo('/customer/dashboard', { replace: true })
+  // 2. إذا كان المستخدم يحمل توكن جلسة ويزور صفحات الدخول/التسجيل المخصصة للضيوف فقط
+  if (isGuestOnlyAuthRoute && token.value && user.value) {
+    // إذا كان الحساب غير مفعل بريده، يتم توجيهه حصراً للتحقق من البريد
+    if (user.value.isVerified === false) {
+      if (path !== '/auth/verify-email') {
+        return navigateTo(`/auth/verify-email?email=${encodeURIComponent(user.value.email || '')}`, { replace: true })
       }
+      return
     }
+
+    const role = (user.value.role || '').trim().toLowerCase()
+    let target = '/customer/dashboard'
+    if (role === 'admin') target = '/admin'
+    else if (role === 'supplier') target = '/supplier/dashboard'
+    else if (role === 'engineer') target = '/engineer/dashboard'
+
+    if (path !== target) {
+      return navigateTo(target, { replace: true })
+    }
+    return
   }
 
-  // 3. التحقق من صلاحية الجلسة واسترجاع المستخدم للمسارات المحمية
+  // 3. التحقق من صلاحية الجلسة للمسارات المحمية
   if (isProtectedRoute && token.value) {
     if (!user.value) {
-      const fetched = await fetchCurrentUser()
-      if (!fetched) {
+      // التوكن غير صالح أو انتهت صلاحيته
+      if (path !== '/auth/login') {
         return navigateTo('/auth/login', { replace: true })
       }
+      return
     }
 
-    // 4. التحقق من تطابق الأدوار والوصول غير المصرح به
-    const currentRole = (user.value?.role || '').trim().toLowerCase()
+    // إذا كان البريد غير مفعل، يتم توجيهه لصفحة التحقق بدلاً من طلبات لوحة التحكم
+    if (user.value.isVerified === false && !isVerifyEmailRoute) {
+      return navigateTo(`/auth/verify-email?email=${encodeURIComponent(user.value.email || '')}`, { replace: true })
+    }
 
-    // لوحة تحكم الأدمن تتطلب دور admin حصراً
+    // 4. التحقق من تطابق الأدوار بدون إعادته لصفحة تسجيل الدخول (لمنع الـ Ping-Pong Loop)
+    const currentRole = (user.value.role || '').trim().toLowerCase()
+
     if (isAdminRoute && currentRole !== 'admin') {
-      return navigateTo('/auth/login', { replace: true })
+      const fallbackTarget = currentRole === 'supplier'
+        ? '/supplier/dashboard'
+        : currentRole === 'engineer'
+          ? '/engineer/dashboard'
+          : '/customer/dashboard'
+      if (path !== fallbackTarget) {
+        return navigateTo(fallbackTarget, { replace: true })
+      }
+      return
     }
 
-    // لوحة المورد تتطلب دور supplier (أو admin)
     if (isSupplierRoute && currentRole !== 'supplier' && currentRole !== 'admin') {
-      return navigateTo('/auth/login', { replace: true })
+      const fallbackTarget = currentRole === 'engineer' ? '/engineer/dashboard' : '/customer/dashboard'
+      if (path !== fallbackTarget) {
+        return navigateTo(fallbackTarget, { replace: true })
+      }
+      return
     }
 
-    // لوحة المهندس تتطلب دور engineer (أو admin)
     if (isEngineerRoute && currentRole !== 'engineer' && currentRole !== 'admin') {
-      return navigateTo('/auth/login', { replace: true })
+      const fallbackTarget = currentRole === 'supplier' ? '/supplier/dashboard' : '/customer/dashboard'
+      if (path !== fallbackTarget) {
+        return navigateTo(fallbackTarget, { replace: true })
+      }
+      return
     }
 
     // 5. التحقق الدقيق من الصلاحيات الإجرائية داخل لوحة تحكم الأدمن
     if (isAdminRoute && currentRole === 'admin') {
-      // مدير النظام الرئيسي (Super Admin - User ID: 1) يمتلك حق الوصول الكامل لجميع الصفحات
       if (String(user.value?.id) !== '1') {
         const adminRoutePermissions: Record<string, string[]> = {
           '/admin/users': ['users.manage'],
@@ -93,7 +123,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
           const userPerms = user.value?.permissions || useCookie<string[]>('auth_permissions').value || []
           const hasAccess = requiredPerms.some(p => userPerms.includes(p))
 
-          if (!hasAccess) {
+          if (!hasAccess && path !== '/admin') {
             return navigateTo('/admin?unauthorized=1', { replace: true })
           }
         }

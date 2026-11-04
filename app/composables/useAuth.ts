@@ -13,6 +13,9 @@ export interface ApiErrorResponse {
   errors?: Record<string, string[]>
 }
 
+// متتبع الطلب النشط على مستوى الوحدة لدمج أي استدعاءات متزامنة في طلب شبكي واحد
+let activeFetchCurrentUserPromise: Promise<UserProfile | null> | null = null
+
 export const useAuth = () => {
   const { $api } = useNuxtApp()
   const authStore = useAuthStore()
@@ -66,7 +69,7 @@ export const useAuth = () => {
       if (response?.data?.token && response?.data?.user) {
         authStore.setAuth(response.data.user, response.data.token)
         if (response.data.user.id && (!response.data.user.permissions || response.data.user.permissions.length === 0)) {
-          await authStore.fetchUserPermissions(response.data.user.id).catch(() => {})
+          await authStore.fetchUserPermissions(response.data.user.id, response.data.token).catch(() => {})
         }
       }
 
@@ -242,33 +245,43 @@ export const useAuth = () => {
   }
 
   /**
-   * Fetch current authenticated user profile
+   * Fetch current authenticated user profile (deduplicated in-flight singleton)
    */
-  const fetchCurrentUser = async () => {
+  const fetchCurrentUser = async (): Promise<UserProfile | null> => {
+    if (activeFetchCurrentUserPromise) {
+      return activeFetchCurrentUserPromise
+    }
+
     if (!token.value) {
       authStore.clearAuth()
       return null
     }
 
-    try {
-      const response = await $api<ApiSuccessResponse<UserProfile>>('/auth/me', {
-        method: 'GET',
-      })
+    activeFetchCurrentUserPromise = (async () => {
+      try {
+        const response = await $api<ApiSuccessResponse<UserProfile>>('/auth/me', {
+          method: 'GET',
+        })
 
-      if (response?.data) {
-        authStore.setUser(response.data)
-        if (response.data.id && (!response.data.permissions || response.data.permissions.length === 0)) {
-          await authStore.fetchUserPermissions(response.data.id).catch(() => {})
+        if (response?.data) {
+          authStore.setUser(response.data)
+          if (response.data.id && (!response.data.permissions || response.data.permissions.length === 0)) {
+            await authStore.fetchUserPermissions(response.data.id, token.value || undefined).catch(() => {})
+          }
+          return response.data
         }
-        return response.data
+        return null
+      } catch (err: any) {
+        if (err?.status === 401) {
+          authStore.clearAuth()
+        }
+        return null
       }
-      return null
-    } catch (err: any) {
-      if (err?.status === 401) {
-        authStore.clearAuth()
-      }
-      return null
-    }
+    })().finally(() => {
+      activeFetchCurrentUserPromise = null
+    })
+
+    return activeFetchCurrentUserPromise
   }
 
   /**

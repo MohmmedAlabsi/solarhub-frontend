@@ -27,10 +27,14 @@ export const useAdminStores = () => {
     error.value = null
 
     try {
-      // 1. جلب المتاجر المعتمدة
+      const [approvedSettled, pendingSettled] = await Promise.allSettled([
+        $api('/stores?per_page=100'),
+        $api('/admin/stores/pending'),
+      ])
+
       let approvedList: any[] = []
-      try {
-        const approvedRes: any = await $api('/stores?per_page=100')
+      if (approvedSettled.status === 'fulfilled') {
+        const approvedRes: any = approvedSettled.value
         if (Array.isArray(approvedRes)) {
           approvedList = approvedRes
         } else if (Array.isArray(approvedRes?.data)) {
@@ -38,14 +42,13 @@ export const useAdminStores = () => {
         } else if (Array.isArray(approvedRes?.data?.data)) {
           approvedList = approvedRes.data.data
         }
-      } catch (err) {
-        console.warn('Could not fetch approved stores:', err)
+      } else {
+        console.warn('Could not fetch approved stores:', approvedSettled.reason)
       }
 
-      // 2. جلب المتاجر قيد المراجعة
       let pendingList: any[] = []
-      try {
-        const pendingRes: any = await $api('/admin/stores/pending')
+      if (pendingSettled.status === 'fulfilled') {
+        const pendingRes: any = pendingSettled.value
         if (Array.isArray(pendingRes)) {
           pendingList = pendingRes
         } else if (Array.isArray(pendingRes?.data)) {
@@ -53,8 +56,8 @@ export const useAdminStores = () => {
         } else if (Array.isArray(pendingRes?.data?.data)) {
           pendingList = pendingRes.data.data
         }
-      } catch (err) {
-        console.warn('Could not fetch pending stores:', err)
+      } else {
+        console.warn('Could not fetch pending stores:', pendingSettled.reason)
       }
 
       // توحيد وتنسيق السجلات

@@ -160,8 +160,9 @@ export const useAuthStore = defineStore('auth', () => {
       ...options.headers,
     }
 
-    if (token.value) {
-      headers.Authorization = `Bearer ${token.value}`
+    const activeToken = token.value || (import.meta.client ? (localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token')) : null)
+    if (activeToken && !headers.Authorization) {
+      headers.Authorization = `Bearer ${activeToken}`
     }
 
     try {
@@ -205,7 +206,7 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Fetch live permissions for a given user from database/API
    */
-  async function fetchUserPermissions(userId?: string | number): Promise<string[]> {
+  async function fetchUserPermissions(userId?: string | number, explicitToken?: string): Promise<string[]> {
     const targetId = userId || user.value?.id
     if (!targetId) return []
 
@@ -217,7 +218,10 @@ export const useAuthStore = defineStore('auth', () => {
 
     // 2. Fetch using apiRequest with explicit Authorization Bearer token
     try {
-      const res = await apiRequest<any>(`/admin/permissions/users/${targetId}`)
+      const activeToken = explicitToken || token.value || (import.meta.client ? (localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token')) : null)
+      const res = await apiRequest<any>(`/admin/permissions/users/${targetId}`, {
+        headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : {},
+      })
       if (res.success && res.data?.all_permissions) {
         const perms = res.data.all_permissions
         if (user.value && String(user.value.id) === String(targetId)) {
@@ -279,7 +283,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (res.success && res.data) {
         setAuth(res.data.user, res.data.token)
         if (res.data.user?.id && (!res.data.user.permissions || res.data.user.permissions.length === 0)) {
-          await fetchUserPermissions(res.data.user.id).catch(() => {})
+          await fetchUserPermissions(res.data.user.id, res.data.token).catch(() => {})
         }
         return { success: true, user: user.value }
       }
