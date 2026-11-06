@@ -15,36 +15,51 @@ import AdminSectionHeading from '../../components/admin/workspace/AdminSectionHe
 definePageMeta({ layout: 'admin', alias: '/admin/dashboard' })
 useSeoMeta({ title: 'لوحة تحكم الإدارة | SolarHub' })
 
-const { users, fetchUsers } = useAdminUsers()
-const { stores, fetchStores } = useAdminStores()
-const { engineers, fetchEngineers } = useAdminEngineers()
-const { orders, fetchOrders } = useAdminOrderManagement()
-const { services, fetchServices } = useAdminServices()
+const { $api } = useNuxtApp()
 const { notify } = useAdminNotice()
 
-// تحميل متزامن للبيانات الحقيقية
+interface DashboardStatsData {
+  users_count: number
+  approved_stores_count: number
+  pending_stores_count: number
+  approved_engineers_count: number
+  pending_engineers_count: number
+  orders_count: number
+  pending_orders_count: number
+  open_services_count: number
+}
+
+const statsData = ref<DashboardStatsData>({
+  users_count: 0,
+  approved_stores_count: 0,
+  pending_stores_count: 0,
+  approved_engineers_count: 0,
+  pending_engineers_count: 0,
+  orders_count: 0,
+  pending_orders_count: 0,
+  open_services_count: 0,
+})
+
+// جلب إحصائيات لوحة التحكم بنقطة نهاية موحدة وخفيفة
 const { pending, refresh } = useLazyAsyncData('admin_dashboard_stats', async () => {
-  await Promise.allSettled([
-    fetchUsers(false),
-    fetchStores(false),
-    fetchEngineers(false),
-    fetchOrders(false),
-    fetchServices(false),
-  ])
-  return true
+  try {
+    const res = await $api<any>('/admin/dashboard/stats')
+    if (res?.data) {
+      statsData.value = res.data
+    }
+  } catch (err) {
+    console.warn('[Admin Dashboard] Failed to fetch stats:', err)
+  }
+  return statsData.value
+}, {
+  default: () => statsData.value,
 })
 
 const isRefreshing = ref(false)
 async function handleRefresh() {
   isRefreshing.value = true
   try {
-    await Promise.allSettled([
-      fetchUsers(true),
-      fetchStores(true),
-      fetchEngineers(true),
-      fetchOrders(true),
-      fetchServices(true),
-    ])
+    await refresh()
     notify('تم تحديث مؤشرات وإحصائيات لوحة التحكم بنجاح.')
   } finally {
     isRefreshing.value = false
@@ -62,37 +77,37 @@ onMounted(() => {
   }).format(new Date())
 })
 
-// إحصائيات معتمدة من قاعدة البيانات
-const pendingSuppliers = computed(() => stores.value.filter(s => s.approval === 'pending').length)
-const pendingEngineers = computed(() => engineers.value.filter(e => e.approval === 'pending').length)
-const pendingOrders = computed(() => orders.value.filter(o => o.status === 'قيد المعالجة').length)
-const openServices = computed(() => services.value.filter(s => s.status === 'open').length)
+// إحصائيات معتمدة من قاعدة البيانات مباشرة من نقطة الإحصائيات المجمعة
+const pendingSuppliers = computed(() => statsData.value.pending_stores_count)
+const pendingEngineers = computed(() => statsData.value.pending_engineers_count)
+const pendingOrders = computed(() => statsData.value.pending_orders_count)
+const openServices = computed(() => statsData.value.open_services_count)
 
 const stats = computed(() => [
   {
     label: 'المستخدمون المسجلون',
-    value: users.value.length,
+    value: statsData.value.users_count,
     detail: 'حساب مسجل',
     icon: Users,
     warm: false,
   },
   {
     label: 'المتاجر والموردون',
-    value: stores.value.filter(s => s.approval === 'approved').length,
+    value: statsData.value.approved_stores_count,
     detail: 'متجر معتمد',
     icon: Store,
     warm: true,
   },
   {
     label: 'المهندسون الاستشاريون',
-    value: engineers.value.filter(e => e.approval === 'approved').length,
+    value: statsData.value.approved_engineers_count,
     detail: 'مهندس معتمد',
     icon: UserRoundCog,
     warm: false,
   },
   {
     label: 'طلبات الشراء',
-    value: orders.value.length,
+    value: statsData.value.orders_count,
     detail: 'طلب شراء في النظام',
     icon: ClipboardList,
     warm: true,
@@ -218,6 +233,8 @@ const tasks = computed(() => [
           <div class="mt-5 border-t border-solar-border-card/60 pt-3">
             <NuxtLink
               :to="task.to"
+              :prefetch="false"
+              no-prefetch
               class="inline-flex items-center gap-1.5 text-xs font-bold text-solar-navy hover:text-solar-yellow transition-colors cursor-pointer"
             >
               الانتقال للمراجعة

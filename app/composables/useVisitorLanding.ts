@@ -255,9 +255,9 @@ export function useVisitorLanding() {
 
     try {
       const [productsRes, storesRes, engineersRes] = await Promise.allSettled([
-        $api<any>('/store-products?per_page=100'),
-        $api<any>('/stores?per_page=50'),
-        $api<any>('/engineers?per_page=50'),
+        $api<any>('/store-products?per_page=16'),
+        $api<any>('/stores?per_page=12'),
+        $api<any>('/engineers?per_page=12'),
       ])
 
       // 1. المنتجات من قاعدة البيانات الحقيقية

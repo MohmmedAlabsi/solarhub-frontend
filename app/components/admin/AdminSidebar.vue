@@ -115,7 +115,7 @@ function handleLinkClick() {
 
     <!-- رأس السايدبار والشعار الشفاف -->
     <div class="flex shrink-0 items-center justify-center px-4 transition-all duration-300 h-20 border-b border-solar-navy-light/40 sm:h-24">
-      <NuxtLink to="/admin/dashboard" class="flex items-center justify-center" @click="handleLinkClick">
+      <NuxtLink to="/admin/dashboard" :prefetch="false" no-prefetch class="flex items-center justify-center" @click="handleLinkClick">
         <!-- الشعار المدمج SH-logo.png في حالة الطي -->
         <img
           v-if="isCollapsed && !isMobile"

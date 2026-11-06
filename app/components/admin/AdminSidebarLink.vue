@@ -28,6 +28,8 @@ watch(() => props.collapsed, hideTooltip)
 <template>
   <NuxtLink
     :to="to"
+    :prefetch="false"
+    no-prefetch
     :aria-label="label"
     :aria-current="active ? 'page' : undefined"
     class="group relative flex items-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow"
