@@ -12,7 +12,6 @@ import {
   MapPin,
   Package,
   Percent,
-  RefreshCw,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
@@ -22,16 +21,14 @@ import {
   Users,
   Zap,
 } from 'lucide-vue-next'
-import { useVisitorLanding, type LandingTab } from '~/composables/useVisitorLanding'
+import { useVisitorLanding } from '~/composables/useVisitorLanding'
 
 useSeoMeta({
   title: 'سولار هب | وجهتك الموثوقة لمنظومات ومنتجات الطاقة الشمسية المتكاملة',
   description: 'ربط مباشر بأفضل المتاجر المعتمدة والمهندسين المرخصين لتصميم وتركيب أنظمة طاقة شمسية مستدامة وعالية الكفاءة بضمانات رسمية معتمدة.',
 })
 
-const route = useRoute()
-
-// تصنيفات الأقسام الأكثر طلباً
+// تصنيفات الأقسام الأكثر طلباً (المطابقة تماماً لتصميم المنصة المعتمد)
 const topCategories = [
   { label: 'الألواح الشمسية', sub: 'Monocrystalline & Bifacial', icon: Sun, query: 'panel' },
   { label: 'محولات الطاقة', sub: 'On-Grid, Off-Grid & Hybrid', icon: Zap, query: 'inverter' },
@@ -41,59 +38,45 @@ const topCategories = [
   { label: 'أدوات التحكم', sub: 'Smart Trackers & MPPT', icon: Cpu, query: 'controller' },
 ]
 
-// استخدام نظام الجلب الكسول الصريح والمخزن مؤقتاً بدون أي استدعاءات تلقائية عند التحميل
+// استدعاء البيانات الحقيقية من قاعدة البيانات ومؤقت الـ 10 ثواني التلقائي
 const {
-  activeTab,
-  selectTab,
-  products,
-  stores,
-  engineers,
-  isProductsLoading,
-  isStoresLoading,
-  isEngineersLoading,
-  productsError,
-  storesError,
-  engineersError,
-  fetchProducts,
-  fetchStores,
-  fetchEngineers,
+  displayedProducts,
+  displayedStores,
+  displayedEngineers,
+  productChunkIndex,
+  storeChunkIndex,
+  engineerChunkIndex,
+  totalProductSlides,
+  totalStoreSlides,
+  totalEngineerSlides,
+  isLoading,
+  errorMessage,
   stats,
+  fetchVisitorData,
 } = useVisitorLanding()
-
-// إذا تم فتح الصفحة مع معامل تبويب في الرابط مثل /?tab=engineers، يتم تفعيله كسولاً
-onMounted(() => {
-  const queryTab = route.query.tab as string
-  if (queryTab === 'engineers' || queryTab === 'stores' || queryTab === 'products') {
-    selectTab(queryTab as LandingTab)
-  }
-})
-
-const tabsConfig = [
-  {
-    id: 'products' as LandingTab,
-    label: 'المنتجات الشمسية',
-    sub: 'مكونات وأنظمة معتمدة',
-    icon: Zap,
-  },
-  {
-    id: 'stores' as LandingTab,
-    label: 'المتاجر والوكلاء',
-    sub: 'شركاء توريد رسميون',
-    icon: Store,
-  },
-  {
-    id: 'engineers' as LandingTab,
-    label: 'المهندسون والاستشاريون',
-    sub: 'كوادر هندسية مرخصة',
-    icon: Users,
-  },
-]
 </script>
 
 <template>
   <div class="flex flex-col gap-14 sm:gap-20 pb-20">
+    <!-- شريط تنبيه الخطأ عند تعذر الاتصال بالخادم -->
+    <div v-if="errorMessage" class="container-page pt-4">
+      <div class="solar-card border-rose-200 bg-rose-50/70 dark:bg-rose-950/30 p-4 flex items-center justify-between gap-3 text-xs text-rose-800 dark:text-rose-200 rounded-2xl">
+        <div class="flex items-center gap-2.5">
+          <AlertCircle class="size-5 shrink-0 text-rose-600 dark:text-rose-400" />
+          <span class="font-bold">{{ errorMessage }}</span>
+        </div>
+        <button
+          type="button"
+          @click="fetchVisitorData"
+          class="rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition-colors shrink-0 cursor-pointer"
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    </div>
+
     <!-- ============================================================ -->
-    <!-- 1. البانر الرئيسي للزائر (Hero Section)                       -->
+    <!-- 1. البانر الرئيسي للزائر (Hero Section) المطابق للتصميم السابق -->
     <!-- ============================================================ -->
     <section class="relative overflow-hidden bg-gradient-to-b from-solar-bg-card via-solar-bg-subtle/50 to-solar-bg-page pt-6 sm:pt-12 pb-10 sm:pb-14 border-b border-solar-border-card/60 transition-colors duration-200">
       <div class="container-page grid items-center gap-10 lg:grid-cols-12 lg:gap-12">
@@ -114,7 +97,7 @@ const tabsConfig = [
             ربط مباشر بأفضل المتاجر المعتمدة والمهندسين المرخصين لتصميم وتركيب أنظمة طاقة شمسية مستدامة وعالية الكفاءة بضمانات رسمية معتمدة.
           </p>
 
-          <!-- بطاقات الإحصائيات الحية المعتمدة -->
+          <!-- بطاقات الإحصائيات الحية المسترجعة من قاعدة البيانات -->
           <div class="grid grid-cols-3 gap-3 pt-1">
             <div class="p-3 sm:p-4 rounded-2xl bg-white dark:bg-solar-bg-card border border-solar-border-card shadow-2xs text-center">
               <span class="block text-xl sm:text-2xl font-black font-mono text-solar-navy-dark dark:text-solar-yellow">
@@ -138,38 +121,27 @@ const tabsConfig = [
             </div>
           </div>
 
-          <!-- أزرار التصفح السريع -->
+          <!-- أزرار التصفح للزائر (Browse-Only تنقل مباشر للصفحات المعتمدة) -->
           <div class="flex flex-wrap items-center gap-3.5 pt-2">
-            <button
-              type="button"
-              @click="selectTab('products')"
+            <NuxtLink
+              to="/stores"
               class="btn-primary h-12 px-6 text-sm font-black gap-2 shadow-md cursor-pointer hover:scale-[1.02] active:scale-95 transition-all"
             >
-              <Zap class="size-4.5" />
-              <span>استكشف المنتجات</span>
-            </button>
+              <Store class="size-4.5" />
+              <span>دليل المتاجر والوكلاء</span>
+            </NuxtLink>
 
-            <button
-              type="button"
-              @click="selectTab('stores')"
-              class="btn-outline h-12 px-6 text-sm font-bold gap-2 cursor-pointer hover:border-solar-yellow transition-all"
-            >
-              <Store class="size-4.5 text-solar-navy-dark dark:text-solar-yellow" />
-              <span>المتاجر المعتمدة</span>
-            </button>
-
-            <button
-              type="button"
-              @click="selectTab('engineers')"
+            <NuxtLink
+              to="/engineers"
               class="btn-outline h-12 px-6 text-sm font-bold gap-2 cursor-pointer hover:border-solar-yellow transition-all"
             >
               <Users class="size-4.5 text-solar-navy-dark dark:text-solar-yellow" />
-              <span>المهندسون المرخصون</span>
-            </button>
+              <span>دليل المهندسين المعتمدين</span>
+            </NuxtLink>
           </div>
         </div>
 
-        <!-- صورة الهيرو الجانبية -->
+        <!-- الصورة على اليسار (المطابقة تماماً للتصميم السابق) -->
         <div class="relative lg:col-span-5">
           <div class="relative overflow-hidden rounded-3xl border border-solar-border-card bg-solar-bg-card p-2 shadow-2xl">
             <img
@@ -184,7 +156,7 @@ const tabsConfig = [
     </section>
 
     <!-- ============================================================ -->
-    <!-- 2. قسم "كيف تخدمك منصة سولار هب؟"                            -->
+    <!-- 2. قسم "كيف تخدمك منصة سولار هب؟" (3 مسارات رئيسية) -->
     <!-- ============================================================ -->
     <section class="container-page">
       <div class="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
@@ -226,14 +198,13 @@ const tabsConfig = [
             </ul>
           </div>
 
-          <button
-            type="button"
-            @click="selectTab('products')"
-            class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-sm cursor-pointer"
+          <NuxtLink
+            to="/products"
+            class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-sm"
           >
-            <span>استعراض المنتجات المعتمدة</span>
+            <span>تصفح كتالوج المنتجات</span>
             <ArrowLeft class="size-4" />
-          </button>
+          </NuxtLink>
         </div>
 
         <!-- المسار 2: العثور على مهندس معتمد -->
@@ -266,14 +237,13 @@ const tabsConfig = [
             </ul>
           </div>
 
-          <button
-            type="button"
-            @click="selectTab('engineers')"
-            class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-sm cursor-pointer"
+          <NuxtLink
+            to="/engineers"
+            class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-sm"
           >
             <span>استكشف المهندسين المعتمدين</span>
             <ArrowLeft class="size-4" />
-          </button>
+          </NuxtLink>
         </div>
 
         <!-- المسار 3: التواصل مع المتاجر والموردين -->
@@ -306,20 +276,19 @@ const tabsConfig = [
             </ul>
           </div>
 
-          <button
-            type="button"
-            @click="selectTab('stores')"
-            class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-sm cursor-pointer"
+          <NuxtLink
+            to="/stores"
+            class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-sm"
           >
             <span>دليل المتاجر المعتمدة</span>
             <ArrowLeft class="size-4" />
-          </button>
+          </NuxtLink>
         </div>
       </div>
     </section>
 
     <!-- ============================================================ -->
-    <!-- 3. قسم "الأقسام الرئيسية الأكثر طلباً"                       -->
+    <!-- 3. قسم "الأقسام الرئيسية الأكثر طلباً" (المطابق للتصميم السابق) -->
     <!-- ============================================================ -->
     <section class="container-page">
       <div class="text-center max-w-2xl mx-auto mb-10">
@@ -345,136 +314,65 @@ const tabsConfig = [
     </section>
 
     <!-- ============================================================ -->
-    <!-- 4. واجهة التبويبات الكسولة والمخزنة مؤقتاً (Tabbed Showcase)    -->
+    <!-- 4. سلايدر المنتجات الشمسية (مريح للعينين وتنقل انسيابي فائق السلاسة) -->
     <!-- ============================================================ -->
-    <section id="showcase-section" class="container-page scroll-mt-24" aria-label="استكشف منظومة سولار هب">
-      <div class="flex flex-col gap-6">
-        <!-- ترويسة القسم وأزرار التبويبات التفاعلية -->
-        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-solar-border-card/60 pb-6">
-          <div>
-            <div class="inline-flex items-center gap-2 rounded-full border border-solar-yellow/30 bg-solar-yellow/10 px-3 py-0.5 text-xs font-bold text-solar-navy-dark dark:text-solar-yellow mb-2">
-              <Sparkles class="size-3.5 text-solar-yellow" />
-              <span>استكشف المنظومة المعتمدة</span>
-            </div>
-            <h2 class="text-2xl sm:text-3xl font-black text-solar-text-heading">
-              منظومة الطاقة الشمسية الموثوقة
+    <section class="container-page" aria-label="سلايدر المنتجات الشمسية">
+      <!-- ترويسة السلايدر بدون أي أزرار تنقل يدوي -->
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="flex size-8 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-navy-dark dark:text-solar-yellow">
+              <Zap class="size-4 stroke-[2.5]" />
+            </span>
+            <h2 class="text-xl sm:text-2xl font-black text-solar-text-heading tracking-tight">
+              أحدث وأبرز المنتجات الشمسية
             </h2>
-            <p class="text-xs text-solar-text-muted mt-1 max-w-xl">
-              تصفح المنتجات والمتاجر والمهندسين بشكل كسول حسب اختيارك؛ لا يتم تحميل أي بيانات إلا عند اختيار التبويب المطلوب.
-            </p>
           </div>
-
-          <!-- شريط أزرار التبويبات -->
-          <div role="tablist" aria-label="أقسام المنظومة" class="flex flex-wrap gap-2">
-            <button
-              v-for="tab in tabsConfig"
-              :key="tab.id"
-              type="button"
-              role="tab"
-              :aria-selected="activeTab === tab.id"
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer shadow-xs border"
-              :class="activeTab === tab.id
-                ? 'bg-solar-navy text-solar-yellow border-solar-yellow font-black scale-[1.02] shadow-md'
-                : 'bg-solar-bg-card text-solar-text-body border-solar-border-card hover:border-solar-yellow/60 hover:text-solar-text-heading'"
-              @click="selectTab(tab.id)"
-            >
-              <component :is="tab.icon" class="size-4" />
-              <span>{{ tab.label }}</span>
-            </button>
-          </div>
+          <p class="text-xs text-solar-text-muted mt-1">
+            عرض بانورامي متجدد تلقائياً كل 10 ثوانٍ لحلول ومنتجات الطاقة الشمسية المعتمدة
+          </p>
         </div>
 
-        <!-- الحالة الأولى: لم يتم اختيار أي تبويب بعد (Initial Zero-Fetch State) -->
-        <div
-          v-if="!activeTab"
-          class="solar-card p-8 sm:p-12 text-center rounded-3xl border-dashed border-solar-border-card flex flex-col items-center justify-center gap-6"
+        <!-- رابط الكتالوج الكامل فقط بدون أي أزرار تقليب يدوية -->
+        <NuxtLink
+          to="/products"
+          class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0 hover:border-solar-yellow self-start sm:self-auto"
         >
-          <div class="size-16 rounded-3xl bg-solar-yellow/15 flex items-center justify-center text-solar-navy-dark dark:text-solar-yellow">
-            <Sparkles class="size-8 text-solar-yellow" />
-          </div>
-          <div class="max-w-md">
-            <h3 class="text-base sm:text-lg font-black text-solar-text-heading mb-1.5">
-              اختر القسم الذي ترغب باستكشافه
-            </h3>
-            <p class="text-xs text-solar-text-muted leading-relaxed">
-              انقر على أي من الأقسام التالية لتحميل بياناته المعتمدة فوراً وتصفحها بسلاسة فائقة.
-            </p>
-          </div>
+          <span>عرض الكتالوج بالكامل (+{{ stats.totalProducts }})</span>
+          <ArrowLeft class="size-3.5" />
+        </NuxtLink>
+      </div>
 
-          <div class="grid sm:grid-cols-3 gap-3.5 w-full max-w-2xl">
-            <button
-              v-for="tab in tabsConfig"
-              :key="`cta-${tab.id}`"
-              type="button"
-              class="flex flex-col items-center gap-2 p-5 rounded-2xl bg-solar-bg-card border border-solar-border-card hover:border-solar-yellow hover:shadow-md transition-all cursor-pointer group text-center"
-              @click="selectTab(tab.id)"
-            >
-              <span class="flex size-11 items-center justify-center rounded-xl bg-solar-bg-subtle text-solar-navy-dark dark:text-solar-yellow group-hover:bg-solar-yellow group-hover:text-solar-navy-dark transition-colors">
-                <component :is="tab.icon" class="size-5" />
-              </span>
-              <span class="text-xs font-black text-solar-text-heading group-hover:text-solar-navy dark:group-hover:text-solar-yellow transition-colors">
-                {{ tab.label }}
-              </span>
-              <span class="text-[10px] text-solar-text-muted">
-                {{ tab.sub }}
-              </span>
-            </button>
-          </div>
+      <!-- محتوى سلايدر المنتجات مع انتقال انسيابي مريح للعينين -->
+      <div v-if="isLoading" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div v-for="i in 4" :key="`p-skel-${i}`" class="solar-card p-5 rounded-3xl animate-pulse space-y-3">
+          <div class="aspect-[4/3] rounded-2xl bg-solar-bg-subtle" />
+          <div class="h-3 w-1/3 bg-solar-bg-subtle rounded" />
+          <div class="h-4 w-4/5 bg-solar-bg-subtle rounded" />
+          <div class="h-3 w-1/2 bg-solar-bg-subtle rounded" />
         </div>
+      </div>
 
-        <!-- ============================================================ -->
-        <!-- تبويب المنتجات (Products Tab Content)                         -->
-        <!-- ============================================================ -->
-        <div v-else-if="activeTab === 'products'" class="flex flex-col gap-6">
-          <div class="flex items-center justify-between text-xs text-solar-text-muted">
-            <span class="font-bold">أحدث المنتجات والأنظمة الشمسية المعتمدة:</span>
-            <NuxtLink to="/products" class="btn-outline px-3 py-1.5 text-xs font-bold gap-1 hover:border-solar-yellow">
-              <span>تصفح الكتالوج بالكامل (+{{ stats.totalProducts }})</span>
-              <ArrowLeft class="size-3.5" />
-            </NuxtLink>
-          </div>
+      <div v-else-if="displayedProducts.length === 0" class="solar-card p-12 text-center rounded-3xl border-dashed">
+        <Package class="size-12 mx-auto text-solar-text-muted mb-3 opacity-60" />
+        <h3 class="text-sm font-bold text-solar-text-heading">لا توجد منتجات مسجلة في قاعدة البيانات حالياً</h3>
+        <p class="text-xs text-solar-text-muted mt-1">ستظهر المنتجات في السلايدر تلقائياً فور إضافتها من المتاجر.</p>
+      </div>
 
-          <!-- حالة التحميل -->
-          <div v-if="isProductsLoading" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <div v-for="i in 4" :key="`p-skel-${i}`" class="solar-card p-5 rounded-3xl animate-pulse space-y-3">
-              <div class="aspect-[4/3] rounded-2xl bg-solar-bg-subtle" />
-              <div class="h-3 w-1/3 bg-solar-bg-subtle rounded" />
-              <div class="h-4 w-4/5 bg-solar-bg-subtle rounded" />
-              <div class="h-3 w-1/2 bg-solar-bg-subtle rounded" />
-            </div>
-          </div>
-
-          <!-- حالة الخطأ -->
-          <div v-else-if="productsError" class="solar-card p-8 text-center rounded-3xl border-dashed border-red-500/40">
-            <AlertCircle class="size-10 text-rose-500 mx-auto mb-2" />
-            <h4 class="text-sm font-bold text-solar-text-heading mb-1">{{ productsError }}</h4>
-            <button
-              type="button"
-              @click="fetchProducts(true)"
-              class="btn-primary px-4 py-2 text-xs font-black gap-1.5 mt-3 inline-flex items-center"
-            >
-              <RefreshCw class="size-3.5" />
-              <span>إعادة المحاولة</span>
-            </button>
-          </div>
-
-          <!-- حالة الفراغ -->
-          <div v-else-if="products.length === 0" class="solar-card p-10 text-center rounded-3xl border-dashed">
-            <Package class="size-12 mx-auto text-solar-text-muted mb-2 opacity-60" />
-            <h4 class="text-sm font-bold text-solar-text-heading">لا توجد منتجات مسجلة حالياً</h4>
-            <NuxtLink to="/products" class="btn-outline text-xs mt-3 inline-flex">
-              الانتقال لكتالوج المنتجات
-            </NuxtLink>
-          </div>
-
-          <!-- شبكة المنتجات -->
-          <div v-else class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <!-- حاوية السلايدر بتأثير Transition مريح للعينين -->
+      <div v-else class="relative overflow-hidden">
+        <Transition name="glide-fade" mode="out-in">
+          <div
+            :key="`products-slide-${productChunkIndex}`"
+            class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
+          >
             <div
-              v-for="product in products"
+              v-for="product in displayedProducts"
               :key="`prod-${product.id}`"
               class="solar-card group flex flex-col justify-between overflow-hidden p-5 rounded-3xl hover:border-solar-yellow/80 transition-all duration-300 shadow-xs hover:shadow-lg hover:-translate-y-1"
             >
               <div>
+                <!-- الصورة والعلامة المائية للماركة وبادج الضمان (رابط مباشر لصفحة التفاصيل) -->
                 <NuxtLink
                   :to="`/products/${product.id}`"
                   class="relative mb-3.5 flex aspect-[4/3] w-full items-center justify-center rounded-2xl bg-solar-bg-subtle/80 p-3 overflow-hidden border border-solar-border-card/30 cursor-pointer block"
@@ -497,6 +395,7 @@ const tabsConfig = [
                   </span>
                 </NuxtLink>
 
+                <!-- التقييم والنوع -->
                 <div class="flex items-center justify-between gap-2 text-xs mb-1.5">
                   <span class="text-solar-text-muted text-[11px] font-medium truncate">{{ product.category }}</span>
                   <div class="flex items-center gap-1 font-bold text-amber-500">
@@ -505,6 +404,7 @@ const tabsConfig = [
                   </div>
                 </div>
 
+                <!-- اسم المنتج كرابط لصفحة التفاصيل -->
                 <NuxtLink
                   :to="`/products/${product.id}`"
                   class="block text-xs sm:text-sm font-black text-solar-text-heading line-clamp-2 leading-relaxed mb-2 hover:text-solar-navy dark:hover:text-solar-yellow transition-colors"
@@ -513,15 +413,17 @@ const tabsConfig = [
                   {{ product.title }}
                 </NuxtLink>
 
+                <!-- المتجر والموقع -->
                 <div class="flex items-center gap-1.5 text-[11px] text-solar-text-muted mb-4">
                   <Store class="size-3.5 shrink-0 text-solar-navy-dark dark:text-solar-yellow" />
                   <span class="truncate">{{ product.storeName }} ({{ product.governorateName }})</span>
                 </div>
               </div>
 
+              <!-- بطاقة التصفح السفلية -->
               <div class="flex flex-col gap-2.5 pt-3 border-t border-solar-border-card/60">
                 <div class="flex items-center justify-between text-xs">
-                  <span class="text-[10px] text-solar-text-muted">السعر:</span>
+                  <span class="text-[10px] text-solar-text-muted">السعر الاسترشادي:</span>
                   <span class="font-black font-mono text-solar-navy-dark dark:text-solar-yellow">
                     {{ product.price ? `${product.price.toLocaleString('en-US')} ر.ي` : 'عند التعاقد' }}
                   </span>
@@ -537,60 +439,65 @@ const tabsConfig = [
               </div>
             </div>
           </div>
+        </Transition>
+
+        <!-- مؤشرات نقاط الشريحة الهادئة (مريحة للعينين بدون إزعاج) -->
+        <div v-if="totalProductSlides > 1" class="flex justify-center items-center gap-2 mt-6">
+          <span
+            v-for="(_, idx) in totalProductSlides"
+            :key="`p-dot-${idx}`"
+            class="h-1.5 rounded-full transition-all duration-500 ease-out"
+            :class="productChunkIndex === idx ? 'w-7 bg-solar-yellow shadow-xs' : 'w-2 bg-slate-200 dark:bg-slate-700/60'"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 5. سلايدر المتاجر والوكلاء المعتمدين (مريح للعينين وبدون أزرار يدوية) -->
+    <!-- ============================================================ -->
+    <section class="container-page" aria-label="سلايدر المتاجر المعتمدة">
+      <!-- ترويسة السلايدر بدون أي أزرار تنقل يدوي -->
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+        <div>
+          <span class="text-xs font-black text-solar-yellow uppercase tracking-widest">شركاء التوريد الموثوقون</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-solar-text-heading mt-1">المتاجر والوكلاء المعتمدون</h2>
+          <p class="text-xs text-solar-text-muted mt-1 max-w-xl">
+            متاجر رسمية مرخصة توفر فواتير معتمدة، شحن سريع لجميع المحافظات، وضمانات المصنّعين الأصلية.
+          </p>
         </div>
 
-        <!-- ============================================================ -->
-        <!-- تبويب المتاجر (Stores Tab Content)                           -->
-        <!-- ============================================================ -->
-        <div v-else-if="activeTab === 'stores'" class="flex flex-col gap-6">
-          <div class="flex items-center justify-between text-xs text-solar-text-muted">
-            <span class="font-bold">المتاجر والوكلاء المعتمدون في المنصة:</span>
-            <NuxtLink to="/stores" class="btn-outline px-3 py-1.5 text-xs font-bold gap-1 hover:border-solar-yellow">
-              <span>دليل المتاجر بالكامل ({{ stats.totalStores }})</span>
-              <ArrowLeft class="size-3.5" />
-            </NuxtLink>
-          </div>
+        <!-- رابط دليل المتاجر فقط -->
+        <NuxtLink
+          to="/stores"
+          class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0 hover:border-solar-yellow self-start sm:self-auto"
+        >
+          <span>دليل المتاجر بالكامل ({{ stats.totalStores }})</span>
+          <ArrowLeft class="size-3.5" />
+        </NuxtLink>
+      </div>
 
-          <!-- حالة التحميل -->
-          <div v-if="isStoresLoading" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <div v-for="i in 3" :key="`s-skel-${i}`" class="solar-card p-6 rounded-3xl animate-pulse space-y-4">
-              <div class="size-14 rounded-2xl bg-solar-bg-subtle" />
-              <div class="h-4 w-3/4 bg-solar-bg-subtle rounded" />
-              <div class="h-3 w-1/2 bg-solar-bg-subtle rounded" />
-            </div>
-          </div>
+      <div v-if="isLoading" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div v-for="i in 3" :key="`s-skel-${i}`" class="solar-card p-6 rounded-3xl animate-pulse space-y-4">
+          <div class="size-14 rounded-2xl bg-solar-bg-subtle" />
+          <div class="h-4 w-3/4 bg-solar-bg-subtle rounded" />
+          <div class="h-3 w-1/2 bg-solar-bg-subtle rounded" />
+        </div>
+      </div>
 
-          <!-- حالة الخطأ -->
-          <div v-else-if="storesError" class="solar-card p-8 text-center rounded-3xl border-dashed border-red-500/40">
-            <AlertCircle class="size-10 text-rose-500 mx-auto mb-2" />
-            <h4 class="text-sm font-bold text-solar-text-heading mb-1">{{ storesError }}</h4>
-            <button
-              type="button"
-              @click="fetchStores(true)"
-              class="btn-primary px-4 py-2 text-xs font-black gap-1.5 mt-3 inline-flex items-center"
-            >
-              <RefreshCw class="size-3.5" />
-              <span>إعادة المحاولة</span>
-            </button>
-          </div>
-
-          <!-- حالة الفراغ -->
-          <div v-else-if="stores.length === 0" class="solar-card p-10 text-center rounded-3xl border-dashed">
-            <Store class="size-12 mx-auto text-solar-text-muted mb-2 opacity-60" />
-            <h4 class="text-sm font-bold text-solar-text-heading">لا توجد متاجر معتمدة حالياً</h4>
-            <NuxtLink to="/stores" class="btn-outline text-xs mt-3 inline-flex">
-              الانتقال لدليل المتاجر
-            </NuxtLink>
-          </div>
-
-          <!-- شبكة المتاجر -->
-          <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-else class="relative overflow-hidden">
+        <Transition name="glide-fade" mode="out-in">
+          <div
+            :key="`stores-slide-${storeChunkIndex}`"
+            class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          >
             <div
-              v-for="store in stores"
+              v-for="store in displayedStores"
               :key="`store-${store.id}`"
               class="solar-card group flex flex-col justify-between p-6 rounded-3xl hover:border-solar-yellow/80 transition-all duration-300 shadow-xs hover:shadow-lg hover:-translate-y-1"
             >
               <div>
+                <!-- الرأس والبادج -->
                 <div class="flex items-start justify-between gap-3 mb-4">
                   <span class="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 border border-blue-500/20">
                     <ShieldCheck class="size-3 text-blue-600 dark:text-blue-400" />
@@ -619,6 +526,7 @@ const tabsConfig = [
                   </div>
                 </div>
 
+                <!-- إحصائيات المتجر -->
                 <div class="grid grid-cols-2 gap-2 text-center p-3 rounded-2xl bg-solar-bg-subtle/80 mb-4 border border-solar-border-card/30">
                   <div>
                     <span class="block text-sm font-black text-solar-navy-dark dark:text-solar-yellow">{{ store.productsCount ?? 12 }}+</span>
@@ -630,10 +538,12 @@ const tabsConfig = [
                   </div>
                 </div>
 
+                <!-- نبذة المتجر -->
                 <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mb-4">
                   {{ store.bio }}
                 </p>
 
+                <!-- الوسوم والماركات -->
                 <div class="flex flex-wrap gap-1.5 mb-5">
                   <span
                     v-for="tag in (store.tags || ['ألواح شمسية', 'إنفرترات', 'بطاريات'])"
@@ -645,6 +555,7 @@ const tabsConfig = [
                 </div>
               </div>
 
+              <!-- زر التصفح للزائر ينقل لصفحة المتجر -->
               <NuxtLink
                 :to="`/stores/${store.id}`"
                 class="btn-primary w-full py-2.5 text-xs font-black gap-2 justify-center shadow-xs hover:shadow-md transition-all cursor-pointer rounded-xl"
@@ -654,60 +565,65 @@ const tabsConfig = [
               </NuxtLink>
             </div>
           </div>
+        </Transition>
+
+        <!-- مؤشرات نقاط الشريحة الهادئة -->
+        <div v-if="totalStoreSlides > 1" class="flex justify-center items-center gap-2 mt-6">
+          <span
+            v-for="(_, idx) in totalStoreSlides"
+            :key="`s-dot-${idx}`"
+            class="h-1.5 rounded-full transition-all duration-500 ease-out"
+            :class="storeChunkIndex === idx ? 'w-7 bg-solar-yellow shadow-xs' : 'w-2 bg-slate-200 dark:bg-slate-700/60'"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 6. سلايدر المهندسين والاستشاريين (مريح للعينين وبدون أزرار يدوية) -->
+    <!-- ============================================================ -->
+    <section class="container-page" aria-label="سلايدر المهندسين المعتمدين">
+      <!-- ترويسة السلايدر بدون أي أزرار تنقل يدوي -->
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+        <div>
+          <span class="text-xs font-black text-solar-yellow uppercase tracking-widest">خبرات هندسية موثقة</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-solar-text-heading mt-1">مهندسون واستشاريون موثوقون لمشروعك</h2>
+          <p class="text-xs text-solar-text-muted mt-1 max-w-xl">
+            اختر مهندسك المعتمد لتصميم ومراجعة مخططاتك الشمسية وضمان مطابقتها لأعلى المعايير والمواصفات الهندسية.
+          </p>
         </div>
 
-        <!-- ============================================================ -->
-        <!-- تبويب المهندسين (Engineers Tab Content)                       -->
-        <!-- ============================================================ -->
-        <div v-else-if="activeTab === 'engineers'" class="flex flex-col gap-6">
-          <div class="flex items-center justify-between text-xs text-solar-text-muted">
-            <span class="font-bold">نخبة المهندسين والاستشاريين المعتمدين:</span>
-            <NuxtLink to="/engineers" class="btn-outline px-3 py-1.5 text-xs font-bold gap-1 hover:border-solar-yellow">
-              <span>دليل المهندسين بالكامل ({{ stats.totalEngineers }})</span>
-              <ArrowLeft class="size-3.5" />
-            </NuxtLink>
-          </div>
+        <!-- رابط دليل المهندسين فقط -->
+        <NuxtLink
+          to="/engineers"
+          class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0 hover:border-solar-yellow self-start sm:self-auto"
+        >
+          <span>دليل المهندسين بالكامل ({{ stats.totalEngineers }})</span>
+          <ArrowLeft class="size-3.5" />
+        </NuxtLink>
+      </div>
 
-          <!-- حالة التحميل -->
-          <div v-if="isEngineersLoading" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <div v-for="i in 3" :key="`e-skel-${i}`" class="solar-card p-6 rounded-3xl animate-pulse space-y-4">
-              <div class="size-14 rounded-full bg-solar-bg-subtle" />
-              <div class="h-4 w-3/4 bg-solar-bg-subtle rounded" />
-              <div class="h-3 w-1/2 bg-solar-bg-subtle rounded" />
-            </div>
-          </div>
+      <div v-if="isLoading" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div v-for="i in 3" :key="`e-skel-${i}`" class="solar-card p-6 rounded-3xl animate-pulse space-y-4">
+          <div class="size-14 rounded-full bg-solar-bg-subtle" />
+          <div class="h-4 w-3/4 bg-solar-bg-subtle rounded" />
+          <div class="h-3 w-1/2 bg-solar-bg-subtle rounded" />
+        </div>
+      </div>
 
-          <!-- حالة الخطأ -->
-          <div v-else-if="engineersError" class="solar-card p-8 text-center rounded-3xl border-dashed border-red-500/40">
-            <AlertCircle class="size-10 text-rose-500 mx-auto mb-2" />
-            <h4 class="text-sm font-bold text-solar-text-heading mb-1">{{ engineersError }}</h4>
-            <button
-              type="button"
-              @click="fetchEngineers(true)"
-              class="btn-primary px-4 py-2 text-xs font-black gap-1.5 mt-3 inline-flex items-center"
-            >
-              <RefreshCw class="size-3.5" />
-              <span>إعادة المحاولة</span>
-            </button>
-          </div>
-
-          <!-- حالة الفراغ -->
-          <div v-else-if="engineers.length === 0" class="solar-card p-10 text-center rounded-3xl border-dashed">
-            <Users class="size-12 mx-auto text-solar-text-muted mb-2 opacity-60" />
-            <h4 class="text-sm font-bold text-solar-text-heading">لا يوجد مهندسون معتمدون حالياً</h4>
-            <NuxtLink to="/engineers" class="btn-outline text-xs mt-3 inline-flex">
-              الانتقال لدليل المهندسين
-            </NuxtLink>
-          </div>
-
-          <!-- شبكة المهندسين -->
-          <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-else class="relative overflow-hidden">
+        <Transition name="glide-fade" mode="out-in">
+          <div
+            :key="`engineers-slide-${engineerChunkIndex}`"
+            class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          >
             <div
-              v-for="eng in engineers"
+              v-for="eng in displayedEngineers"
               :key="`eng-${eng.id}`"
               class="solar-card group flex flex-col justify-between p-6 rounded-3xl hover:border-solar-yellow/80 transition-all duration-300 shadow-xs hover:shadow-lg hover:-translate-y-1"
             >
               <div>
+                <!-- رأس بطاقة المهندس: الصورة مع النقطة الخضراء والبادج المعتمد -->
                 <div class="flex items-start justify-between gap-3 mb-3.5">
                   <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                     <CheckCircle2 class="size-3 text-emerald-600 dark:text-emerald-400" />
@@ -725,6 +641,7 @@ const tabsConfig = [
                   </div>
                 </div>
 
+                <!-- الاسم والتخصص والوصف -->
                 <div class="text-right mb-3">
                   <h3 class="text-base font-black text-solar-text-heading group-hover:text-solar-navy dark:group-hover:text-solar-yellow transition-colors">{{ eng.name }}</h3>
                   <p class="text-xs font-bold text-solar-navy-dark dark:text-solar-yellow mt-0.5">{{ eng.specialization }}</p>
@@ -733,6 +650,7 @@ const tabsConfig = [
                   </p>
                 </div>
 
+                <!-- معلومات الخبرة والموقع والتقييم والمشاريع -->
                 <div class="grid grid-cols-2 gap-2 text-[11px] text-solar-text-muted border-y border-solar-border-card/60 py-3 mb-4">
                   <span class="flex items-center gap-1.5 truncate">
                     <Clock class="size-3.5 text-solar-navy-dark dark:text-solar-yellow shrink-0" />
@@ -753,6 +671,7 @@ const tabsConfig = [
                 </div>
               </div>
 
+              <!-- زر التصفح للزائر ينقل لصفحة المهندس -->
               <NuxtLink
                 :to="`/engineers/${eng.id}`"
                 class="btn-primary w-full py-2.5 text-xs font-black gap-1.5 justify-center shadow-xs hover:shadow-md transition-all cursor-pointer rounded-xl"
@@ -762,16 +681,27 @@ const tabsConfig = [
               </NuxtLink>
             </div>
           </div>
+        </Transition>
+
+        <!-- مؤشرات نقاط الشريحة الهادئة -->
+        <div v-if="totalEngineerSlides > 1" class="flex justify-center items-center gap-2 mt-6">
+          <span
+            v-for="(_, idx) in totalEngineerSlides"
+            :key="`e-dot-${idx}`"
+            class="h-1.5 rounded-full transition-all duration-500 ease-out"
+            :class="engineerChunkIndex === idx ? 'w-7 bg-solar-yellow shadow-xs' : 'w-2 bg-slate-200 dark:bg-slate-700/60'"
+          />
         </div>
       </div>
     </section>
 
     <!-- ============================================================ -->
-    <!-- 5. بانر طلب العروض والمناقصات (CTA Banner)                    -->
+    <!-- 7. بانر طلب العروض والمناقصات (CTA Banner) المطابق للتصميم السابق -->
     <!-- ============================================================ -->
     <section class="container-page">
       <div class="relative overflow-hidden rounded-3xl bg-solar-navy-dark p-8 sm:p-12 lg:p-14 text-white shadow-2xl border border-white/10">
         <div class="grid gap-8 lg:grid-cols-12 items-center">
+          <!-- الجانب الأيمن: النص والعنوان والأزرار -->
           <div class="flex flex-col gap-4 lg:col-span-7">
             <span class="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-solar-yellow border border-white/10">
               <Sparkles class="size-3.5" />
@@ -804,6 +734,7 @@ const tabsConfig = [
             </div>
           </div>
 
+          <!-- الجانب الأيسر: الصناديق الثلاثة للميزات -->
           <div class="flex flex-col gap-3 lg:col-span-5">
             <div class="flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
               <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-solar-yellow/20 text-solar-yellow">
@@ -840,3 +771,24 @@ const tabsConfig = [
     </section>
   </div>
 </template>
+
+<style scoped>
+/* حركة انتقال انسيابية فائقة النعومة ومريحة جداً للعينين */
+.glide-fade-enter-active {
+  transition: opacity 0.55s ease-out, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glide-fade-leave-active {
+  transition: opacity 0.35s ease-in, transform 0.35s ease-in;
+}
+
+.glide-fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.glide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+</style>

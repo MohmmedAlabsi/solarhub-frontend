@@ -180,7 +180,7 @@ useSeoMeta({
                 :src="dynamicEngineer.avatar"
                 :alt="dynamicEngineer.name"
                 class="size-24 sm:size-28 shrink-0 rounded-full object-cover border-4 border-solar-yellow ring-4 ring-solar-bg-subtle shadow-md"
-                @error="(e) => ((e.target as HTMLImageElement).src = '/images/default-avatar.png')"
+                @error="(e) => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/images/default-avatar.png'; }"
               />
               <span class="absolute bottom-1 left-1 size-4 rounded-full bg-emerald-500 ring-4 ring-solar-bg-card" />
             </div>
