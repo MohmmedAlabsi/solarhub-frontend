@@ -39,10 +39,19 @@ function getChunkSlice<T>(array: T[], index: number, size: number): T[] {
   return slice
 }
 
+function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
+}
+
 export function useVisitorLanding() {
   const { $api } = useNuxtApp()
 
-  // المخزون الكامل المسترجع من قاعدة البيانات الحقيقية
+  // المخزون الكامل المسترجع عشوائياً من إجمالي قاعدة البيانات
   const allProducts = ref<VisitorProductItem[]>([])
   const allStores = ref<VisitorStoreItem[]>([])
   const allEngineers = ref<VisitorEngineerItem[]>([])
@@ -135,17 +144,44 @@ export function useVisitorLanding() {
 
   function cycleRandomItems() {
     if (allProducts.value.length > 0) {
-      productChunkIndex.value = (productChunkIndex.value + 1) % totalProductSlides.value
+      if (totalProductSlides.value > 1) {
+        let nextIndex = Math.floor(Math.random() * totalProductSlides.value)
+        if (nextIndex === productChunkIndex.value) {
+          nextIndex = (productChunkIndex.value + 1) % totalProductSlides.value
+        }
+        productChunkIndex.value = nextIndex
+      } else {
+        productChunkIndex.value = 0
+      }
       displayedProducts.value = getChunkSlice(allProducts.value, productChunkIndex.value, 4)
     }
+
     if (allStores.value.length > 0) {
-      storeChunkIndex.value = (storeChunkIndex.value + 1) % totalStoreSlides.value
+      if (totalStoreSlides.value > 1) {
+        let nextIndex = Math.floor(Math.random() * totalStoreSlides.value)
+        if (nextIndex === storeChunkIndex.value) {
+          nextIndex = (storeChunkIndex.value + 1) % totalStoreSlides.value
+        }
+        storeChunkIndex.value = nextIndex
+      } else {
+        storeChunkIndex.value = 0
+      }
       displayedStores.value = getChunkSlice(allStores.value, storeChunkIndex.value, 3)
     }
+
     if (allEngineers.value.length > 0) {
-      engineerChunkIndex.value = (engineerChunkIndex.value + 1) % totalEngineerSlides.value
+      if (totalEngineerSlides.value > 1) {
+        let nextIndex = Math.floor(Math.random() * totalEngineerSlides.value)
+        if (nextIndex === engineerChunkIndex.value) {
+          nextIndex = (engineerChunkIndex.value + 1) % totalEngineerSlides.value
+        }
+        engineerChunkIndex.value = nextIndex
+      } else {
+        engineerChunkIndex.value = 0
+      }
       displayedEngineers.value = getChunkSlice(allEngineers.value, engineerChunkIndex.value, 3)
     }
+
     secondsLeft.value = ROTATE_INTERVAL_SECONDS
   }
 
@@ -237,11 +273,11 @@ export function useVisitorLanding() {
         // Fallback to individual endpoints
       }
 
-      // 2. Fallback: fetch individual endpoints in parallel
+      // 2. Fallback: fetch individual endpoints in parallel with random flag
       const [productsRes, storesRes, engineersRes] = await Promise.allSettled([
-        $api<any>('/store-products?per_page=16'),
-        $api<any>('/stores?per_page=12'),
-        $api<any>('/engineers?per_page=12'),
+        $api<any>('/store-products?per_page=36&random=1'),
+        $api<any>('/stores?per_page=12&random=1'),
+        $api<any>('/engineers?per_page=12&random=1'),
       ])
 
       const rawProducts = productsRes.status === 'fulfilled'
@@ -268,7 +304,7 @@ export function useVisitorLanding() {
     }
   )
 
-  // Sync loaded data into reactive state and initialize viewports
+  // Sync loaded data into reactive state and randomize order across all records
   watch(
     () => landingPayload.value,
     (val) => {
@@ -278,13 +314,13 @@ export function useVisitorLanding() {
       const engs = Array.isArray(val.engineers) ? val.engineers : []
 
       if (prods.length > 0) {
-        allProducts.value = prods.map(mapProduct)
+        allProducts.value = shuffleArray(prods.map(mapProduct))
       }
       if (stores.length > 0) {
-        allStores.value = stores.map(mapStore)
+        allStores.value = shuffleArray(stores.map(mapStore))
       }
       if (engs.length > 0) {
-        allEngineers.value = engs.map(mapEngineer)
+        allEngineers.value = shuffleArray(engs.map(mapEngineer))
       }
       if (val.stats) {
         backendStats.value = val.stats
