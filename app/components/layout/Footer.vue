@@ -31,7 +31,7 @@ const contacts = [
     <div class="container-page grid gap-10 sm:grid-cols-2 lg:grid-cols-4 pb-12">
       <!-- العمود 1: عن المنصة والهوية -->
       <div class="flex flex-col gap-4">
-        <NuxtLink to="/" class="flex items-center transition-transform hover:scale-[1.02]" aria-label="سولار هب - الرئيسية">
+        <NuxtLink to="/" :prefetch="false" no-prefetch class="flex items-center transition-transform hover:scale-[1.02]" aria-label="سولار هب - الرئيسية">
           <img
             src="/images/logo-expanded-transparent.png"
             alt="Solar Hub - Your Hub For Solar Solutions"
@@ -72,7 +72,7 @@ const contacts = [
         <h3 class="text-sm font-black text-white border-r-2 border-solar-yellow pr-2.5">روابط سريعة</h3>
         <ul class="flex flex-col gap-2.5 text-xs">
           <li v-for="link in quickLinks" :key="link.label">
-            <NuxtLink :to="link.to" class="text-white/70 hover:text-solar-yellow transition-colors">
+            <NuxtLink :to="link.to" :prefetch="false" no-prefetch class="text-white/70 hover:text-solar-yellow transition-colors">
               {{ link.label }}
             </NuxtLink>
           </li>
@@ -84,7 +84,7 @@ const contacts = [
         <h3 class="text-sm font-black text-white border-r-2 border-solar-yellow pr-2.5">الدعم والسياسات</h3>
         <ul class="flex flex-col gap-2.5 text-xs">
           <li v-for="link in policyLinks" :key="link.label">
-            <NuxtLink :to="link.to" class="text-white/70 hover:text-solar-yellow transition-colors">
+            <NuxtLink :to="link.to" :prefetch="false" no-prefetch class="text-white/70 hover:text-solar-yellow transition-colors">
               {{ link.label }}
             </NuxtLink>
           </li>

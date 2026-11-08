@@ -70,15 +70,27 @@ export default defineNuxtConfig({
     }
   },
 
+  // إيقاف استخراج الحمولات والطلب المفرط لـ _payload.json
+  experimental: {
+    payloadExtraction: false,
+    defaults: {
+      nuxtLink: {
+        prefetch: false,
+        noPrefetch: true,
+      },
+    },
+  },
+
+  // تعطيل فئة البريفيتش الافتراضية
+  router: {
+    options: {
+      linkPrefetchedClass: undefined,
+    },
+  },
+
   // سياسة الرندرة الهجينة (Hybrid Rendering Policy) حسب معايير سولار هب
   routeRules: {
     '/products/**': { swr: 3600 },
-    '/admin/products': { ssr: true },
-    '/admin/products/**': { ssr: true },
-    '/admin/master-data': { ssr: true },
-    '/admin/master-data/**': { ssr: true },
-    '/admin/orders': { ssr: true },
-    '/admin/orders/**': { ssr: true },
     '/customer/**': { ssr: false },
     '/engineer/**': { ssr: false },
     '/auth/**': { ssr: false },

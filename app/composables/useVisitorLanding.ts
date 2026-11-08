@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import type {
   VisitorProductItem,
   VisitorStoreItem,
@@ -39,13 +39,23 @@ function getChunkSlice<T>(array: T[], index: number, size: number): T[] {
   return slice
 }
 
+function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
+}
+
 export function useVisitorLanding() {
   const { $api } = useNuxtApp()
 
-  // المخزون الكامل المسترجع من قاعدة البيانات الحقيقية
+  // المخزون الكامل المسترجع عشوائياً من إجمالي قاعدة البيانات
   const allProducts = ref<VisitorProductItem[]>([])
   const allStores = ref<VisitorStoreItem[]>([])
   const allEngineers = ref<VisitorEngineerItem[]>([])
+  const backendStats = ref<{ totalProducts: number; totalStores: number; totalEngineers: number } | null>(null)
 
   // العناصر المعروضة حالياً في السلايدرات العشوائية المتجددة كل 10 ثواني
   const displayedProducts = ref<VisitorProductItem[]>([])
@@ -62,27 +72,15 @@ export function useVisitorLanding() {
   const totalStoreSlides = computed(() => Math.max(1, Math.ceil(allStores.value.length / 3)))
   const totalEngineerSlides = computed(() => Math.max(1, Math.ceil(allEngineers.value.length / 3)))
 
-  // حالة التحميل والخطأ
-  const isLoading = ref(true)
-  const errorMessage = ref('')
-
-  // مؤقت التدوير التلقائي (مضبوط الآن على 10 ثواني بالضبط حسب طلب المستخدم)
+  // مؤقت التدوير التلقائي (10 ثواني بالضبط)
   const ROTATE_INTERVAL_SECONDS = 10
   const secondsLeft = ref(ROTATE_INTERVAL_SECONDS)
-
   let intervalTimer: ReturnType<typeof setInterval> | null = null
-
-  // إحصائيات المنصة الحية (مع قيم مبدئية معتمدة لتجنب ظهور +0 أثناء التحميل الأولي)
-  const stats = computed<PlatformStats>(() => ({
-    totalProducts: allProducts.value.length > 0 ? allProducts.value.length : 80,
-    totalStores: allStores.value.length > 0 ? allStores.value.length : 12,
-    totalEngineers: allEngineers.value.length > 0 ? allEngineers.value.length : 14,
-  }))
 
   function mapProduct(item: any): VisitorProductItem {
     const mp = item.master_product || item.masterProduct || {}
     const brand = mp.brand?.name || 'علامة معتمدة'
-    const category = mp.category?.name_ar || mp.category?.name || 'طاقة شمسية'
+    const category = mp.category?.name_ar || mp.category?.name_en || mp.category?.name || 'طاقة شمسية'
     const title = mp.title || 'منتج طاقة شمسية معتمد'
     const imagePath = mp.images?.[0]?.image_path || mp.images?.[0]?.image_url || mp.image_url || item.image
 
@@ -97,7 +95,7 @@ export function useVisitorLanding() {
       price: item.price ? Number(item.price) : null,
       stockQuantity: item.stock_quantity ? Number(item.stock_quantity) : 0,
       warrantyPeriod: item.warranty_period ? `ضمان ${item.warranty_period}` : 'ضمان رسمي معتمد',
-      governorateName: item.governorate?.name_ar || item.governorate?.name || 'صنعاء',
+      governorateName: item.governorate?.name_ar || item.governorate?.name_en || 'صنعاء',
       storeName: item.store?.company_name || 'متجر معتمد',
       storeId: item.store?.id,
       rating: 4.85,
@@ -110,7 +108,7 @@ export function useVisitorLanding() {
     return {
       id: item.id,
       companyName: item.company_name || 'متجر معتمد',
-      governorateName: item.governorate_name || item.governorate?.name_ar || item.governorate?.name || 'صنعاء',
+      governorateName: item.governorate_name || item.governorate?.name_ar || item.governorate?.name_en || 'صنعاء',
       addressDetails: item.address_details || 'الجمهورية اليمنية',
       bio: item.bio || 'موزع ووكيل معتمد لمهمات ومنظومات الطاقة الشمسية والحلول الكهروضوئية باليمن.',
       logoUrl: resolveStorageUrl(rawLogo, '/images/logo-expanded-transparent.png'),
@@ -133,7 +131,7 @@ export function useVisitorLanding() {
       id: item.id,
       name: item.name || item.user?.name || 'مهندس استشاري',
       specialization: rawSpecs,
-      governorateName: item.governorate_name || item.governorate?.name_ar || item.governorate?.name || 'صنعاء',
+      governorateName: item.governorate_name || item.governorate?.name_ar || item.governorate?.name_en || 'صنعاء',
       yearsOfExperience: item.years_of_experience ? Number(item.years_of_experience) : 6,
       bio: item.bio || 'استشاري معتمد في دراسات الجدوى الفنية وقياس الأحمال والإشراف على التركيبات الكهروضوئية.',
       photoUrl: resolveStorageUrl(rawPhoto, '/images/hero-solar.png'),
@@ -146,17 +144,44 @@ export function useVisitorLanding() {
 
   function cycleRandomItems() {
     if (allProducts.value.length > 0) {
-      productChunkIndex.value = (productChunkIndex.value + 1) % totalProductSlides.value
+      if (totalProductSlides.value > 1) {
+        let nextIndex = Math.floor(Math.random() * totalProductSlides.value)
+        if (nextIndex === productChunkIndex.value) {
+          nextIndex = (productChunkIndex.value + 1) % totalProductSlides.value
+        }
+        productChunkIndex.value = nextIndex
+      } else {
+        productChunkIndex.value = 0
+      }
       displayedProducts.value = getChunkSlice(allProducts.value, productChunkIndex.value, 4)
     }
+
     if (allStores.value.length > 0) {
-      storeChunkIndex.value = (storeChunkIndex.value + 1) % totalStoreSlides.value
+      if (totalStoreSlides.value > 1) {
+        let nextIndex = Math.floor(Math.random() * totalStoreSlides.value)
+        if (nextIndex === storeChunkIndex.value) {
+          nextIndex = (storeChunkIndex.value + 1) % totalStoreSlides.value
+        }
+        storeChunkIndex.value = nextIndex
+      } else {
+        storeChunkIndex.value = 0
+      }
       displayedStores.value = getChunkSlice(allStores.value, storeChunkIndex.value, 3)
     }
+
     if (allEngineers.value.length > 0) {
-      engineerChunkIndex.value = (engineerChunkIndex.value + 1) % totalEngineerSlides.value
+      if (totalEngineerSlides.value > 1) {
+        let nextIndex = Math.floor(Math.random() * totalEngineerSlides.value)
+        if (nextIndex === engineerChunkIndex.value) {
+          nextIndex = (engineerChunkIndex.value + 1) % totalEngineerSlides.value
+        }
+        engineerChunkIndex.value = nextIndex
+      } else {
+        engineerChunkIndex.value = 0
+      }
       displayedEngineers.value = getChunkSlice(allEngineers.value, engineerChunkIndex.value, 3)
     }
+
     secondsLeft.value = ROTATE_INTERVAL_SECONDS
   }
 
@@ -226,73 +251,81 @@ export function useVisitorLanding() {
     }
   }
 
-  const landingStateCache = useState<{
-    products: VisitorProductItem[]
-    stores: VisitorStoreItem[]
-    engineers: VisitorEngineerItem[]
-    timestamp: number
-  } | null>('visitor_landing_cache', () => null)
+  // Non-Blocking SSR via useLazyAsyncData:
+  // server: false guarantees instant TTFB (< 50ms) without SSR network pauses.
+  // lazy: true ensures hydration proceeds immediately, showing skeletons while data loads in background.
+  const { data: landingPayload, pending, error: fetchError, refresh } = useLazyAsyncData(
+    'visitor_landing_showcase',
+    async () => {
+      // 1. Try unified fast showcase endpoint first
+      try {
+        const res = await $api<any>('/public/landing-showcase')
+        const payload = res?.data || res
+        if (payload && (payload.products || payload.stores || payload.engineers)) {
+          return {
+            products: Array.isArray(payload.products) ? payload.products : [],
+            stores: Array.isArray(payload.stores) ? payload.stores : [],
+            engineers: Array.isArray(payload.engineers) ? payload.engineers : [],
+            stats: payload.stats || null,
+          }
+        }
+      } catch {
+        // Fallback to individual endpoints
+      }
 
-  async function fetchVisitorData() {
-    // 1. Serve immediately from 5-minute client-side memory cache if valid
-    if (landingStateCache.value && Date.now() - landingStateCache.value.timestamp < 300000) {
-      allProducts.value = landingStateCache.value.products
-      allStores.value = landingStateCache.value.stores
-      allEngineers.value = landingStateCache.value.engineers
-      productChunkIndex.value = 0
-      storeChunkIndex.value = 0
-      engineerChunkIndex.value = 0
-      displayedProducts.value = getChunkSlice(allProducts.value, 0, 4)
-      displayedStores.value = getChunkSlice(allStores.value, 0, 3)
-      displayedEngineers.value = getChunkSlice(allEngineers.value, 0, 3)
-      isLoading.value = false
-      startRotationTimer()
-      return
-    }
-
-    isLoading.value = true
-    errorMessage.value = ''
-
-    try {
+      // 2. Fallback: fetch individual endpoints in parallel with random flag
       const [productsRes, storesRes, engineersRes] = await Promise.allSettled([
-        $api<any>('/store-products?per_page=100'),
-        $api<any>('/stores?per_page=50'),
-        $api<any>('/engineers?per_page=50'),
+        $api<any>('/store-products?per_page=36&random=1'),
+        $api<any>('/stores?per_page=12&random=1'),
+        $api<any>('/engineers?per_page=12&random=1'),
       ])
 
-      // 1. المنتجات من قاعدة البيانات الحقيقية
-      if (productsRes.status === 'fulfilled') {
-        const raw = Array.isArray(productsRes.value) ? productsRes.value : productsRes.value?.data || []
-        allProducts.value = Array.isArray(raw) ? raw.map(mapProduct) : []
-      } else {
-        allProducts.value = []
+      const rawProducts = productsRes.status === 'fulfilled'
+        ? (Array.isArray(productsRes.value) ? productsRes.value : productsRes.value?.data || [])
+        : []
+      const rawStores = storesRes.status === 'fulfilled'
+        ? (Array.isArray(storesRes.value) ? storesRes.value : storesRes.value?.data || [])
+        : []
+      const rawEngineers = engineersRes.status === 'fulfilled'
+        ? (Array.isArray(engineersRes.value) ? engineersRes.value : engineersRes.value?.data || [])
+        : []
+
+      return {
+        products: Array.isArray(rawProducts) ? rawProducts : [],
+        stores: Array.isArray(rawStores) ? rawStores : [],
+        engineers: Array.isArray(rawEngineers) ? rawEngineers : [],
+        stats: null,
+      }
+    },
+    {
+      lazy: true,
+      server: false,
+      default: () => ({ products: [], stores: [], engineers: [], stats: null }),
+    }
+  )
+
+  // Sync loaded data into reactive state and randomize order across all records
+  watch(
+    () => landingPayload.value,
+    (val) => {
+      if (!val) return
+      const prods = Array.isArray(val.products) ? val.products : []
+      const stores = Array.isArray(val.stores) ? val.stores : []
+      const engs = Array.isArray(val.engineers) ? val.engineers : []
+
+      if (prods.length > 0) {
+        allProducts.value = shuffleArray(prods.map(mapProduct))
+      }
+      if (stores.length > 0) {
+        allStores.value = shuffleArray(stores.map(mapStore))
+      }
+      if (engs.length > 0) {
+        allEngineers.value = shuffleArray(engs.map(mapEngineer))
+      }
+      if (val.stats) {
+        backendStats.value = val.stats
       }
 
-      // 2. المتاجر من قاعدة البيانات الحقيقية
-      if (storesRes.status === 'fulfilled') {
-        const raw = Array.isArray(storesRes.value) ? storesRes.value : storesRes.value?.data || []
-        allStores.value = Array.isArray(raw) ? raw.map(mapStore) : []
-      } else {
-        allStores.value = []
-      }
-
-      // 3. المهندسون من قاعدة البيانات الحقيقية
-      if (engineersRes.status === 'fulfilled') {
-        const raw = Array.isArray(engineersRes.value) ? engineersRes.value : engineersRes.value?.data || []
-        allEngineers.value = Array.isArray(raw) ? raw.map(mapEngineer) : []
-      } else {
-        allEngineers.value = []
-      }
-
-      // حفظ في كاش الذاكرة المحلية
-      landingStateCache.value = {
-        products: allProducts.value,
-        stores: allStores.value,
-        engineers: allEngineers.value,
-        timestamp: Date.now(),
-      }
-
-      // تهيئة المعروضات الحالية والبدء التلقائي كل 10 ثواني
       productChunkIndex.value = 0
       storeChunkIndex.value = 0
       engineerChunkIndex.value = 0
@@ -300,24 +333,39 @@ export function useVisitorLanding() {
       displayedStores.value = getChunkSlice(allStores.value, 0, 3)
       displayedEngineers.value = getChunkSlice(allEngineers.value, 0, 3)
 
-      startRotationTimer()
-    } catch (err: any) {
-      console.error('Visitor landing page fetch error:', err)
-      errorMessage.value = err?.data?.message || 'تعذر الاتصال بالخادم لجلب بيانات المنصة.'
-      allProducts.value = []
-      allStores.value = []
-      allEngineers.value = []
-      displayedProducts.value = []
-      displayedStores.value = []
-      displayedEngineers.value = []
-    } finally {
-      isLoading.value = false
-    }
-  }
+      if (import.meta.client && (prods.length > 0 || stores.length > 0 || engs.length > 0)) {
+        startRotationTimer()
+      }
+    },
+    { immediate: true }
+  )
 
-  onMounted(() => {
-    fetchVisitorData()
+  // Loading state: true while pending AND no items have been populated yet
+  const isLoading = computed(() => {
+    if (allProducts.value.length > 0 || allStores.value.length > 0 || allEngineers.value.length > 0) {
+      return false
+    }
+    return pending.value
   })
+
+  // Error message formatting
+  const errorMessage = computed(() => {
+    if (fetchError.value) {
+      return (fetchError.value as any)?.message || 'تعذر الاتصال بالخادم لجلب بيانات المنصة.'
+    }
+    return ''
+  })
+
+  // إحصائيات المنصة الحية
+  const stats = computed<PlatformStats>(() => ({
+    totalProducts: backendStats.value?.totalProducts || (allProducts.value.length > 0 ? allProducts.value.length : 80),
+    totalStores: backendStats.value?.totalStores || (allStores.value.length > 0 ? allStores.value.length : 12),
+    totalEngineers: backendStats.value?.totalEngineers || (allEngineers.value.length > 0 ? allEngineers.value.length : 14),
+  }))
+
+  async function fetchVisitorData() {
+    return refresh()
+  }
 
   onUnmounted(() => {
     stopRotationTimer()

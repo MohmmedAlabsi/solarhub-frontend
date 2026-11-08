@@ -288,7 +288,7 @@ onMounted(() => {
                 :alt="engineer.name"
                 class="size-full object-cover rounded-xl"
                 loading="lazy"
-                @error="(e) => ((e.target as HTMLImageElement).src = '/images/default-avatar.png')"
+                @error="(e) => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/images/default-avatar.png'; }"
               />
             </NuxtLink>
 
