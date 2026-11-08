@@ -1,25 +1,37 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-
-const execFileAsync = promisify(execFile)
-
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const q = String(query.q || '')
 
+  const config = useRuntimeConfig()
+  const apiBase = (config.public?.apiBaseUrl as string) || (config.public?.apiBase as string) || 'http://127.0.0.1:8000/api'
+
   try {
-    const scriptPath = 'G:\\solarhub-frontend\\server\\utils\\permissions-ops.php'
-    const payloadStr = JSON.stringify({ query: q })
-    const { stdout } = await execFileAsync('php', [scriptPath, 'search_users', payloadStr], {
-      cwd: 'G:\\solarhub-api',
-      timeout: 10000,
+    const res: any = await $fetch(`${apiBase}/users`, {
+      query: {
+        search: q,
+        per_page: 15,
+      },
+      headers: { 'Accept': 'application/json' },
     })
 
-    return JSON.parse(stdout.trim())
+    const raw = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+    const mapped = raw.map((u: any) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone,
+      role: u.roles?.[0]?.name || u.role || 'user',
+    }))
+
+    return {
+      status: 'success',
+      data: mapped,
+    }
   } catch (err: any) {
     return {
       status: 'error',
       message: String(err?.message || err),
+      data: [],
     }
   }
 })

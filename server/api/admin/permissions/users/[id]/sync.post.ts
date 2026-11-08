@@ -1,24 +1,20 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-
-const execFileAsync = promisify(execFile)
-
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   const body = await readBody(event)
 
+  const config = useRuntimeConfig()
+  const apiBase = (config.public?.apiBaseUrl as string) || (config.public?.apiBase as string) || 'http://127.0.0.1:8000/api'
+
   try {
-    const scriptPath = 'G:\\solarhub-frontend\\server\\utils\\permissions-ops.php'
-    const payloadStr = JSON.stringify({
-      user_id: Number(id),
-      permissions: body?.permissions || [],
-    })
-    const { stdout } = await execFileAsync('php', [scriptPath, 'sync_user_permissions', payloadStr], {
-      cwd: 'G:\\solarhub-api',
-      timeout: 60000,
+    const res: any = await $fetch(`${apiBase}/admin/permissions/users/${id}/sync`, {
+      method: 'POST',
+      body: {
+        permissions: body?.permissions || [],
+      },
+      headers: { 'Accept': 'application/json' },
     })
 
-    return JSON.parse(stdout.trim())
+    return res
   } catch (err: any) {
     return {
       status: 'error',

@@ -331,7 +331,7 @@ export const useAdminPermissions = () => {
       // 2. إذا لم ترجع بيانات، محاولة جلب المستخدمين وفلترة من يحمل دور admin
       if (data.length === 0) {
         try {
-          const usersRes: any = await $api('/users?per_page=100')
+          const usersRes: any = await $api('/users?per_page=50')
           const rawUsers: any[] = Array.isArray(usersRes?.data)
             ? usersRes.data
             : (Array.isArray(usersRes?.data?.data) ? usersRes.data.data : (Array.isArray(usersRes) ? usersRes : []))

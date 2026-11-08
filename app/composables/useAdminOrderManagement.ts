@@ -1,6 +1,7 @@
 import type { AdminOrder, AdminSupplierOrderGroup, AdminOrderProduct } from '../../types/admin'
 
 export const useAdminOrderManagement = () => {
+  const { $api } = useNuxtApp()
   const { notify } = useAdminNotice()
 
   const orders = useState<AdminOrder[]>('admin_management_orders', () => [])
@@ -43,15 +44,19 @@ export const useAdminOrderManagement = () => {
   }
 
   /**
-   * جلب طلبات الشراء ديناميكياً من قاعدة البيانات عبر الـ API
+   * جلب طلبات الشراء ديناميكياً من قاعدة البيانات عبر الـ API المباشر
    */
   const fetchOrders = async (force = false): Promise<AdminOrder[]> => {
     if (!force && orders.value.length > 0) return orders.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/orders', {
-        query: force ? { force: 'true' } : {}
-      })
+      let res: any
+      try {
+        res = await $api('/admin/orders', { query: { per_page: 50 } })
+      } catch {
+        res = await $fetch('/api/admin/orders', { query: force ? { force: 'true' } : {} })
+      }
+
       const apiData = Array.isArray(res) ? res : (res?.data || [])
       
       const transformed: AdminOrder[] = apiData.map((o: any) => ({
@@ -106,10 +111,17 @@ export const useAdminOrderManagement = () => {
 
       try {
         const apiStatus = mapArabicStatusToApi(newStatus)
-        await $fetch(`/api/admin/orders/${orderId}/status`, {
-          method: 'POST',
-          body: { status: apiStatus },
-        })
+        try {
+          await $api(`/admin/orders/${orderId}/status`, {
+            method: 'POST',
+            body: { status: apiStatus },
+          })
+        } catch {
+          await $fetch(`/api/admin/orders/${orderId}/status`, {
+            method: 'POST',
+            body: { status: apiStatus },
+          })
+        }
       } catch (apiErr) {
         console.warn('Status update backend warning:', apiErr)
       }

@@ -1,6 +1,7 @@
 import type { OrderPayment, StorePayout, PlatformSetting } from '../../types/api'
 
 export const useAdminFinance = () => {
+  const { $api } = useNuxtApp()
   const { notify } = useAdminNotice()
 
   const payments = useState<OrderPayment[]>('admin_finance_payments', () => [])
@@ -12,13 +13,18 @@ export const useAdminFinance = () => {
   const isActionLoading = ref(false)
 
   /**
-   * جلب مدفوعات العملاء ديناميكياً من قاعدة البيانات عبر الـ API
+   * جلب مدفوعات العملاء ديناميكياً من قاعدة البيانات عبر الـ API المباشر
    */
   const fetchPayments = async (force = false): Promise<OrderPayment[]> => {
     if (!force && payments.value.length > 0) return payments.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/finance/payments')
+      let res: any
+      try {
+        res = await $api('/admin/finance/payments', { query: { per_page: 50 } })
+      } catch {
+        res = await $fetch('/api/admin/finance/payments')
+      }
       const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
       payments.value = data
       return data
@@ -37,7 +43,6 @@ export const useAdminFinance = () => {
     isActionLoading.value = true
     try {
       const target = payments.value.find(p => String(p.id) === String(paymentId))
-      const oldStatus = target?.status
       if (target) {
         target.status = newStatus // Optimistic instant update
         if (newStatus === 'verified') {
@@ -45,10 +50,17 @@ export const useAdminFinance = () => {
         }
       }
 
-      await $fetch(`/api/admin/finance/payments/${paymentId}/status`, {
-        method: 'POST',
-        body: { status: newStatus },
-      })
+      try {
+        await $api(`/admin/finance/payments/${paymentId}/status`, {
+          method: 'POST',
+          body: { status: newStatus },
+        })
+      } catch {
+        await $fetch(`/api/admin/finance/payments/${paymentId}/status`, {
+          method: 'POST',
+          body: { status: newStatus },
+        })
+      }
 
       const statusAr = newStatus === 'verified' ? 'تم التحقق' : (newStatus === 'rejected' ? 'مرفوض' : 'قيد المراجعة')
       notify(`تم تحديث حالة الدفعة #${paymentId} إلى "${statusAr}" بنجاح`)
@@ -62,13 +74,18 @@ export const useAdminFinance = () => {
   }
 
   /**
-   * جلب مستحقات الموردين ديناميكياً من قاعدة البيانات عبر الـ API
+   * جلب مستحقات الموردين ديناميكياً من قاعدة البيانات عبر الـ API المباشر
    */
   const fetchPayouts = async (force = false): Promise<StorePayout[]> => {
     if (!force && payouts.value.length > 0) return payouts.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/finance/payouts')
+      let res: any
+      try {
+        res = await $api('/admin/finance/payouts', { query: { per_page: 50 } })
+      } catch {
+        res = await $fetch('/api/admin/finance/payouts')
+      }
       const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
       payouts.value = data
       return data
@@ -93,10 +110,17 @@ export const useAdminFinance = () => {
         if (status === 'completed') target.paid_at = new Date().toISOString()
       }
 
-      await $fetch(`/api/admin/finance/payouts/${payoutId}/status`, {
-        method: 'POST',
-        body: { status, transfer_reference: transferReference },
-      })
+      try {
+        await $api(`/admin/finance/payouts/${payoutId}/status`, {
+          method: 'POST',
+          body: { status, transfer_reference: transferReference },
+        })
+      } catch {
+        await $fetch(`/api/admin/finance/payouts/${payoutId}/status`, {
+          method: 'POST',
+          body: { status, transfer_reference: transferReference },
+        })
+      }
 
       const statusAr = status === 'completed' ? 'تم الصرف بنجاح' : (status === 'failed' ? 'فشل الصرف' : 'قيد الانتظار')
       notify(`تم تحديث سجل المستحقات #${payoutId} إلى "${statusAr}"`)
@@ -115,7 +139,12 @@ export const useAdminFinance = () => {
   const fetchStats = async (force = false) => {
     if (!force && stats.value) return stats.value
     try {
-      const res: any = await $fetch('/api/admin/finance/stats')
+      let res: any
+      try {
+        res = await $api('/admin/finance/stats')
+      } catch {
+        res = await $fetch('/api/admin/finance/stats')
+      }
       if (res?.data) {
         stats.value = res.data
       }
@@ -132,7 +161,12 @@ export const useAdminFinance = () => {
     if (!force && settings.value) return settings.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/finance/settings')
+      let res: any
+      try {
+        res = await $api('/admin/finance/settings')
+      } catch {
+        res = await $fetch('/api/admin/finance/settings')
+      }
       if (res?.data) {
         settings.value = res.data
       }
@@ -151,10 +185,18 @@ export const useAdminFinance = () => {
   const updateSettings = async (payload: Partial<PlatformSetting>): Promise<boolean> => {
     isActionLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/finance/settings', {
-        method: 'POST',
-        body: payload,
-      })
+      let res: any
+      try {
+        res = await $api('/admin/finance/settings', {
+          method: 'POST',
+          body: payload,
+        })
+      } catch {
+        res = await $fetch('/api/admin/finance/settings', {
+          method: 'POST',
+          body: payload,
+        })
+      }
       if (res?.data) {
         settings.value = res.data
       }

@@ -546,7 +546,12 @@ export const useAdminMasterData = () => {
     if (!force && walletProviders.value.length > 0) return walletProviders.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/wallet-providers')
+      let res: any
+      try {
+        res = await $api('/admin/wallet-providers')
+      } catch {
+        res = await $fetch('/api/admin/wallet-providers')
+      }
       const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
       walletProviders.value = data
       return data

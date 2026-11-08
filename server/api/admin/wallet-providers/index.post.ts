@@ -1,21 +1,17 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-
-const execFileAsync = promisify(execFile)
-
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
 
+  const config = useRuntimeConfig()
+  const apiBase = (config.public?.apiBaseUrl as string) || (config.public?.apiBase as string) || 'http://127.0.0.1:8000/api'
+
   try {
-    const scriptPath = 'G:\\solarhub-frontend\\server\\utils\\finance-ops.php'
-    const payloadStr = JSON.stringify(body || {})
-    const { stdout } = await execFileAsync('php', [scriptPath, 'create_wallet_provider', payloadStr], {
-      cwd: 'G:\\solarhub-api',
-      maxBuffer: 10 * 1024 * 1024,
-      timeout: 20000,
+    const res: any = await $fetch(`${apiBase}/admin/wallet-providers`, {
+      method: 'POST',
+      body,
+      headers: { 'Accept': 'application/json' },
     })
 
-    return JSON.parse(stdout.trim())
+    return res
   } catch (err: any) {
     return {
       status: 'error',

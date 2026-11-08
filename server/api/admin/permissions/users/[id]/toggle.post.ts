@@ -1,25 +1,24 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-
-const execFileAsync = promisify(execFile)
-
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   const body = await readBody(event)
+  const permission = body?.permission
+  const enable = body?.enable ?? true
+
+  if (!id || !permission) {
+    throw createError({ statusCode: 400, message: 'Missing user id or permission' })
+  }
+
+  const config = useRuntimeConfig()
+  const apiBase = (config.public?.apiBaseUrl as string) || (config.public?.apiBase as string) || 'http://127.0.0.1:8000/api'
 
   try {
-    const scriptPath = 'G:\\solarhub-frontend\\server\\utils\\permissions-ops.php'
-    const payloadStr = JSON.stringify({
-      user_id: Number(id),
-      permission: body?.permission,
-      enable: body?.enable ?? true,
-    })
-    const { stdout } = await execFileAsync('php', [scriptPath, 'toggle_permission', payloadStr], {
-      cwd: 'G:\\solarhub-api',
-      timeout: 60000,
+    const res: any = await $fetch(`${apiBase}/admin/users/${id}/permissions`, {
+      method: enable ? 'POST' : 'DELETE',
+      body: { permission },
+      headers: { 'Accept': 'application/json' },
     })
 
-    return JSON.parse(stdout.trim())
+    return res
   } catch (err: any) {
     return {
       status: 'error',

@@ -20,7 +20,7 @@ export const useAdminCatalog = () => {
 
     isLoading.value = true
     try {
-      const res: any = await $api('/master-products?per_page=500')
+      const res: any = await $api('/master-products?per_page=50')
       let list: MasterProduct[] = []
 
       if (Array.isArray(res)) {

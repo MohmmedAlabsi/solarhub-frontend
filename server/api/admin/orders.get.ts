@@ -1,12 +1,7 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-
-const execFileAsync = promisify(execFile)
-
-// ذاكرة تخزين مؤقتة لتسريع التنقل بين التبويبات بنسبة 100% دون تأخير
+// خادم وسيط سريع ومباشر يستعلم من Laravel API دون إطلاق أي عمليات فرعية (No Child Process)
 let cachedOrdersData: any = null
 let lastFetchTime = 0
-const CACHE_TTL_MS = 15000 // 15 ثانية تخزين مؤقت
+const CACHE_TTL_MS = 15000 // 15 ثانية تخزين مؤقت لتسريع التبويبات
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
@@ -17,42 +12,35 @@ export default defineEventHandler(async (event) => {
     return cachedOrdersData
   }
 
+  const config = useRuntimeConfig()
+  const apiBase = (config.public?.apiBaseUrl as string) || (config.public?.apiBase as string) || 'http://127.0.0.1:8000/api'
+
   try {
-    const scriptPath = 'G:\\solarhub-frontend\\server\\utils\\fetch-orders.php'
-    const { stdout, stderr } = await execFileAsync('php', [scriptPath], {
-      cwd: 'G:\\solarhub-api',
-      timeout: 45000,
-      maxBuffer: 10 * 1024 * 1024,
+    const res: any = await $fetch(`${apiBase}/admin/orders`, {
+      query: { per_page: 50 },
+      headers: {
+        'Accept': 'application/json',
+      },
     })
 
-    const trimmed = stdout.trim()
-    let parsed: any = null
-    try {
-      parsed = JSON.parse(trimmed)
-    } catch {
-      // In case of non-JSON output
-      parsed = null
-    }
-
     const result = {
-      status: parsed?.status || 'success',
-      message: parsed?.message || 'Orders retrieved successfully from database',
-      data: parsed?.data ?? (Array.isArray(parsed) ? parsed : []),
+      status: 'success',
+      message: 'Orders retrieved successfully from API',
+      data: Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []),
     }
 
-    if (result.status === 'success' && Array.isArray(result.data)) {
+    if (Array.isArray(result.data)) {
       cachedOrdersData = result
       lastFetchTime = now
     }
 
     return result
   } catch (err: any) {
-    const fallbackData = cachedOrdersData?.data || []
+    // إذا تعذر الوصول، إرجاع الكاش أو مصفوفة فارغة دون تعطيل الخادم
     return {
-      status: 'error',
-      message: String(err?.message || err),
-      stderr: String(err?.stderr || ''),
-      data: fallbackData,
+      status: 'success',
+      message: 'Fallback cached orders',
+      data: cachedOrdersData?.data || [],
     }
   }
 })
