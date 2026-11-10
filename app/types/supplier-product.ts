@@ -2,7 +2,7 @@
 // Supplier Product Types
 // ============================================================
 
-export interface GovernorateItem {
+export interface SupplierGovernorateItem {
   id: number
   name_ar: string
   name_en?: string

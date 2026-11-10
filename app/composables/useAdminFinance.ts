@@ -1,6 +1,7 @@
 import type { OrderPayment, StorePayout, PlatformSetting } from '../../types/api'
 
 export const useAdminFinance = () => {
+  const { $api } = useNuxtApp()
   const { notify } = useAdminNotice()
 
   const payments = useState<OrderPayment[]>('admin_finance_payments', () => [])
@@ -18,7 +19,7 @@ export const useAdminFinance = () => {
     if (!force && payments.value.length > 0) return payments.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/finance/payments')
+      const res: any = await $api('/admin/finance/payments')
       const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
       payments.value = data
       return data
@@ -45,7 +46,7 @@ export const useAdminFinance = () => {
         }
       }
 
-      await $fetch(`/api/admin/finance/payments/${paymentId}/status`, {
+      await $api(`/admin/finance/payments/${paymentId}/status`, {
         method: 'POST',
         body: { status: newStatus },
       })
@@ -68,7 +69,7 @@ export const useAdminFinance = () => {
     if (!force && payouts.value.length > 0) return payouts.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/finance/payouts')
+      const res: any = await $api('/admin/finance/payouts')
       const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
       payouts.value = data
       return data
@@ -93,7 +94,7 @@ export const useAdminFinance = () => {
         if (status === 'completed') target.paid_at = new Date().toISOString()
       }
 
-      await $fetch(`/api/admin/finance/payouts/${payoutId}/status`, {
+      await $api(`/admin/finance/payouts/${payoutId}/status`, {
         method: 'POST',
         body: { status, transfer_reference: transferReference },
       })
@@ -115,7 +116,7 @@ export const useAdminFinance = () => {
   const fetchStats = async (force = false) => {
     if (!force && stats.value) return stats.value
     try {
-      const res: any = await $fetch('/api/admin/finance/stats')
+      const res: any = await $api('/admin/finance/stats')
       if (res?.data) {
         stats.value = res.data
       }
@@ -132,7 +133,7 @@ export const useAdminFinance = () => {
     if (!force && settings.value) return settings.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/finance/settings')
+      const res: any = await $api('/admin/finance/settings')
       if (res?.data) {
         settings.value = res.data
       }
@@ -151,7 +152,7 @@ export const useAdminFinance = () => {
   const updateSettings = async (payload: Partial<PlatformSetting>): Promise<boolean> => {
     isActionLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/finance/settings', {
+      const res: any = await $api('/admin/finance/settings', {
         method: 'POST',
         body: payload,
       })

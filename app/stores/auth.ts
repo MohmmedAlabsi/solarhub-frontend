@@ -160,7 +160,7 @@ export const useAuthStore = defineStore('auth', () => {
       ...options.headers,
     }
 
-    const activeToken = token.value || (import.meta.client ? (localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token')) : null)
+    const activeToken = token.value
     if (activeToken && !headers.Authorization) {
       headers.Authorization = `Bearer ${activeToken}`
     }
@@ -218,7 +218,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // 2. Fetch using apiRequest with explicit Authorization Bearer token
     try {
-      const activeToken = explicitToken || token.value || (import.meta.client ? (localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token')) : null)
+      const activeToken = explicitToken || token.value
       const res = await apiRequest<any>(`/admin/permissions/users/${targetId}`, {
         headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : {},
       })
@@ -250,7 +250,7 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await apiRequest<any>('/auth/me')
       if (res.success && res.data) {
         setUser(res.data)
-        if (res.data.id && (!res.data.permissions || res.data.permissions.length === 0)) {
+        if (res.data.id && res.data.role === 'admin' && (!res.data.permissions || res.data.permissions.length === 0)) {
           await fetchUserPermissions(res.data.id).catch(() => {})
         }
         return user.value
@@ -282,7 +282,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (res.success && res.data) {
         setAuth(res.data.user, res.data.token)
-        if (res.data.user?.id && (!res.data.user.permissions || res.data.user.permissions.length === 0)) {
+        if (res.data.user?.id && res.data.user.role === 'admin' && (!res.data.user.permissions || res.data.user.permissions.length === 0)) {
           await fetchUserPermissions(res.data.user.id, res.data.token).catch(() => {})
         }
         return { success: true, user: user.value }

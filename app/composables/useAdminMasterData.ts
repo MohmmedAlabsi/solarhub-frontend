@@ -546,7 +546,7 @@ export const useAdminMasterData = () => {
     if (!force && walletProviders.value.length > 0) return walletProviders.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/wallet-providers')
+      const res: any = await $api('/admin/wallet-providers')
       const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
       walletProviders.value = data
       return data
@@ -561,7 +561,7 @@ export const useAdminMasterData = () => {
   const createWalletProvider = async (data: { code: string; name_ar: string; name_en?: string | null; is_active?: boolean; logo_path?: string | null; logo_base64?: string | null; logo_filename?: string | null }): Promise<WalletProvider | null> => {
     isActionLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/wallet-providers', {
+      const res: any = await $api('/admin/wallet-providers', {
         method: 'POST',
         body: data,
       })
@@ -580,7 +580,7 @@ export const useAdminMasterData = () => {
   const updateWalletProvider = async (id: number | string, data: { code?: string; name_ar?: string; name_en?: string | null; is_active?: boolean; logo_path?: string | null; logo_base64?: string | null; logo_filename?: string | null }): Promise<WalletProvider | null> => {
     isActionLoading.value = true
     try {
-      const res: any = await $fetch(`/api/admin/wallet-providers/${id}`, {
+      const res: any = await $api(`/admin/wallet-providers/${id}`, {
         method: 'PUT',
         body: data,
       })
@@ -602,7 +602,7 @@ export const useAdminMasterData = () => {
   const deleteWalletProvider = async (id: number | string): Promise<boolean> => {
     isActionLoading.value = true
     try {
-      const res: any = await $fetch(`/api/admin/wallet-providers/${id}`, {
+      const res: any = await $api(`/admin/wallet-providers/${id}`, {
         method: 'DELETE',
       })
       const message = res?.message || 'تم حذف المحفظة بنجاح'

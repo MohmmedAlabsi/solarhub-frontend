@@ -1,6 +1,7 @@
 import type { AdminOrder, AdminSupplierOrderGroup, AdminOrderProduct } from '../../types/admin'
 
 export const useAdminOrderManagement = () => {
+  const { $api } = useNuxtApp()
   const { notify } = useAdminNotice()
 
   const orders = useState<AdminOrder[]>('admin_management_orders', () => [])
@@ -49,7 +50,7 @@ export const useAdminOrderManagement = () => {
     if (!force && orders.value.length > 0) return orders.value
     isLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/orders', {
+      const res: any = await $api('/admin/orders', {
         query: force ? { force: 'true' } : {}
       })
       const apiData = Array.isArray(res) ? res : (res?.data || [])
@@ -106,7 +107,7 @@ export const useAdminOrderManagement = () => {
 
       try {
         const apiStatus = mapArabicStatusToApi(newStatus)
-        await $fetch(`/api/admin/orders/${orderId}/status`, {
+        await $api(`/admin/orders/${orderId}/status`, {
           method: 'POST',
           body: { status: apiStatus },
         })

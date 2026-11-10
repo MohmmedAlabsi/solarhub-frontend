@@ -1,49 +1,49 @@
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
 
-  // Unified Sanctum Token lookup across SSR and Client
+  // مصدر واحد للتوكن: كوكي auth_token (نفس المرجع الذي يستخدمه stores/auth.ts).
+  // أُزيلت القراءة الاحتياطية من localStorage و document.cookie لأنها كانت قد تعيد
+  // إحياء توكن أُلغي للتو عند وصول طلبات متزامنة بعد استجابة 401.
   const tokenCookie = useCookie<string | null>('auth_token', {
     maxAge: 60 * 60 * 24 * 7, // 7 days
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
   })
 
-  const getActiveToken = (): string | null => {
-    // 1. Direct cookie ref value
-    if (tokenCookie.value) return tokenCookie.value
-
-    // 2. Client-side fallbacks (document.cookie and localStorage)
-    if (import.meta.client) {
-      try {
-        const local = localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token')
-        if (local) {
-          tokenCookie.value = local
-          return local
-        }
-      } catch {
-        /* storage fallback */
-      }
-
-      try {
-        const match = document.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/)
-        if (match && match[1]) {
-          const val = decodeURIComponent(match[1])
-          tokenCookie.value = val
-          return val
-        }
-      } catch {
-        /* cookie fallback */
-      }
-    }
-    return null
-  }
-
   const baseURL =
     (config.public.apiBaseUrl as string) ||
     (config.public.apiBase as string) ||
     'http://127.0.0.1:8000/api'
 
-  let isRedirectingToLogin = false
+  // كل الطلبات الجارية تتشارك هذا المتحكم حتى نلغيها دفعة واحدة عند انتهاء الجلسة
+  let sessionController = import.meta.client ? new AbortController() : null
+  let isHandlingUnauthorized = false
+
+  const handleUnauthorized = async () => {
+    if (!import.meta.client || isHandlingUnauthorized) return
+    isHandlingUnauthorized = true
+
+    // 1. إلغاء بقية طلبات اللوحة بدل انتظار 401 لكل واحد منها
+    sessionController?.abort()
+    sessionController = new AbortController()
+
+    // 2. مسح الجلسة بالكامل: التوكن والمستخدم والصلاحيات (الكوكيز و localStorage و Pinia)
+    try {
+      useAuthStore().clearAuth()
+    } catch {
+      tokenCookie.value = null
+    }
+
+    // 3. تحويل واحد إلى صفحة الدخول
+    try {
+      const route = useRoute()
+      if (!route.path.startsWith('/auth')) {
+        await navigateTo('/auth/login', { replace: true })
+      }
+    } finally {
+      isHandlingUnauthorized = false
+    }
+  }
 
   const apiFetcher = $fetch.create({
     baseURL,
@@ -52,53 +52,29 @@ export default defineNuxtPlugin(() => {
     },
 
     onRequest({ options }) {
-      const token = getActiveToken()
-      if (token) {
-        const headers = new Headers(options.headers)
-        if (!headers.has('Authorization')) {
-          headers.set('Authorization', `Bearer ${token}`)
-        }
-        options.headers = headers
+      const token = tokenCookie.value
+      const headers = new Headers(options.headers)
+      if (token && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${token}`)
+      }
+      options.headers = headers
+
+      if (sessionController && !options.signal) {
+        options.signal = sessionController.signal
       }
     },
 
-    onResponseError({ response }) {
+    onResponseError({ request, response }) {
       const status = response.status
       const data = response._data
 
-      // 401 Unauthorized: Session expired or invalid token
+      // 401: الجلسة منتهية أو التوكن ملغى. الاستثناء الوحيد: طلبات المصادقة نفسها،
+      // فهذه يعالجها stores/auth.ts (initAuth/login/otp).
       if (status === 401) {
-        // Do NOT clear session or redirect if the request was an optional background permission or auth check
-        const reqUrl = response?.url || ''
-        if (
-          reqUrl.includes('/permissions/users/') ||
-          reqUrl.includes('/permissions/admins') ||
-          reqUrl.includes('/auth/me') ||
-          reqUrl.includes('/auth/otp')
-        ) {
-          return
-        }
-
-        tokenCookie.value = null
-        if (import.meta.client) {
-          try {
-            localStorage.removeItem('solarhub_token')
-            localStorage.removeItem('solarhub_user')
-            localStorage.removeItem('auth_token')
-          } catch {
-            /* ignore */
-          }
-
-          const route = useRoute()
-          // Only redirect if not already on auth pages and not already redirecting
-          if (!route.path.startsWith('/auth') && !isRedirectingToLogin) {
-            isRedirectingToLogin = true
-            navigateTo('/auth/login').finally(() => {
-              setTimeout(() => {
-                isRedirectingToLogin = false
-              }, 2000)
-            })
-          }
+        const reqUrl = String(typeof request === 'string' ? request : (request as Request)?.url || response?.url || '')
+        const isAuthEndpoint = reqUrl.includes('/auth/')
+        if (!isAuthEndpoint) {
+          void handleUnauthorized()
         }
       }
 

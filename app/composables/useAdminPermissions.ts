@@ -295,11 +295,7 @@ export const useAdminPermissions = () => {
     isLoading.value = true
     try {
       let res: any
-      try {
-        res = await $api('/admin/permissions')
-      } catch {
-        res = await $fetch('/api/admin/permissions')
-      }
+      res = await $api('/admin/permissions')
       const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
       permissions.value = data
       return data
@@ -360,14 +356,6 @@ export const useAdminPermissions = () => {
         } catch (userErr) {
           console.warn('Could not fetch from /users fallback:', userErr)
         }
-      }
-
-      // 3. Fallback احتياطي عبر المسار الداخلي إذا كان متاحاً
-      if (data.length === 0) {
-        try {
-          const internalRes: any = await $fetch('/api/admin/permissions/admins')
-          data = Array.isArray(internalRes?.data) ? internalRes.data : (Array.isArray(internalRes) ? internalRes : [])
-        } catch {}
       }
 
       // 4. Fallback أدنى لضمان وجود حساب المدير الرئيسي دائماً
@@ -443,17 +431,10 @@ export const useAdminPermissions = () => {
     isSaving.value = true
     try {
       let res: any
-      try {
-        res = await $api(`/admin/permissions/users/${userId}/sync`, {
+      res = await $api(`/admin/permissions/users/${userId}/sync`, {
           method: 'POST',
           body: { permissions: permsToSave },
         })
-      } catch {
-        res = await $fetch(`/api/admin/permissions/users/${userId}/sync`, {
-          method: 'POST',
-          body: { permissions: permsToSave },
-        })
-      }
 
       // تحديث الحالة محلياً للمشرف في القائمة
       const target = adminUsers.value.find(u => String(u.id) === String(userId))
@@ -487,17 +468,10 @@ export const useAdminPermissions = () => {
     isSaving.value = true
     try {
       let res: any
-      try {
-        res = await $api(`/admin/permissions/users/${userId}/role`, {
+      res = await $api(`/admin/permissions/users/${userId}/role`, {
           method: 'POST',
           body: { role },
         })
-      } catch {
-        res = await $fetch(`/api/admin/permissions/users/${userId}/role`, {
-          method: 'POST',
-          body: { role },
-        })
-      }
 
       const target = adminUsers.value.find(u => String(u.id) === String(userId))
       if (target) {

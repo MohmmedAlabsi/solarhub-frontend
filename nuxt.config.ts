@@ -76,15 +76,7 @@ export default defineNuxtConfig({
     defaults: {
       nuxtLink: {
         prefetch: false,
-        noPrefetch: true,
       },
-    },
-  },
-
-  // تعطيل فئة البريفيتش الافتراضية
-  router: {
-    options: {
-      linkPrefetchedClass: undefined,
     },
   },
 

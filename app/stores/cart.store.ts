@@ -33,13 +33,7 @@ export const useCartStore = defineStore('cart', () => {
   const isInitialized = ref(false)
 
   // هل المستخدم مسجل دخول؟
-  const isAuthenticated = computed(() => {
-    if (tokenCookie.value) return true
-    if (import.meta.client) {
-      return Boolean(localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token'))
-    }
-    return false
-  })
+  const isAuthenticated = computed(() => Boolean(tokenCookie.value))
 
   // إجمالي عدد العناصر في السلة
   const totalItemsCount = computed(() => {
@@ -140,7 +134,15 @@ export const useCartStore = defineStore('cart', () => {
   /**
    * جلب سلة المشتريات من مخدم Laravel
    */
-  const fetchCart = async () => {
+  // طلب واحد جارٍ فقط: الهيدر ولوحة العميل يستدعيانه في نفس اللحظة
+  let inflightCartFetch: Promise<void> | null = null
+  const fetchCart = (): Promise<void> => {
+    if (inflightCartFetch) return inflightCartFetch
+    inflightCartFetch = doFetchCart().finally(() => { inflightCartFetch = null })
+    return inflightCartFetch
+  }
+
+  const doFetchCart = async () => {
     if (!isAuthenticated.value) {
       loadLocalCart()
       isInitialized.value = true

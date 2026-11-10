@@ -11,14 +11,14 @@ import {
 } from 'lucide-vue-next'
 import type {
   SupplierProductItem,
-  GovernorateItem,
+  SupplierGovernorateItem,
   UpdateSupplierProductInput,
 } from '~/types/supplier-product'
 
 const props = defineProps<{
   isOpen: boolean
   product: SupplierProductItem | null
-  governorates: GovernorateItem[]
+  governorates: SupplierGovernorateItem[]
   isSubmitting?: boolean
 }>()
 

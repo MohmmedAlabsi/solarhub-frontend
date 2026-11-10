@@ -2,13 +2,13 @@ import { ref, computed, onMounted } from 'vue'
 import type {
   SupplierProductItem,
   MasterProductSummary,
-  GovernorateItem,
+  SupplierGovernorateItem,
   CreateSupplierProductInput,
   UpdateSupplierProductInput,
 } from '~/types/supplier-product'
 
 // دالة ذكية وموثوقة لاستخراج الرابط الكامل لصورة المنتج من Supabase Storage أو البدائل المحلية
-export function resolveProductImage(mp: any): string {
+export function resolveSupplierProductImage(mp: any): string {
   if (Array.isArray(mp?.images) && mp.images.length > 0) {
     const featured = mp.images.find((img: any) => img.is_featured)
     const target = featured || mp.images[0]
@@ -40,7 +40,7 @@ export function useSupplierProducts() {
   const masterCatalog = ref<MasterProductSummary[]>([])
   const categories = ref<string[]>([])
   const brands = ref<string[]>([])
-  const governorates = ref<GovernorateItem[]>([])
+  const governorates = ref<SupplierGovernorateItem[]>([])
 
   const isLoading = ref(false)
   const isActionLoading = ref(false)
@@ -81,7 +81,7 @@ export function useSupplierProducts() {
     const brandName = mp.brand?.name || (typeof mp.brand === 'string' ? mp.brand : 'طاقة شمسية')
     const categoryName = mp.category?.name_ar || (typeof mp.category === 'string' ? mp.category : 'عام')
     const sku = mp.model_number || `SKU-${item.id}`
-    const img = resolveProductImage(mp)
+    const img = resolveSupplierProductImage(mp)
 
     const stock = Number(item.stock_quantity ?? item.stockQuantity ?? 0)
     let status: 'active' | 'out_of_stock' | 'inactive' = 'active'
@@ -186,7 +186,7 @@ export function useSupplierProducts() {
             category: m.category,
             brand: m.brand,
             images: Array.isArray(m.images) ? m.images : [],
-            image: resolveProductImage(m),
+            image: resolveSupplierProductImage(m),
           }))
         }
       }
