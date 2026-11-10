@@ -54,6 +54,11 @@ const {
   stats,
   fetchVisitorData,
 } = useVisitorLanding()
+
+/** عدد حقيقي من الـ API، أو "—" إذا لم يتوفر */
+function formatStat(value: number | null): string {
+  return value === null ? '—' : String(value)
+}
 </script>
 
 <template>
@@ -101,21 +106,21 @@ const {
           <div class="grid grid-cols-3 gap-3 pt-1">
             <div class="p-3 sm:p-4 rounded-2xl bg-white dark:bg-solar-bg-card border border-solar-border-card shadow-2xs text-center">
               <span class="block text-xl sm:text-2xl font-black font-mono text-solar-navy-dark dark:text-solar-yellow">
-                {{ stats.totalProducts }}+
+                {{ formatStat(stats.totalProducts) }}
               </span>
               <span class="text-[11px] font-bold text-solar-text-muted mt-0.5 block">منتج معتمد</span>
             </div>
 
             <div class="p-3 sm:p-4 rounded-2xl bg-white dark:bg-solar-bg-card border border-solar-border-card shadow-2xs text-center">
               <span class="block text-xl sm:text-2xl font-black font-mono text-solar-navy-dark dark:text-solar-yellow">
-                {{ stats.totalStores }}+
+                {{ formatStat(stats.totalStores) }}
               </span>
               <span class="text-[11px] font-bold text-solar-text-muted mt-0.5 block">متجر ووكيل</span>
             </div>
 
             <div class="p-3 sm:p-4 rounded-2xl bg-white dark:bg-solar-bg-card border border-solar-border-card shadow-2xs text-center">
               <span class="block text-xl sm:text-2xl font-black font-mono text-solar-navy-dark dark:text-solar-yellow">
-                {{ stats.totalEngineers }}+
+                {{ formatStat(stats.totalEngineers) }}
               </span>
               <span class="text-[11px] font-bold text-solar-text-muted mt-0.5 block">مهندس مرخص</span>
             </div>
@@ -338,7 +343,7 @@ const {
           to="/products"
           class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0 hover:border-solar-yellow self-start sm:self-auto"
         >
-          <span>عرض الكتالوج بالكامل (+{{ stats.totalProducts }})</span>
+          <span>عرض الكتالوج بالكامل<template v-if="stats.totalProducts !== null"> ({{ stats.totalProducts }})</template></span>
           <ArrowLeft class="size-3.5" />
         </NuxtLink>
       </div>
@@ -384,7 +389,7 @@ const {
                     loading="lazy"
                     @error="(e) => ((e.target as HTMLImageElement).src = '/images/hero-solar.png')"
                   />
-                  <span class="absolute bottom-2 left-2 rounded-md bg-solar-bg-card/90 px-2.5 py-1 text-[10px] font-bold text-solar-navy-dark dark:text-solar-yellow border border-solar-border-card/40 shadow-xs backdrop-blur-2xs">
+                  <span v-if="product.brand" class="absolute bottom-2 left-2 rounded-md bg-solar-bg-card/90 px-2.5 py-1 text-[10px] font-bold text-solar-navy-dark dark:text-solar-yellow border border-solar-border-card/40 shadow-xs backdrop-blur-2xs">
                     {{ product.brand }}
                   </span>
                   <span
@@ -398,9 +403,9 @@ const {
                 <!-- التقييم والنوع -->
                 <div class="flex items-center justify-between gap-2 text-xs mb-1.5">
                   <span class="text-solar-text-muted text-[11px] font-medium truncate">{{ product.category }}</span>
-                  <div class="flex items-center gap-1 font-bold text-amber-500">
+                  <div v-if="product.rating !== null" class="flex items-center gap-1 font-bold text-amber-500">
                     <Star class="size-3.5 fill-amber-400 text-amber-400" />
-                    <span>{{ product.rating ?? 4.85 }}</span>
+                    <span>{{ product.rating }}</span>
                   </div>
                 </div>
 
@@ -416,7 +421,7 @@ const {
                 <!-- المتجر والموقع -->
                 <div class="flex items-center gap-1.5 text-[11px] text-solar-text-muted mb-4">
                   <Store class="size-3.5 shrink-0 text-solar-navy-dark dark:text-solar-yellow" />
-                  <span class="truncate">{{ product.storeName }} ({{ product.governorateName }})</span>
+                  <span class="truncate">{{ product.storeName }}<template v-if="product.governorateName"> ({{ product.governorateName }})</template></span>
                 </div>
               </div>
 
@@ -472,7 +477,7 @@ const {
           to="/stores"
           class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0 hover:border-solar-yellow self-start sm:self-auto"
         >
-          <span>دليل المتاجر بالكامل ({{ stats.totalStores }})</span>
+          <span>دليل المتاجر بالكامل<template v-if="stats.totalStores !== null"> ({{ stats.totalStores }})</template></span>
           <ArrowLeft class="size-3.5" />
         </NuxtLink>
       </div>
@@ -509,7 +514,7 @@ const {
                       <h3 class="text-sm font-black text-solar-text-heading line-clamp-1 group-hover:text-solar-navy dark:group-hover:text-solar-yellow transition-colors">
                         {{ store.companyName }}
                       </h3>
-                      <p class="text-[11px] text-solar-text-muted flex items-center justify-end gap-1">
+                      <p v-if="store.governorateName" class="text-[11px] text-solar-text-muted flex items-center justify-end gap-1">
                         <MapPin class="size-3" />
                         <span>{{ store.governorateName }}</span>
                       </p>
@@ -529,24 +534,30 @@ const {
                 <!-- إحصائيات المتجر -->
                 <div class="grid grid-cols-2 gap-2 text-center p-3 rounded-2xl bg-solar-bg-subtle/80 mb-4 border border-solar-border-card/30">
                   <div>
-                    <span class="block text-sm font-black text-solar-navy-dark dark:text-solar-yellow">{{ store.productsCount ?? 12 }}+</span>
-                    <span class="text-[10px] text-solar-text-muted">منتج معتمد</span>
+                    <span class="block text-sm font-black text-solar-navy-dark dark:text-solar-yellow">{{ store.productsCount ?? '—' }}</span>
+                    <span class="text-[10px] text-solar-text-muted">منتج نشط</span>
                   </div>
                   <div class="border-r border-solar-border-card">
-                    <span class="block text-sm font-black text-amber-500">★ {{ store.rating }}</span>
-                    <span class="text-[10px] text-solar-text-muted">تقييم المعتمدين</span>
+                    <template v-if="store.rating !== null">
+                      <span class="block text-sm font-black text-amber-500">★ {{ store.rating }}</span>
+                      <span class="text-[10px] text-solar-text-muted">{{ store.ratingsCount }} تقييم</span>
+                    </template>
+                    <template v-else>
+                      <span class="block text-sm font-black text-solar-text-muted">—</span>
+                      <span class="text-[10px] text-solar-text-muted">لا تقييمات بعد</span>
+                    </template>
                   </div>
                 </div>
 
                 <!-- نبذة المتجر -->
-                <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mb-4">
+                <p v-if="store.bio" class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mb-4">
                   {{ store.bio }}
                 </p>
 
                 <!-- الوسوم والماركات -->
-                <div class="flex flex-wrap gap-1.5 mb-5">
+                <div v-if="store.tags.length" class="flex flex-wrap gap-1.5 mb-5">
                   <span
-                    v-for="tag in (store.tags || ['ألواح شمسية', 'إنفرترات', 'بطاريات'])"
+                    v-for="tag in store.tags"
                     :key="tag"
                     class="rounded-lg bg-solar-bg-card border border-solar-border-card/60 px-2.5 py-0.5 text-[10px] text-solar-text-body font-medium"
                   >
@@ -598,7 +609,7 @@ const {
           to="/engineers"
           class="btn-outline px-4 py-2 text-xs font-bold gap-1.5 shrink-0 hover:border-solar-yellow self-start sm:self-auto"
         >
-          <span>دليل المهندسين بالكامل ({{ stats.totalEngineers }})</span>
+          <span>دليل المهندسين بالكامل<template v-if="stats.totalEngineers !== null"> ({{ stats.totalEngineers }})</template></span>
           <ArrowLeft class="size-3.5" />
         </NuxtLink>
       </div>
@@ -644,8 +655,8 @@ const {
                 <!-- الاسم والتخصص والوصف -->
                 <div class="text-right mb-3">
                   <h3 class="text-base font-black text-solar-text-heading group-hover:text-solar-navy dark:group-hover:text-solar-yellow transition-colors">{{ eng.name }}</h3>
-                  <p class="text-xs font-bold text-solar-navy-dark dark:text-solar-yellow mt-0.5">{{ eng.specialization }}</p>
-                  <p class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mt-1.5">
+                  <p v-if="eng.specialization" class="text-xs font-bold text-solar-navy-dark dark:text-solar-yellow mt-0.5">{{ eng.specialization }}</p>
+                  <p v-if="eng.bio" class="text-xs text-solar-text-body line-clamp-2 leading-relaxed mt-1.5">
                     {{ eng.bio }}
                   </p>
                 </div>
@@ -654,19 +665,23 @@ const {
                 <div class="grid grid-cols-2 gap-2 text-[11px] text-solar-text-muted border-y border-solar-border-card/60 py-3 mb-4">
                   <span class="flex items-center gap-1.5 truncate">
                     <Clock class="size-3.5 text-solar-navy-dark dark:text-solar-yellow shrink-0" />
-                    {{ eng.yearsOfExperience }}+ سنوات خبرة
+                    <template v-if="eng.yearsOfExperience !== null">{{ eng.yearsOfExperience }} سنوات خبرة</template>
+                    <template v-else>الخبرة غير محددة</template>
                   </span>
                   <span class="flex items-center gap-1.5 truncate">
                     <MapPin class="size-3.5 text-solar-navy-dark dark:text-solar-yellow shrink-0" />
-                    {{ eng.governorateName }}
+                    {{ eng.governorateName ?? '—' }}
                   </span>
                   <span class="flex items-center gap-1.5">
                     <Star class="size-3.5 fill-amber-400 text-amber-400 shrink-0" />
-                    <span class="font-bold text-solar-text-heading">{{ eng.rating }}</span> ({{ eng.ratingsCount }} تقييم)
+                    <template v-if="eng.rating !== null">
+                      <span class="font-bold text-solar-text-heading">{{ eng.rating }}</span> ({{ eng.ratingsCount }} تقييم)
+                    </template>
+                    <template v-else>لا تقييمات بعد</template>
                   </span>
-                  <span class="flex items-center gap-1.5 font-semibold text-solar-navy-dark dark:text-solar-yellow">
+                  <span v-if="eng.licenseNumber" class="flex items-center gap-1.5 font-semibold text-solar-navy-dark dark:text-solar-yellow truncate">
                     <Award class="size-3.5 text-solar-yellow shrink-0" />
-                    {{ eng.projectsCount ?? 18 }} مشروع منجز
+                    ترخيص {{ eng.licenseNumber }}
                   </span>
                 </div>
               </div>
