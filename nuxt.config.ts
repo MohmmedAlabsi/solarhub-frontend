@@ -65,7 +65,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: 'http://127.0.0.1:8000/api',
-      apiBaseUrl: 'http://127.0.0.1:8000/api',
+      // يُضبط عبر NUXT_PUBLIC_API_BASE في .env (مثلاً http://solarhub-api.test/api مع Herd)
+      // apiBaseUrl فارغ افتراضياً حتى يكون apiBase هو المصدر الوحيد (كل الكود يستخدم apiBaseUrl || apiBase)
+      apiBaseUrl: '',
       appName: 'SolarHub',
     }
   },
