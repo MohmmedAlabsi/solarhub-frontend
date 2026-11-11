@@ -41,7 +41,7 @@ function mapStatus(status: string): OfferStatus {
 function formatDate(dateString: string): string {
   try {
     const d = new Date(dateString)
-    return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })
+    return d.toLocaleDateString('ar-YE', { day: 'numeric', month: 'long', year: 'numeric' })
   } catch {
     return dateString || 'مؤخراً'
   }

@@ -251,7 +251,7 @@ onMounted(async () => {
                   {{ getStatusBadge(order.status).text }}
                 </span>
                 <span class="text-xs text-solar-text-muted">
-                  {{ new Date(order.created_at).toLocaleDateString('ar-SA') }}
+                  {{ new Date(order.created_at).toLocaleDateString('ar-YE') }}
                 </span>
               </div>
 
@@ -335,7 +335,7 @@ onMounted(async () => {
                   {{ getStatusBadge(quote.status).text }}
                 </span>
                 <span class="text-xs text-solar-text-muted">
-                  {{ new Date(quote.created_at).toLocaleDateString('ar-SA') }}
+                  {{ new Date(quote.created_at).toLocaleDateString('ar-YE') }}
                 </span>
               </div>
 

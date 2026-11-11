@@ -158,7 +158,7 @@
                 v-model="form.walletProviderName"
                 type="text"
                 required
-                placeholder="مثال: مصرف الراجحي / البنك الأهلي / بنك التضامن"
+                placeholder="مثال: بنك الكريمي / بنك التضامن"
                 class="solar-input w-full p-2.5 text-xs rounded-xl"
               />
             </div>
@@ -171,7 +171,7 @@
                 v-model="form.accountNumber"
                 type="text"
                 required
-                placeholder="SAXX XXXX XXXX XXXX XXXX XXXX"
+                placeholder="رقم الحساب البنكي أو IBAN"
                 class="solar-input w-full p-2.5 text-xs font-mono uppercase rounded-xl"
               />
             </div>

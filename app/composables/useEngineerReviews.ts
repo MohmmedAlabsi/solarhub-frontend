@@ -20,7 +20,7 @@ function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return 'مؤخراً'
   try {
     const d = new Date(dateStr)
-    return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })
+    return d.toLocaleDateString('ar-YE', { day: 'numeric', month: 'long', year: 'numeric' })
   } catch {
     return dateStr
   }
