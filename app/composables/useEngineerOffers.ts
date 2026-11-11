@@ -131,8 +131,18 @@ export function useEngineerOffers() {
     fetchOffers()
   })
 
+  // تصدير العروض المعروضة حالياً (بعد البحث والفلترة) إلى CSV
+  function exportCsv() {
+    downloadAdminCsv(
+      'عروضي_الهندسية',
+      ['رقم العرض', 'رقم الطلب', 'عنوان الطلب', 'التكلفة (ر.ي)', 'مدة التنفيذ (يوم)', 'تاريخ التقديم', 'الحالة'],
+      filtered.value.map(o => [o.id, o.requestId, o.requestTitle, o.totalCost, o.durationDays, o.submittedAt, statusLabels[o.status] ?? o.status]),
+    )
+  }
+
   return {
     offers,
+    exportCsv,
     search,
     statusFilter,
     filtered,

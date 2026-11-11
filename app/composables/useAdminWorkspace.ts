@@ -1,19 +1,16 @@
 import type { MaybeRefOrGetter } from 'vue'
-import type { AdminApproval, AdminAudience, AdminBroadcast, AdminDisplayPreferences, AdminEngineer, AdminPlatformSettings, AdminReview, AdminServiceRequest, AdminServiceStatus, AdminSupplier, AdminUser, AdminOrder } from '../../types/admin'
-import { adminBroadcasts, adminEngineerReviews, adminEngineers, adminServices, adminSupplierReviews, adminSuppliers, adminUsers } from '../data/admin-workspace'
+import type { AdminApproval, AdminAudience, AdminDisplayPreferences, AdminServiceStatus } from '../../types/admin'
 
+// حالة واجهة الإدارة المحلية فقط (تفضيلات العرض). كل البيانات تأتي من الـ API.
+// (أُزيلت مصفوفات البيانات الوهمية users/suppliers/engineers/services/reviews/broadcasts والإعدادات المخترعة.)
 interface AdminWorkspaceData {
-  users: AdminUser[]; suppliers: AdminSupplier[]; engineers: AdminEngineer[]; services: AdminServiceRequest[]
-  supplierReviews: AdminReview[]; engineerReviews: AdminReview[]; broadcasts: AdminBroadcast[]
-  settings: AdminPlatformSettings; preferences: AdminDisplayPreferences
+  preferences: AdminDisplayPreferences
 }
 export const approvalLabels: Record<AdminApproval,string> = {approved:'معتمد',pending:'قيد المراجعة',rejected:'مرفوض'}
 export const serviceStatusLabels: Record<AdminServiceStatus,string> = {open:'مفتوح لاستقبال العروض',awarded:'تمت الترسية',executing:'قيد التنفيذ',completed:'مكتمل',cancelled:'ملغي'}
 export const audienceLabels: Record<AdminAudience,string> = {all:'جميع المستخدمين',customers:'العملاء',suppliers:'الموردون والوكلاء',engineers:'المهندسون المعتمدون',specific:'مستخدم محدد'}
 export function useAdminWorkspace() {
   return useState<AdminWorkspaceData>('admin-workspace',()=>({
-    users:structuredClone(adminUsers),suppliers:structuredClone(adminSuppliers),engineers:structuredClone(adminEngineers),services:structuredClone(adminServices),supplierReviews:structuredClone(adminSupplierReviews),engineerReviews:structuredClone(adminEngineerReviews),broadcasts:structuredClone(adminBroadcasts),
-    settings:{nameAr:'منصة سولار هب (Solar Hub)',nameEn:'Solar Hub Platform',email:'support@solarhub.sa',phone:'8001234567',maintenance:false},
     preferences:{language:'ar',theme:'light',density:'comfortable'},
   }))
 }

@@ -397,39 +397,36 @@ export function useSupplierProducts() {
     const target = products.value.find(p => p.id === id)
     if (!target) return
 
-    const previousStatus = target.status
     const newStatus: 'active' | 'inactive' = target.status === 'active' ? 'inactive' : 'active'
-    target.status = newStatus
 
+    // لا نغيّر الحالة في الواجهة إلا بعد نجاح الطلب؛ عند الفشل تبقى كما هي مع رسالة الخطأ
     try {
       await $api<any>(`/store-products/${id}`, {
         method: 'PUT',
         body: { status: newStatus },
       })
+      target.status = newStatus
       showNotice(newStatus === 'active' ? 'تم تنشيط المنتج وعرضه في المتجر.' : 'تم إخفاء المنتج مؤقتاً.')
-    } catch (err) {
-      // Revert if error
+    } catch (err: any) {
       console.warn('API toggle failed:', err)
-      showNotice(newStatus === 'active' ? 'تم تنشيط المنتج محلياً.' : 'تم تعطيل المنتج محلياً.')
+      showNotice(err?.data?.userMessage || err?.data?.message || 'تعذر تغيير حالة المنتج، لم يتم حفظ أي تغيير. حاول مرة أخرى.')
     }
   }
 
   // 6. حذف المنتج من المتجر
   async function deleteProduct(id: number) {
-    const prevIndex = products.value.findIndex(p => p.id === id)
-    if (prevIndex === -1) return
+    if (!products.value.some(p => p.id === id)) return
 
-    const removedItem = products.value[prevIndex]
-    products.value.splice(prevIndex, 1)
-
+    // لا نحذف من القائمة إلا بعد نجاح الطلب؛ عند الفشل يبقى المنتج ظاهراً مع رسالة الخطأ
     try {
       await $api<any>(`/store-products/${id}`, {
         method: 'DELETE',
       })
+      products.value = products.value.filter(p => p.id !== id)
       showNotice('تم حذف المنتج من متجرك بنجاح.')
     } catch (err: any) {
       console.warn('API delete failed:', err)
-      showNotice(err?.data?.message || 'تم حذف المنتج من العرض.')
+      showNotice(err?.data?.userMessage || err?.data?.message || 'تعذر حذف المنتج، لم يتم حذف أي شيء. حاول مرة أخرى.')
     }
   }
 

@@ -22,6 +22,7 @@ const {
   statusLabels,
   statusClasses,
   fetchOffers,
+  exportCsv,
 } = useEngineerOffers()
 
 // حالة المودال
@@ -87,6 +88,7 @@ const filterOptions = [
       <button
         type="button"
         class="flex items-center gap-2 rounded-lg bg-solar-navy-dark px-4 py-2 text-sm font-semibold text-white hover:bg-solar-navy transition-colors"
+        @click="exportCsv"
       >
         <Download class="size-4" aria-hidden="true" />
         تصدير البيانات
