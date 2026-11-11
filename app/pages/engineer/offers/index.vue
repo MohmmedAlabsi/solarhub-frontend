@@ -36,10 +36,18 @@ function openDetail(offer: EngineerOffer) {
 }
 
 // بعد بدء التنفيذ أو الإبلاغ بالإنهاء: إعادة تحميل العروض وتحديث العرض المفتوح في النافذة
-async function handleOfferUpdated() {
-  const id = selectedOffer.value?.rawId
+async function handleOfferUpdated(request: { status?: string; started_at?: string | null; engineer_completed_at?: string | null }) {
+  const current = selectedOffer.value
+  if (!current) return
+  // تحديث فوري للنافذة من استجابة الخادم حتى لا يبقى الزر القديم ظاهراً أثناء إعادة التحميل
+  selectedOffer.value = {
+    ...current,
+    requestStatus: request.status ?? current.requestStatus,
+    requestStartedAt: request.started_at ?? current.requestStartedAt,
+    requestDoneAt: request.engineer_completed_at ?? current.requestDoneAt,
+  }
   await fetchOffers()
-  selectedOffer.value = offers.value.find(o => o.rawId === id) ?? selectedOffer.value
+  selectedOffer.value = offers.value.find(o => o.rawId === current.rawId) ?? selectedOffer.value
 }
 
 const startIndex = computed(() => (currentPage.value - 1) * pageSize + 1)

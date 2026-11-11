@@ -10,7 +10,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
   (e: 'withdrawn', offerId: number): void
-  (e: 'updated'): void
+  (e: 'updated', request: { status?: string; started_at?: string | null; engineer_completed_at?: string | null }): void
 }>()
 
 const { $api } = useNuxtApp()
@@ -46,7 +46,8 @@ async function runLifecycleAction() {
     const res: any = await $api(`/service-requests/${props.offer.rawRequestId}/${pendingAction.value}`, { method: 'POST' })
     actionNotice.value = res?.message || (pendingAction.value === 'start' ? 'تم بدء التنفيذ.' : 'تم إبلاغ العميل بإنهاء العمل.')
     pendingAction.value = null
-    emit('updated')
+    // تحديث فوري من الاستجابة نفسها (الطلب المحدَّث)، ثم تعيد الصفحة تحميل القائمة في الخلفية
+    emit('updated', res?.data || {})
   } catch (err: any) {
     actionError.value = err?.data?.message || 'تعذر تنفيذ الإجراء، حاول مرة أخرى.'
   } finally {
