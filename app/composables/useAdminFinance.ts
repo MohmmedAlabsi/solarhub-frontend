@@ -1,9 +1,13 @@
 import type { OrderPayment, StorePayout, PlatformSetting } from '../../types/api'
 
+/**
+ * كل الطلبات تذهب لمسارات Laravel المحمية (auth + admin + permission)
+ * بدل مسارات خادم Nuxt القديمة /api/admin/* التي كانت تعدّل قاعدة البيانات بدون مصادقة.
+ */
 export const useAdminFinance = () => {
   const { $api } = useNuxtApp()
   const { notify } = useAdminNotice()
-
+  
   const payments = useState<OrderPayment[]>('admin_finance_payments', () => [])
   const payouts = useState<StorePayout[]>('admin_finance_payouts', () => [])
   const stats = useState<any>('admin_finance_stats', () => null)
@@ -36,9 +40,9 @@ export const useAdminFinance = () => {
    */
   const updatePaymentStatus = async (paymentId: number | string, newStatus: 'verified' | 'rejected' | 'pending'): Promise<boolean> => {
     isActionLoading.value = true
+    const target = payments.value.find(p => String(p.id) === String(paymentId))
+    const oldStatus = target?.status
     try {
-      const target = payments.value.find(p => String(p.id) === String(paymentId))
-      const oldStatus = target?.status
       if (target) {
         target.status = newStatus // Optimistic instant update
         if (newStatus === 'verified') {
@@ -46,8 +50,12 @@ export const useAdminFinance = () => {
         }
       }
 
-      await $api(`/admin/finance/payments/${paymentId}/status`, {
-        method: 'POST',
+      if (newStatus === 'pending') {
+        throw new Error('لا يمكن إرجاع الدفعة إلى حالة قيد المراجعة بعد البت فيها.')
+      }
+
+      await $api(`/order_payments/${paymentId}/status`, {
+        method: 'PATCH',
         body: { status: newStatus },
       })
 
@@ -55,7 +63,8 @@ export const useAdminFinance = () => {
       notify(`تم تحديث حالة الدفعة #${paymentId} إلى "${statusAr}" بنجاح`)
       return true
     } catch (err: any) {
-      notify(err?.message || 'تعذر تحديث حالة الدفعة')
+      if (target && oldStatus) target.status = oldStatus // التراجع عن التحديث المتفائل
+      notify(err?.data?.userMessage || err?.message || 'تعذر تحديث حالة الدفعة')
       return false
     } finally {
       isActionLoading.value = false
@@ -86,24 +95,31 @@ export const useAdminFinance = () => {
    */
   const updatePayoutStatus = async (payoutId: number | string, status: 'completed' | 'pending' | 'failed', transferReference?: string): Promise<boolean> => {
     isActionLoading.value = true
+    const payoutTarget = payouts.value.find(p => String(p.id) === String(payoutId))
+    const oldPayoutStatus = payoutTarget?.status
     try {
-      const target = payouts.value.find(p => String(p.id) === String(payoutId))
+      const target = payoutTarget
       if (target) {
         target.status = status // Optimistic instant update
         if (transferReference) target.transfer_reference = transferReference
         if (status === 'completed') target.paid_at = new Date().toISOString()
       }
 
-      await $api(`/admin/finance/payouts/${payoutId}/status`, {
-        method: 'POST',
-        body: { status, transfer_reference: transferReference },
+      if (status === 'pending') {
+        throw new Error('لا يمكن إرجاع المستحقات إلى حالة الانتظار بعد البت فيها.')
+      }
+
+      await $api(`/store_payouts/${payoutId}`, {
+        method: 'PUT',
+        body: { status, transfer_reference: transferReference || undefined },
       })
 
       const statusAr = status === 'completed' ? 'تم الصرف بنجاح' : (status === 'failed' ? 'فشل الصرف' : 'قيد الانتظار')
       notify(`تم تحديث سجل المستحقات #${payoutId} إلى "${statusAr}"`)
       return true
     } catch (err: any) {
-      notify(err?.message || 'تعذر تحديث حالة مستحقات المورد')
+      if (payoutTarget && oldPayoutStatus) payoutTarget.status = oldPayoutStatus
+      notify(err?.data?.userMessage || err?.message || 'تعذر تحديث حالة مستحقات المورد')
       return false
     } finally {
       isActionLoading.value = false
@@ -133,7 +149,7 @@ export const useAdminFinance = () => {
     if (!force && settings.value) return settings.value
     isLoading.value = true
     try {
-      const res: any = await $api('/admin/finance/settings')
+      const res: any = await $api('/settings')
       if (res?.data) {
         settings.value = res.data
       }
@@ -152,8 +168,8 @@ export const useAdminFinance = () => {
   const updateSettings = async (payload: Partial<PlatformSetting>): Promise<boolean> => {
     isActionLoading.value = true
     try {
-      const res: any = await $api('/admin/finance/settings', {
-        method: 'POST',
+      const res: any = await $api('/settings', {
+        method: 'PUT',
         body: payload,
       })
       if (res?.data) {

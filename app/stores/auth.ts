@@ -58,13 +58,8 @@ export const useAuthStore = defineStore('auth', () => {
   const apiBase = (config.public.apiBaseUrl as string) || (config.public.apiBase as string) || 'http://127.0.0.1:8000/api'
 
   function setAuth(newUser: any, newToken: string) {
+    // التوكن يُحفظ في الكوكي فقط (مصدر واحد)، وليس في localStorage.
     token.value = newToken
-    if (import.meta.client) {
-      try {
-        localStorage.setItem('solarhub_token', newToken)
-        localStorage.setItem('auth_token', newToken)
-      } catch {}
-    }
     setUser(newUser)
     isInitialized.value = true
   }
@@ -96,28 +91,12 @@ export const useAuthStore = defineStore('auth', () => {
       if (Array.isArray(newUser.permissions) && newUser.permissions.length > 0) {
         authPermissionsCookie.value = newUser.permissions
       }
-      if (import.meta.client) {
-        try {
-          localStorage.setItem('solarhub_user', JSON.stringify(normalizedUser))
-        } catch {}
-      }
     }
     isInitialized.value = true
   }
 
   function setToken(newToken: string | null) {
     token.value = newToken
-    if (import.meta.client) {
-      try {
-        if (newToken) {
-          localStorage.setItem('solarhub_token', newToken)
-          localStorage.setItem('auth_token', newToken)
-        } else {
-          localStorage.removeItem('solarhub_token')
-          localStorage.removeItem('auth_token')
-        }
-      } catch {}
-    }
   }
 
   function clearAuth() {
@@ -187,8 +166,8 @@ export const useAuthStore = defineStore('auth', () => {
         message = 'البريد الإلكتروني مسجل مسبقاً في المنصة'
       } else if (errors.phone && errors.phone[0]?.includes('already been taken')) {
         message = 'رقم الجوال مسجل مسبقاً في المنصة'
-      } else if (errors.password) {
-        message = 'كلمة المرور يجب أن تتكون من 8 خانات على الأقل، وتحتوي على أحرف كبيرة وصغيرة وأرقام'
+      } else if (errors.password && Array.isArray(errors.password)) {
+        message = errors.password[0] || message
       }
 
       error.value = message
@@ -209,6 +188,11 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchUserPermissions(userId?: string | number, explicitToken?: string): Promise<string[]> {
     const targetId = userId || user.value?.id
     if (!targetId) return []
+
+    // مسار الصلاحيات خاص بالإدارة؛ لغير المدراء يُرجع 403 فلا داعي لطلبه.
+    if (user.value && String(user.value.id) === String(targetId) && user.value.role !== 'admin') {
+      return Array.isArray(user.value.permissions) ? user.value.permissions : []
+    }
 
     // 1. If permissions already exist on user object, sync cookie and return immediately
     if (user.value && String(user.value.id) === String(targetId) && Array.isArray(user.value.permissions) && user.value.permissions.length > 0) {
@@ -355,9 +339,9 @@ export const useAuthStore = defineStore('auth', () => {
         formData.append('password', engPayload.password)
         formData.append('password_confirmation', engPayload.password_confirmation)
         
-        // License number (required by backend)
-        const license = engPayload.licenseNumber || engPayload.license_number || `SCE-${Math.floor(100000 + Math.random() * 900000)}`
-        formData.append('license_number', license)
+        // رقم الترخيص يُرسل كما أدخله المستخدم فقط (كان يُولَّد رقم عشوائي مزيف إذا تُرك فارغاً)
+        const license = (engPayload.licenseNumber || engPayload.license_number || '').trim()
+        if (license) formData.append('license_number', license)
 
         // Governorate & Coordinates
         if (engPayload.governorate) formData.append('governorate', engPayload.governorate)
@@ -406,19 +390,20 @@ export const useAuthStore = defineStore('auth', () => {
         formData.append('phone', supPayload.phone.trim())
         formData.append('password', supPayload.password)
         formData.append('password_confirmation', supPayload.password_confirmation)
-        formData.append('company_name', supPayload.companyName?.trim() || supPayload.name.trim())
+        const companyName = (supPayload.companyName || supPayload.company_name || '').trim()
+        if (companyName) formData.append('company_name', companyName)
 
-        // Commercial registry (required by backend)
-        const reg = supPayload.commercialRegistry || supPayload.commercial_registry || `CR-${Math.floor(1000000000 + Math.random() * 9000000000)}`
-        formData.append('commercial_registry', reg)
+        // السجل التجاري يُرسل كما أدخله المستخدم فقط (كان يُولَّد رقم عشوائي مزيف إذا تُرك فارغاً)
+        const reg = (supPayload.commercialRegistry || supPayload.commercial_registry || '').trim()
+        if (reg) formData.append('commercial_registry', reg)
 
         // Store type: wholesaler, retailer, authorized_agent
         const storeType = supPayload.storeType || supPayload.store_type || 'retailer'
         formData.append('store_type', storeType)
 
         // Address details & Governorate
-        const address = supPayload.addressDetails || supPayload.address_details || supPayload.location?.address || supPayload.governorate || 'صنعاء'
-        formData.append('address_details', address)
+        const address = (supPayload.addressDetails || supPayload.address_details || supPayload.location?.address || '').trim()
+        if (address) formData.append('address_details', address)
         if (supPayload.governorate) formData.append('governorate', supPayload.governorate)
         if (supPayload.governorate_id) formData.append('governorate_id', String(supPayload.governorate_id))
 

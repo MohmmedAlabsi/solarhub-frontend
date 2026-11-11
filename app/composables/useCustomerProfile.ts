@@ -189,11 +189,18 @@ export const useCustomerProfile = () => {
     statusMessage.value = ''
   }
 
+  // كان هذا الزر وهمياً (setTimeout ثم رسالة نجاح). الآن يحذف فعلياً كل التوكنات ما عدا الجلسة الحالية.
   const terminateOtherSessions = async () => {
     terminatingSessions.value = true
-    await new Promise(resolve => setTimeout(resolve, 350))
-    terminatingSessions.value = false
-    statusMessage.value = 'تم إنهاء كافة الجلسات الأخرى بنجاح.'
+    try {
+      const { $api } = useNuxtApp()
+      const res: any = await $api('/my/sessions/revoke-others', { method: 'POST' })
+      statusMessage.value = res?.message || 'تم إنهاء كافة الجلسات الأخرى بنجاح.'
+    } catch (err: any) {
+      statusMessage.value = err?.data?.userMessage || 'تعذر إنهاء الجلسات الأخرى، حاول مرة أخرى.'
+    } finally {
+      terminatingSessions.value = false
+    }
   }
 
   watch(form, () => {

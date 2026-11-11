@@ -3,7 +3,7 @@ import type { AdminOrder, AdminSupplierOrderGroup, AdminOrderProduct } from '../
 export const useAdminOrderManagement = () => {
   const { $api } = useNuxtApp()
   const { notify } = useAdminNotice()
-
+  
   const orders = useState<AdminOrder[]>('admin_management_orders', () => [])
   const isLoading = ref(false)
   const isActionLoading = ref(false)
@@ -26,7 +26,7 @@ export const useAdminOrderManagement = () => {
     switch (status) {
       case 'قيد المعالجة': return 'pending'
       case 'قيد التجهيز والشحن': return 'processing'
-      case 'تم التسليم': return 'delivered'
+      case 'تم التسليم': return 'completed'
       case 'مكتمل': return 'completed'
       case 'ملغي': return 'cancelled'
       default: return 'pending'
@@ -50,9 +50,8 @@ export const useAdminOrderManagement = () => {
     if (!force && orders.value.length > 0) return orders.value
     isLoading.value = true
     try {
-      const res: any = await $api('/admin/orders', {
-        query: force ? { force: 'true' } : {}
-      })
+      // مسار Laravel محمي (بدل /api/admin/orders في خادم Nuxt بدون مصادقة)
+      const res: any = await $api('/admin/orders')
       const apiData = Array.isArray(res) ? res : (res?.data || [])
       
       const transformed: AdminOrder[] = apiData.map((o: any) => ({
@@ -101,24 +100,22 @@ export const useAdminOrderManagement = () => {
     isActionLoading.value = true
     try {
       const target = orders.value.find(o => o.id === orderId || o.orderNumber === orderId)
-      if (target) {
-        target.status = newStatus // تحديث فوري وسريع (Optimistic UI)
-      }
+      const apiStatus = mapArabicStatusToApi(newStatus)
 
-      try {
-        const apiStatus = mapArabicStatusToApi(newStatus)
-        await $api(`/admin/orders/${orderId}/status`, {
-          method: 'POST',
-          body: { status: apiStatus },
-        })
-      } catch (apiErr) {
-        console.warn('Status update backend warning:', apiErr)
+      // لا نُظهر نجاحاً قبل أن يؤكده الخادم (كان الخطأ يُتجاهل ويظهر "تم بنجاح" دائماً)
+      await $api(`/admin/orders/${target?.id || orderId}/status`, {
+        method: 'PATCH',
+        body: { status: apiStatus },
+      })
+
+      if (target) {
+        target.status = mapApiStatusToArabic(apiStatus)
       }
 
       notify(`تم تحديث حالة طلب الشراء #${target?.orderNumber || orderId} إلى "${newStatus}" بنجاح`)
       return true
     } catch (err: any) {
-      notify(err?.userMessage || 'تعذر تحديث حالة الطلب')
+      notify(err?.data?.userMessage || err?.message || 'تعذر تحديث حالة الطلب')
       return false
     } finally {
       isActionLoading.value = false
@@ -130,7 +127,7 @@ export const useAdminOrderManagement = () => {
    */
   const exportOrdersCsv = () => {
     if (!orders.value.length) return
-    const headers = ['رقم الطلب', 'اسم العميل', 'المحافظة', 'العنوان', 'الإجمالي (ر.س)', 'الحالة', 'تاريخ الطلب']
+    const headers = ['رقم الطلب', 'اسم العميل', 'المحافظة', 'العنوان', 'الإجمالي (ر.ي)', 'الحالة', 'تاريخ الطلب']
     const rows = orders.value.map(o => [
       o.orderNumber,
       `"${o.customerName.replace(/"/g, '""')}"`,

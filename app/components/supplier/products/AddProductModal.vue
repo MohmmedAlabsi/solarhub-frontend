@@ -244,7 +244,7 @@ function handleSubmit() {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                سعر البيع الفردي (ر.س) <span class="text-rose-500">*</span>
+                سعر البيع الفردي (ر.ي) <span class="text-rose-500">*</span>
               </label>
               <div class="relative flex items-center">
                 <input
@@ -257,7 +257,7 @@ function handleSubmit() {
                   :class="errors.price ? 'border-rose-400' : ''"
                 />
                 <span class="pointer-events-none absolute left-3 text-xs font-bold text-solar-text-muted">
-                  ر.س
+                  ر.ي
                 </span>
               </div>
               <p v-if="errors.price" class="mt-1 text-[11px] text-rose-500 font-bold">

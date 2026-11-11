@@ -261,7 +261,7 @@ onMounted(async () => {
 
               <div class="flex items-center gap-3 text-xs text-solar-text-muted mt-0.5">
                 <span class="font-bold text-solar-navy-dark text-sm">
-                  {{ Number(order.total_amount).toLocaleString() }} ر.س
+                  {{ Number(order.total_amount).toLocaleString() }} ر.ي
                 </span>
                 <span>•</span>
                 <span>{{ order.order_stores?.length || 1 }} فروع متاجر معتمدة</span>
@@ -348,14 +348,14 @@ onMounted(async () => {
                 <span>•</span>
                 <span>الكمية: <strong>{{ quote.quantity }} وحدة</strong></span>
                 <span v-if="quote.customer_target_price">•</span>
-                <span v-if="quote.customer_target_price">السعر المستهدف: {{ quote.customer_target_price }} ر.س</span>
+                <span v-if="quote.customer_target_price">السعر المستهدف: {{ quote.customer_target_price }} ر.ي</span>
               </div>
 
               <!-- عرض السعر المقدم من المورد إن وجد -->
               <div v-if="quote.store_offered_price" class="mt-2 rounded-xl bg-amber-50 p-2.5 border border-amber-200 text-xs">
                 <div class="flex items-center justify-between font-bold text-amber-900">
                   <span>السعر المقدم من المورد:</span>
-                  <span class="text-sm font-black text-solar-navy-dark">{{ Number(quote.store_offered_price).toLocaleString() }} ر.س</span>
+                  <span class="text-sm font-black text-solar-navy-dark">{{ Number(quote.store_offered_price).toLocaleString() }} ر.ي</span>
                 </div>
                 <p v-if="quote.store_notes" class="text-[11px] text-amber-800 mt-1">
                   ملاحظات المورد: {{ quote.store_notes }}

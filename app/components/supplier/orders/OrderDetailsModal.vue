@@ -184,10 +184,10 @@ function handleAction(status: SupplierOrderStatus) {
                     {{ item.quantity }} {{ item.unitLabel }}
                   </td>
                   <td class="py-3 px-3 text-center font-bold font-mono text-solar-text-muted">
-                    {{ item.unitPrice.toLocaleString('en-US') }} <span class="text-[10px]">ر.س</span>
+                    {{ item.unitPrice.toLocaleString('en-US') }} <span class="text-[10px]">ر.ي</span>
                   </td>
                   <td class="py-3 px-3 text-center font-black font-mono text-solar-text-heading">
-                    {{ item.totalPrice.toLocaleString('en-US') }} <span class="text-[10px] font-normal text-solar-text-muted">ر.س</span>
+                    {{ item.totalPrice.toLocaleString('en-US') }} <span class="text-[10px] font-normal text-solar-text-muted">ر.ي</span>
                   </td>
                 </tr>
               </tbody>
@@ -199,15 +199,15 @@ function handleAction(status: SupplierOrderStatus) {
         <div class="rounded-2xl border border-solar-border-card bg-solar-bg-subtle p-4 space-y-2 text-xs">
           <div class="flex items-center justify-between text-solar-text-muted">
             <span>إجمالي المنتجات (غير شامل الضريبة):</span>
-            <span class="font-bold font-mono text-solar-text-heading">{{ order.subtotal.toLocaleString('en-US') }} ر.س</span>
+            <span class="font-bold font-mono text-solar-text-heading">{{ order.subtotal.toLocaleString('en-US') }} ر.ي</span>
           </div>
           <div class="flex items-center justify-between text-solar-text-muted">
             <span>ضريبة القيمة المضافة (15%):</span>
-            <span class="font-bold font-mono text-solar-text-heading">{{ order.taxAmount.toLocaleString('en-US') }} ر.س</span>
+            <span class="font-bold font-mono text-solar-text-heading">{{ order.taxAmount.toLocaleString('en-US') }} ر.ي</span>
           </div>
           <div class="flex items-center justify-between pt-2 border-t border-solar-border-card text-sm font-black text-solar-text-heading">
             <span>الإجمالي المستحق لمتجرك:</span>
-            <span class="text-base text-solar-navy-dark dark:text-solar-yellow font-mono">{{ order.totalStoreShare.toLocaleString('en-US') }} ر.س</span>
+            <span class="text-base text-solar-navy-dark dark:text-solar-yellow font-mono">{{ order.totalStoreShare.toLocaleString('en-US') }} ر.ي</span>
           </div>
         </div>
 

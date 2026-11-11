@@ -94,7 +94,7 @@ function handleRfq() {
         <span class="text-xs text-solar-text-muted">السعر المعتمد:</span>
         <div v-if="product.price && product.price > 0" class="flex items-baseline gap-1">
           <span class="text-lg font-black text-solar-text-heading">{{ Number(product.price).toLocaleString() }}</span>
-          <span class="text-xs font-bold text-solar-text-muted">{{ product.currency || 'ر.س' }}</span>
+          <span class="text-xs font-bold text-solar-text-muted">{{ product.currency || 'ر.ي' }}</span>
         </div>
         <div v-else class="text-xs font-bold text-amber-600">
           عرض سعر حسب الطلب

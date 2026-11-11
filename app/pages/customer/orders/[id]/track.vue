@@ -222,7 +222,7 @@ onMounted(async () => {
                 </span>
               </div>
               <span class="text-xs text-solar-text-muted">
-                تاريخ الطلب: {{ new Date(order.created_at).toLocaleDateString('ar-SA') }} • الإجمالي: {{ Number(order.total_amount).toLocaleString() }} ر.س
+                تاريخ الطلب: {{ new Date(order.created_at).toLocaleDateString('ar-SA') }} • الإجمالي: {{ Number(order.total_amount).toLocaleString() }} ر.ي
               </span>
             </div>
           </div>
@@ -351,7 +351,7 @@ onMounted(async () => {
                       </span>
                     </div>
                     <span class="font-bold text-solar-navy-dark">
-                      {{ Number(it.total_price).toLocaleString() }} ر.س
+                      {{ Number(it.total_price).toLocaleString() }} ر.ي
                     </span>
                   </div>
                 </div>

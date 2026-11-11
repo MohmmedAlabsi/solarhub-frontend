@@ -41,7 +41,7 @@
           <div>
             <div class="text-xs text-solar-text-muted">الرصيد المتاح للسحب حالياً</div>
             <div class="text-xl font-black text-solar-text-heading font-mono mt-0.5">
-              {{ availableBalance.toLocaleString('en-US') }} <span class="text-xs font-sans text-solar-text-muted">ر.س</span>
+              {{ availableBalance.toLocaleString('en-US') }} <span class="text-xs font-sans text-solar-text-muted">ر.ي</span>
             </div>
           </div>
           <button
@@ -58,7 +58,7 @@
           <!-- المبلغ المطلوب -->
           <div>
             <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
-              المبلغ المراد سحبه (ر.س) <span class="text-rose-500">*</span>
+              المبلغ المراد سحبه (ر.ي) <span class="text-rose-500">*</span>
             </label>
             <div class="relative">
               <input
@@ -72,7 +72,7 @@
                 class="solar-input w-full pr-4 pl-12 py-2.5 text-sm font-mono font-bold rounded-xl"
               />
               <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-solar-text-muted">
-                ر.س
+                ر.ي
               </span>
             </div>
             <p v-if="form.amount > availableBalance" class="text-xs text-rose-500 mt-1 font-bold">

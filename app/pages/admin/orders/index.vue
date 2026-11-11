@@ -208,7 +208,7 @@ async function handleStatusUpdate(orderId: string, newStatus: AdminOrder['status
 
               <!-- إجمالي الطلب -->
               <td class="py-3.5 px-4 font-black font-mono text-solar-text-heading text-sm">
-                {{ item.totalAmount.toLocaleString() }} ر.س
+                {{ item.totalAmount.toLocaleString() }} ر.ي
               </td>
 
               <!-- عنوان التسليم -->

@@ -72,7 +72,7 @@ const discount = computed(() =>
       </p>
 
       <div class="mt-auto flex items-baseline gap-2 pt-1">
-        <span class="text-lg font-bold text-ink">{{ formatPrice(price) }} <span class="text-xs font-medium">ر.س</span></span>
+        <span class="text-lg font-bold text-ink">{{ formatPrice(price) }} <span class="text-xs font-medium">ر.ي</span></span>
         <span v-if="old_price" class="text-xs text-ink-400 line-through">{{ formatPrice(old_price) }}</span>
       </div>
 
