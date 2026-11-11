@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import type { User, UserRole, LoginPayload, RegisterPayload, VerifyOtpPayload } from '~~/types/auth'
+import { SERVER_ERROR_MESSAGE } from '~/utils/errors'
 
 export interface UserProfile {
   id: number | string
@@ -157,8 +158,13 @@ export const useAuthStore = defineStore('auth', () => {
         message: response.message,
       }
     } catch (err: any) {
-      const errResponse = err?.data
-      let message = errResponse?.message || err?.message || 'حدث خطأ في الاتصال بالخادم'
+      const status = err?.status || err?.statusCode
+      // 5xx أو فشل الشبكة: رسالة عامة فقط. لا نعرض نص الخطأ القادم من الخادم (قد يحتوي SQL أو بيانات داخلية)
+      const isServerError = !status || status >= 500
+      const errResponse = isServerError ? null : err?.data
+      let message = isServerError
+        ? (status ? SERVER_ERROR_MESSAGE : 'تعذر الاتصال بالخادم، تحقق من الاتصال وحاول مجدداً.')
+        : (errResponse?.message || 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.')
       const errors = errResponse?.errors || {}
 
       // Friendly translations for common validation errors

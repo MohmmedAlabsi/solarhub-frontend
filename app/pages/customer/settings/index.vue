@@ -22,6 +22,10 @@ const isMapModalOpen = ref(false)
 
 function handleLocationSelected(loc: { address: string; lat: number; lng: number; governorate?: string }) {
   form.address = loc.address
+  // الإحداثيات تُحفظ بصيغة WKT التي يقبلها عمود geography (الطول ثم العرض)
+  if (Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+    form.coordinates = `POINT(${loc.lng} ${loc.lat})`
+  }
   if (loc.governorate) {
     form.city = loc.governorate
   }

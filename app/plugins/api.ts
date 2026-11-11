@@ -1,4 +1,5 @@
 import { useAuthStore } from '~/stores/auth'
+import { SERVER_ERROR_MESSAGE } from '~/utils/errors'
 
 /**
  * عميل الـ API الموحّد.
@@ -86,6 +87,14 @@ export default defineNuxtPlugin((nuxtApp) => {
 
     onResponseError({ request, response }) {
       const status = response.status
+
+      // 5xx: استبدال جسم الاستجابة كاملاً قبل أن يصل لأي مكوّن، فكل من يقرأ err.data.message
+      // (في الـ composables والصفحات) يحصل على الرسالة العامة بدل نص الاستثناء/SQL.
+      if (status >= 500) {
+        response._data = { status: 'error', message: SERVER_ERROR_MESSAGE, userMessage: SERVER_ERROR_MESSAGE }
+        return
+      }
+
       const data = response._data
 
       // 401: الجلسة منتهية أو التوكن غير صالح. طلبات الدخول والتحقق نفسها يعالجها stores/auth.ts.

@@ -18,7 +18,9 @@ export const useCustomerProfile = () => {
     city: (typeof authStore.user?.governorate === 'object' ? authStore.user?.governorate?.name_ar : authStore.user?.governorate) || 'صنعاء',
     email: authStore.user?.email || '',
     phone: authStore.user?.phone || '',
-    address: (authStore.user as any)?.default_coordinates || authStore.user?.location?.address || 'صنعاء - مركز المحافظة',
+    // العنوان نص للعرض فقط؛ default_coordinates قيمة geography وليست عنواناً قابلاً للقراءة
+    address: authStore.user?.location?.address || '',
+    coordinates: undefined,
     twoFactorEnabled: false,
     currentPassword: '',
     newPassword: '',
@@ -144,8 +146,10 @@ export const useCustomerProfile = () => {
       payload.governorate_id = govId
     }
 
-    if (form.address) {
-      payload.default_coordinates = form.address
+    // default_coordinates عمود geography: يُرسل فقط عند اختيار موقع من الخريطة (POINT(lng lat)).
+    // نص العنوان لا يُرسل فيه أبداً (كان يسبب خطأ 500 "invalid geometry").
+    if (form.coordinates && /^POINT\(\s*-?\d+(\.\d+)?\s+-?\d+(\.\d+)?\s*\)$/i.test(form.coordinates)) {
+      payload.default_coordinates = form.coordinates
     }
 
     if (form.currentPassword && form.newPassword) {
