@@ -23,6 +23,7 @@ const {
   statusClasses,
   fetchOffers,
   exportCsv,
+  offers,
 } = useEngineerOffers()
 
 // حالة المودال
@@ -32,6 +33,13 @@ const showDetailModal = ref(false)
 function openDetail(offer: EngineerOffer) {
   selectedOffer.value = offer
   showDetailModal.value = true
+}
+
+// بعد بدء التنفيذ أو الإبلاغ بالإنهاء: إعادة تحميل العروض وتحديث العرض المفتوح في النافذة
+async function handleOfferUpdated() {
+  const id = selectedOffer.value?.rawId
+  await fetchOffers()
+  selectedOffer.value = offers.value.find(o => o.rawId === id) ?? selectedOffer.value
 }
 
 const startIndex = computed(() => (currentPage.value - 1) * pageSize + 1)
@@ -179,6 +187,7 @@ const filterOptions = [
       v-model="showDetailModal"
       :offer="selectedOffer"
       @withdrawn="fetchOffers"
+      @updated="handleOfferUpdated"
     />
   </div>
 </template>

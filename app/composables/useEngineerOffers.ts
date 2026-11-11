@@ -18,6 +18,10 @@ export interface EngineerOffer {
   attachmentName?: string
   attachmentSize?: string
   attachmentUrl?: string
+  // حالة طلب الخدمة (لعرض أزرار بدء التنفيذ/الإنهاء على العرض المقبول)
+  requestStatus?: string
+  requestStartedAt?: string | null
+  requestDoneAt?: string | null
 }
 
 const statusLabels: Record<OfferStatus, string> = {
@@ -88,6 +92,9 @@ export function useEngineerOffers() {
           attachmentName: item.proposal_file ? item.proposal_file.split('/').pop() : undefined,
           attachmentSize: item.proposal_file ? 'وثيقة هندسية معتمدة' : undefined,
           attachmentUrl: item.proposal_file_url || item.proposal_file || undefined,
+          requestStatus: item.service_request?.status,
+          requestStartedAt: item.service_request?.started_at ?? null,
+          requestDoneAt: item.service_request?.engineer_completed_at ?? null,
         }
       })
     } catch (err: any) {

@@ -44,6 +44,8 @@ const {
   fetchOffers,
   acceptOffer,
   cancelServiceRequest,
+  confirmCompletion,
+  rateEngineer,
 } = useCustomerServices()
 
 const pendingAcceptOffer = ref<ApiServiceOffer | null>(null)
@@ -113,6 +115,66 @@ async function handleConfirmCancel() {
     await loadData()
   } catch (err: any) {
     actionError.value = err?.data?.message || err?.message || 'تعذر إلغاء الطلب، يرجى المحاولة لاحقاً.'
+  }
+}
+
+// ===== دورة حياة الطلب بعد قبول العرض =====
+const acceptedOffer = computed(() => offers.value.find(o => o.status === 'accepted') || null)
+const isConfirmCompletionOpen = ref(false)
+const isRatingOpen = ref(false)
+const ratingValue = ref(0)
+const ratingComment = ref('')
+const ratingError = ref('')
+
+const lifecycleSteps = computed(() => {
+  const r = currentRequest.value
+  if (!r) return []
+  return [
+    { key: 'awarded', label: 'تم قبول العرض', done: ['awarded', 'in_progress', 'completed'].includes(r.status) },
+    { key: 'started', label: 'بدأ المهندس التنفيذ', done: !!r.started_at || ['in_progress', 'completed'].includes(r.status) },
+    { key: 'done', label: 'أبلغ المهندس بإنهاء العمل', done: !!r.engineer_completed_at || r.status === 'completed' },
+    { key: 'completed', label: 'تأكيد الاكتمال', done: r.status === 'completed' },
+    { key: 'rated', label: 'تقييم المهندس', done: !!r.rating },
+  ]
+})
+
+const ratingStars = computed(() => {
+  const n = currentRequest.value?.rating?.rating || 0
+  return '★'.repeat(n) + '☆'.repeat(5 - n)
+})
+
+async function handleConfirmCompletion() {
+  actionError.value = ''
+  try {
+    await confirmCompletion(requestId.value)
+    successMessage.value = 'تم تأكيد اكتمال المشروع. يمكنك الآن تقييم المهندس.'
+    isConfirmCompletionOpen.value = false
+    await loadData()
+  } catch (err: any) {
+    isConfirmCompletionOpen.value = false
+    actionError.value = err?.data?.message || 'تعذر تأكيد اكتمال المشروع، حاول مرة أخرى.'
+  }
+}
+
+function openRating() {
+  ratingValue.value = 0
+  ratingComment.value = ''
+  ratingError.value = ''
+  isRatingOpen.value = true
+}
+
+async function handleSubmitRating() {
+  if (ratingValue.value < 1 || ratingValue.value > 5) {
+    ratingError.value = 'اختر تقييماً من 1 إلى 5 نجوم.'
+    return
+  }
+  ratingError.value = ''
+  try {
+    await rateEngineer(requestId.value, ratingValue.value, ratingComment.value)
+    successMessage.value = 'شكراً لك، تم حفظ تقييمك للمهندس.'
+    isRatingOpen.value = false
+  } catch (err: any) {
+    ratingError.value = err?.data?.message || 'تعذر حفظ التقييم، حاول مرة أخرى.'
   }
 }
 
@@ -266,6 +328,67 @@ onMounted(() => {
             <FileText class="size-4 text-solar-text-muted shrink-0" />
             <span class="font-bold text-solar-text-heading">الملف المرفق:</span>
             <span class="text-solar-text-muted font-mono truncate max-w-[200px]">{{ currentRequest.attachment_file }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 1.5 مراحل تنفيذ المشروع (بعد قبول العرض) -->
+      <section
+        v-if="['awarded', 'in_progress', 'completed'].includes(currentRequest.status)"
+        class="rounded-2xl border border-solar-border-card bg-white p-6 shadow-sm flex flex-col gap-5"
+        data-testid="service-lifecycle"
+      >
+        <div class="flex items-center gap-2 border-b border-solar-border-card pb-4">
+          <ShieldCheck class="size-5 text-emerald-600" />
+          <h2 class="text-base font-bold text-solar-text-heading">مراحل تنفيذ المشروع</h2>
+          <span v-if="acceptedOffer?.engineer?.name" class="mr-auto text-xs text-solar-text-muted">
+            المهندس: <strong class="text-solar-text-heading">{{ acceptedOffer.engineer.name }}</strong>
+          </span>
+        </div>
+
+        <ol class="grid gap-2 sm:grid-cols-5">
+          <li
+            v-for="step in lifecycleSteps"
+            :key="step.key"
+            class="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold"
+            :class="step.done ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-solar-border-card bg-solar-bg-subtle/60 text-solar-text-muted'"
+          >
+            <CheckCircle2 v-if="step.done" class="size-4 shrink-0" aria-hidden="true" />
+            <Clock v-else class="size-4 shrink-0" aria-hidden="true" />
+            <span>{{ step.label }}</span>
+          </li>
+        </ol>
+
+        <!-- الإجراء المناسب للمرحلة الحالية -->
+        <div class="rounded-xl bg-solar-bg-subtle/60 p-4 text-xs leading-relaxed text-solar-text-body">
+          <template v-if="currentRequest.status === 'awarded'">
+            بانتظار أن يبدأ المهندس التنفيذ. سيصلك إشعار عند البدء.
+          </template>
+          <template v-else-if="currentRequest.status === 'in_progress' && !currentRequest.engineer_completed_at">
+            المشروع قيد التنفيذ. عندما يبلغ المهندس بإنهاء العمل ستتمكن من تأكيد الاكتمال.
+          </template>
+          <div v-else-if="currentRequest.status === 'in_progress'" class="flex flex-wrap items-center justify-between gap-3">
+            <span>أبلغ المهندس بإنهاء العمل. راجع التنفيذ ثم أكّد اكتمال المشروع.</span>
+            <button
+              type="button"
+              class="btn-primary h-9 px-5 text-xs font-bold gap-2"
+              :disabled="isActionLoading"
+              @click="isConfirmCompletionOpen = true"
+            >
+              <CheckCircle2 class="size-4" />
+              <span>تأكيد اكتمال المشروع</span>
+            </button>
+          </div>
+          <div v-else-if="currentRequest.status === 'completed' && !currentRequest.rating" class="flex flex-wrap items-center justify-between gap-3">
+            <span>اكتمل المشروع. قيّم تجربتك مع المهندس لمساعدة العملاء الآخرين.</span>
+            <button type="button" class="btn-primary h-9 px-5 text-xs font-bold gap-2" @click="openRating">
+              <span>تقييم المهندس</span>
+            </button>
+          </div>
+          <div v-else-if="currentRequest.rating" class="flex flex-wrap items-center gap-2">
+            <span>تقييمك للمهندس:</span>
+            <span class="font-bold text-amber-600" :aria-label="currentRequest.rating.rating + ' من 5'">{{ ratingStars }}</span>
+            <span v-if="currentRequest.rating.comment" class="text-solar-text-muted">«{{ currentRequest.rating.comment }}»</span>
           </div>
         </div>
       </section>
@@ -451,6 +574,64 @@ onMounted(() => {
             </button>
           </div>
         </div>
+      </div>
+    </Teleport>
+
+    <!-- نافذة تأكيد اكتمال المشروع -->
+    <Teleport to="body">
+      <div v-if="isConfirmCompletionOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs" @click="isConfirmCompletionOpen = false" />
+        <div class="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-solar-border-card flex flex-col gap-4">
+          <h3 class="text-base font-bold text-solar-text-heading">تأكيد اكتمال المشروع</h3>
+          <p class="text-xs text-solar-text-body leading-relaxed">
+            بتأكيدك يُغلق المشروع كمكتمل ويُبلَّغ المهندس بذلك. تأكد أن العمل نُفِّذ كما اتُّفق عليه.
+          </p>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-solar-border-card">
+            <button type="button" class="btn-outline h-9 px-4 text-xs font-bold" :disabled="isActionLoading" @click="isConfirmCompletionOpen = false">تراجع</button>
+            <button type="button" class="btn-primary h-9 px-5 text-xs font-bold gap-2 disabled:opacity-50" :disabled="isActionLoading" @click="handleConfirmCompletion">
+              <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+              <span>{{ isActionLoading ? 'جارٍ التأكيد...' : 'نعم، المشروع مكتمل' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- نافذة تقييم المهندس -->
+    <Teleport to="body">
+      <div v-if="isRatingOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs" @click="isRatingOpen = false" />
+        <form class="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-solar-border-card flex flex-col gap-4" @submit.prevent="handleSubmitRating">
+          <h3 class="text-base font-bold text-solar-text-heading">تقييم المهندس {{ acceptedOffer?.engineer?.name || '' }}</h3>
+          <div class="flex items-center gap-1" role="radiogroup" aria-label="عدد النجوم">
+            <button
+              v-for="star in 5"
+              :key="star"
+              type="button"
+              role="radio"
+              :aria-checked="ratingValue === star"
+              :aria-label="star + ' من 5'"
+              class="text-2xl leading-none transition-transform hover:scale-110"
+              :class="star <= ratingValue ? 'text-amber-500' : 'text-slate-300'"
+              @click="ratingValue = star"
+            >★</button>
+          </div>
+          <textarea
+            v-model="ratingComment"
+            rows="3"
+            maxlength="1000"
+            class="solar-input text-xs"
+            placeholder="اكتب ملاحظاتك عن جودة العمل والالتزام بالمواعيد (اختياري)"
+          />
+          <p v-if="ratingError" class="text-xs font-bold text-red-600">{{ ratingError }}</p>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-solar-border-card">
+            <button type="button" class="btn-outline h-9 px-4 text-xs font-bold" :disabled="isActionLoading" @click="isRatingOpen = false">إلغاء</button>
+            <button type="submit" class="btn-primary h-9 px-5 text-xs font-bold gap-2 disabled:opacity-50" :disabled="isActionLoading">
+              <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+              <span>{{ isActionLoading ? 'جارٍ الحفظ...' : 'إرسال التقييم' }}</span>
+            </button>
+          </div>
+        </form>
       </div>
     </Teleport>
 
