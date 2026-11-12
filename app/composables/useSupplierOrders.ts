@@ -117,6 +117,7 @@ export function useSupplierOrders() {
       deliveredAt: os.delivered_at,
       customerConfirmedAt: os.customer_confirmed_at,
       items: mappedItems,
+      paymentStatus: parentOrder.payment?.status,
     }
   }
 

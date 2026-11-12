@@ -19,6 +19,22 @@ export interface ApiOrder {
     name_ar: string
   }
   order_stores?: ApiOrderStore[]
+  /** ملخص الدفع (كل الطلبات مدفوعة مسبقاً؛ الشحن لا يتم قبل اعتماد الدفعة) */
+  payment?: {
+    status: 'paid' | 'under_review' | 'unpaid'
+    verified_total: number
+    pending_total: number
+    remaining: number
+    total: number
+    last_rejected: boolean
+  }
+  payments?: {
+    id: number
+    amount: number | string
+    status: 'pending' | 'verified' | 'rejected'
+    transaction_reference?: string | null
+    created_at: string
+  }[]
 }
 
 export interface ApiOrderStore {

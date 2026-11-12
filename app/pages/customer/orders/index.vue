@@ -14,6 +14,7 @@ import {
   ShoppingBag,
   Store,
   Truck,
+  Upload,
   X,
   XCircle,
 } from 'lucide-vue-next'
@@ -49,7 +50,32 @@ const {
   isLoading,
   isActionLoading,
   error,
+  walletProviders,
+  fetchWalletProviders,
 } = useCustomerOrders()
+
+// ===== الدفع المسبق: حالة الدفعة ورفع الإيصال لكل طلب =====
+const receiptOrder = ref<ApiOrder | null>(null)
+const receiptOpen = ref(false)
+
+function getPaymentBadge(order: ApiOrder) {
+  const p = order.payment
+  if (!p) return null
+  if (p.status === 'paid') return { text: 'مدفوع', class: 'bg-emerald-100 text-emerald-800 border-emerald-200' }
+  if (p.status === 'under_review') return { text: 'الدفع قيد المراجعة', class: 'bg-blue-100 text-blue-800 border-blue-200' }
+  if (p.last_rejected) return { text: 'رُفض الإيصال — ارفع إيصالاً جديداً', class: 'bg-red-100 text-red-800 border-red-200' }
+  return { text: 'لم يُدفع', class: 'bg-amber-100 text-amber-800 border-amber-200' }
+}
+
+function canUploadReceipt(order: ApiOrder) {
+  return order.status !== 'cancelled' && !!order.payment && order.payment.remaining > 0
+}
+
+function openReceipt(order: ApiOrder) {
+  receiptOrder.value = order
+  receiptOpen.value = true
+  fetchWalletProviders()
+}
 
 const actionNotice = ref<string | null>(null)
 
@@ -160,6 +186,7 @@ onMounted(async () => {
   await Promise.allSettled([
     fetchMyOrders(),
     fetchMyQuoteRequests(),
+    fetchWalletProviders(),
   ])
 })
 </script>
@@ -250,6 +277,14 @@ onMounted(async () => {
                 >
                   {{ getStatusBadge(order.status).text }}
                 </span>
+                <span
+                  v-if="getPaymentBadge(order)"
+                  class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border"
+                  :class="getPaymentBadge(order)!.class"
+                  data-testid="customer-payment-status"
+                >
+                  {{ getPaymentBadge(order)!.text }}
+                </span>
                 <span class="text-xs text-solar-text-muted">
                   {{ new Date(order.created_at).toLocaleDateString('ar-YE') }}
                 </span>
@@ -270,7 +305,17 @@ onMounted(async () => {
           </div>
 
           <!-- الأزرار والإجراءات -->
-          <div class="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0">
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0">
+            <button
+              v-if="canUploadReceipt(order)"
+              type="button"
+              class="btn-outline text-xs px-3 py-2 gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50"
+              data-testid="upload-receipt-btn"
+              @click="openReceipt(order)"
+            >
+              <Upload class="size-3.5" />
+              <span>رفع إيصال الدفع</span>
+            </button>
             <button
               v-if="order.status === 'pending'"
               type="button"
@@ -420,5 +465,13 @@ onMounted(async () => {
         </NuxtLink>
       </div>
     </div>
+  
+    <CustomerOrdersPaymentReceiptModal
+      v-model="receiptOpen"
+      :order="receiptOrder"
+      :remaining="receiptOrder?.payment?.remaining ?? 0"
+      :wallet-providers="walletProviders"
+      @submitted="fetchMyOrders()"
+    />
   </div>
 </template>

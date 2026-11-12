@@ -54,7 +54,8 @@ const notes = ref('')
 const deliveryCoordinates = ref<string | null>(null)
 
 // طريقة الدفع
-const paymentMethod = ref<'wallet' | 'cod' | 'bank_transfer'>('wallet')
+// كل الطلبات مدفوعة مسبقاً (لا يوجد دفع عند الاستلام): محفظة إلكترونية أو حوالة فقط
+const paymentMethod = ref<'wallet' | 'bank_transfer'>('wallet')
 const selectedWalletId = ref<number | null>(null)
 const selectedWallet = computed(() => walletProviders.value.find(p => p.id === selectedWalletId.value))
 
@@ -313,7 +314,7 @@ onMounted(async () => {
             <h2 class="text-base font-bold text-solar-text-heading">3. طريقة الدفع المعتمدة</h2>
           </div>
 
-          <div class="grid gap-3 sm:grid-cols-3">
+          <div class="grid gap-3 sm:grid-cols-2">
             <!-- خيار المحافظ الإلكترونية -->
             <label
               class="flex flex-col gap-2 rounded-xl border p-4 cursor-pointer transition-all"
@@ -329,23 +330,6 @@ onMounted(async () => {
                 />
               </div>
               <p class="text-[11px] text-solar-text-muted">الدفع عبر الكريمي، ون كاش، فلوسك، جايبي...</p>
-            </label>
-
-            <!-- خيار الدفع عند الاستلام -->
-            <label
-              class="flex flex-col gap-2 rounded-xl border p-4 cursor-pointer transition-all"
-              :class="paymentMethod === 'cod' ? 'border-amber-500 bg-amber-50/30 ring-1 ring-amber-500' : 'border-solar-border-card hover:bg-solar-bg-subtle'"
-            >
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-solar-text-heading">الدفع عند الاستلام</span>
-                <input
-                  v-model="paymentMethod"
-                  type="radio"
-                  value="cod"
-                  class="accent-amber-600"
-                />
-              </div>
-              <p class="text-[11px] text-solar-text-muted">الدفع نقداً بعد فحص ومطابقة الشحنة في الموقع</p>
             </label>
 
             <!-- خيار الحوالة البنكية -->
@@ -530,7 +514,7 @@ onMounted(async () => {
           </p>
 
           <!-- رفع إيصال الدفع (للمحفظة والحوالة) -->
-          <div v-if="paymentMethod !== 'cod'" class="w-full mb-6 rounded-xl border border-amber-500/30 bg-amber-50/50 p-4 text-right">
+          <div class="w-full mb-6 rounded-xl border border-amber-500/30 bg-amber-50/50 p-4 text-right">
             <p class="text-xs font-bold text-solar-text-heading mb-1">إرفاق إيصال الدفع</p>
             <p class="text-[11px] text-solar-text-muted mb-3">
               المبلغ المطلوب: <span class="font-bold">{{ Number(createdOrder.total_amount).toLocaleString() }} ر.ي</span>
