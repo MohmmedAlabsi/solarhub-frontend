@@ -75,33 +75,41 @@ export interface ApiOrderItem {
   }
 }
 
+/** يطابق QuoteRequestResource في الـ API */
 export interface ApiQuoteRequest {
   id: number
-  customer_id: number
-  store_product_id: number
+  quote_number?: string
   quantity: number
-  customer_target_price?: number | string | null
+  customer_target_price?: number | null
   customer_notes?: string | null
-  status: 'pending' | 'responded' | 'accepted' | 'rejected'
-  store_offered_price?: number | string | null
+  status: 'pending' | 'responded' | 'accepted' | 'rejected' | 'cancelled'
+  offered_unit_price?: number | null
+  total_price?: number | null
   store_notes?: string | null
   responded_at?: string | null
+  accepted_at?: string | null
+  /** طلب الشراء الذي أُنشئ عند قبول العرض */
+  order_id?: number | null
+  order_number?: string | null
   created_at: string
   store_product?: {
     id: number
-    price: number | string
+    title: string
+    model_number?: string
+    category?: string
+    image?: string | null
+    listed_price?: number | null
     store?: {
       id: number
       company_name: string
-      whatsapp_number?: string
-    }
-    master_product?: {
-      id: number
-      title: string
-      model_number?: string | null
-      category?: { name_ar: string }
     }
   }
+}
+
+export interface QuoteDeliveryPayload {
+  delivery_governorate_id: number | null
+  delivery_address: string
+  delivery_coordinates?: string | null
 }
 
 export const useCustomerOrders = () => {
@@ -260,11 +268,13 @@ export const useCustomerOrders = () => {
   /**
    * قبول عرض السعر المقدم من المورد (Accept Quote)
    */
-  const acceptQuoteRequest = async (quoteId: number | string): Promise<ApiQuoteRequest> => {
+  /** قبول العرض يُنشئ طلب شراء بالسعر المتفق عليه، لذلك يحتاج عنوان التوصيل */
+  const acceptQuoteRequest = async (quoteId: number | string, delivery: QuoteDeliveryPayload): Promise<ApiQuoteRequest> => {
     isActionLoading.value = true
     try {
       const res: any = await $api(`/quote-requests/${quoteId}/accept`, {
         method: 'PATCH',
+        body: delivery,
       })
       const updated = res?.data || res
       const idx = quoteRequests.value.findIndex(q => Number(q.id) === Number(quoteId))

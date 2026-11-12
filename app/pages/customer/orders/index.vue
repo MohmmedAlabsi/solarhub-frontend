@@ -47,6 +47,8 @@ const {
   cancelOrder,
   acceptQuoteRequest,
   rejectQuoteRequest,
+  governorates,
+  fetchGovernorates,
   isLoading,
   isActionLoading,
   error,
@@ -113,7 +115,7 @@ const filteredQuotes = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return quoteRequests.value
   return quoteRequests.value.filter((qr) => {
-    const title = qr.store_product?.master_product?.title || ''
+    const title = qr.store_product?.title || ''
     const store = qr.store_product?.store?.company_name || ''
     return (
       String(qr.id).includes(q) ||
@@ -158,15 +160,43 @@ async function handleCancelOrder(orderId: number) {
   }
 }
 
-// قبول عرض سعر
-async function handleAcceptQuote(quoteId: number) {
-  if (!confirm('هل توافق على عرض السعر والمواصفات المقدمة من المورد؟')) return
+// قبول عرض سعر: يُنشئ طلب شراء بالسعر المتفق عليه بعد إدخال عنوان التوصيل
+const acceptingQuote = ref<ApiQuoteRequest | null>(null)
+const acceptGovernorateId = ref<number | null>(null)
+const acceptAddress = ref('')
+const acceptError = ref('')
+
+function quoteTotal(quote: ApiQuoteRequest) {
+  return Number(quote.total_price ?? (Number(quote.offered_unit_price || 0) * quote.quantity))
+}
+
+async function handleAcceptQuote(quote: ApiQuoteRequest) {
+  acceptingQuote.value = quote
+  acceptAddress.value = ''
+  acceptError.value = ''
+  await fetchGovernorates()
+  if (!acceptGovernorateId.value) acceptGovernorateId.value = governorates.value[0]?.id ?? null
+}
+
+async function confirmAcceptQuote() {
+  const quote = acceptingQuote.value
+  if (!quote) return
+  if (!acceptAddress.value.trim()) {
+    acceptError.value = 'يرجى إدخال عنوان التوصيل التفصيلي.'
+    return
+  }
+  acceptError.value = ''
   try {
-    await acceptQuoteRequest(quoteId)
-    actionNotice.value = 'تم قبول عرض السعر بنجاح، سيقوم المورد بالتواصل لإتمام التجهيز.'
-    setTimeout(() => { actionNotice.value = null }, 4000)
+    const updated = await acceptQuoteRequest(quote.id, {
+      delivery_governorate_id: acceptGovernorateId.value,
+      delivery_address: acceptAddress.value.trim(),
+    })
+    acceptingQuote.value = null
+    actionNotice.value = `تم قبول العرض وإنشاء طلب الشراء ${updated?.order_number || ''}. ارفع إيصال الدفع من تبويب أوامر الشراء ليبدأ المورد بالشحن.`
+    setTimeout(() => { actionNotice.value = null }, 7000)
+    await fetchMyOrders()
   } catch (err: any) {
-    alert(err?.userMessage || 'تعذر قبول عرض السعر.')
+    acceptError.value = err?.data?.message || err?.userMessage || 'تعذر قبول عرض السعر.'
   }
 }
 
@@ -385,7 +415,7 @@ onMounted(async () => {
               </div>
 
               <h4 class="text-xs font-bold text-solar-text-heading truncate">
-                {{ quote.store_product?.master_product?.title || 'معدة طاقة شمسية' }}
+                {{ quote.store_product?.title || 'معدة طاقة شمسية' }}
               </h4>
 
               <div class="flex items-center gap-3 text-xs text-solar-text-muted flex-wrap">
@@ -397,11 +427,18 @@ onMounted(async () => {
               </div>
 
               <!-- عرض السعر المقدم من المورد إن وجد -->
-              <div v-if="quote.store_offered_price" class="mt-2 rounded-xl bg-amber-50 p-2.5 border border-amber-200 text-xs">
+              <div v-if="quote.offered_unit_price" class="mt-2 rounded-xl bg-amber-50 p-2.5 border border-amber-200 text-xs" data-testid="quote-offer">
                 <div class="flex items-center justify-between font-bold text-amber-900">
-                  <span>السعر المقدم من المورد:</span>
-                  <span class="text-sm font-black text-solar-navy-dark">{{ Number(quote.store_offered_price).toLocaleString() }} ر.ي</span>
+                  <span>سعر الوحدة المقدم من المورد:</span>
+                  <span class="text-sm font-black text-solar-navy-dark">{{ Number(quote.offered_unit_price).toLocaleString('ar-YE') }} ر.ي</span>
                 </div>
+                <div class="flex items-center justify-between font-bold text-amber-900 mt-1">
+                  <span>الإجمالي ({{ quote.quantity }} وحدة):</span>
+                  <span class="text-sm font-black text-solar-navy-dark">{{ quoteTotal(quote).toLocaleString('ar-YE') }} ر.ي</span>
+                </div>
+                <p v-if="quote.order_number" class="text-[11px] font-bold text-emerald-700 mt-1">
+                  أُنشئ طلب الشراء {{ quote.order_number }} بهذا السعر.
+                </p>
                 <p v-if="quote.store_notes" class="text-[11px] text-amber-800 mt-1">
                   ملاحظات المورد: {{ quote.store_notes }}
                 </p>
@@ -412,18 +449,20 @@ onMounted(async () => {
           <!-- أزرار الإجراءات للعميل -->
           <div class="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0">
             <!-- إذا كان المورد قد رد بعرض سعر -->
-            <template v-if="quote.status === 'responded'">
+            <template v-if="quote.status === 'responded' || (quote.status === 'accepted' && !quote.order_id)">
               <button
                 type="button"
-                @click="handleAcceptQuote(quote.id)"
+                data-testid="accept-quote-btn"
+                @click="handleAcceptQuote(quote)"
                 :disabled="isActionLoading"
                 class="btn-primary text-xs px-3.5 py-2 gap-1"
               >
                 <Check class="size-3.5" />
-                <span>قبول العرض</span>
+                <span>{{ quote.status === 'accepted' ? 'إنشاء طلب الشراء' : 'قبول العرض' }}</span>
               </button>
 
               <button
+                v-if="quote.status === 'responded'"
                 type="button"
                 @click="handleRejectQuote(quote.id)"
                 :disabled="isActionLoading"
@@ -432,6 +471,16 @@ onMounted(async () => {
                 رفض
               </button>
             </template>
+
+            <button
+              v-else-if="quote.order_id"
+              type="button"
+              class="btn-outline text-xs px-3 py-2 gap-1.5"
+              @click="setTab('orders'); searchQuery = quote.order_number || ''"
+            >
+              <Package class="size-3.5" />
+              <span>عرض طلب الشراء</span>
+            </button>
 
             <!-- إذا كان بانتظار الرد -->
             <button
@@ -466,6 +515,42 @@ onMounted(async () => {
       </div>
     </div>
   
+    <!-- نافذة قبول العرض: عنوان التوصيل ثم إنشاء الطلب بالسعر المتفق عليه -->
+    <Teleport to="body">
+      <div v-if="acceptingQuote" class="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl" role="dialog" aria-modal="true" aria-label="قبول عرض السعر وإنشاء الطلب">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs" @click="!isActionLoading && (acceptingQuote = null)" />
+        <form class="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-solar-border-card flex flex-col gap-3 text-right" @submit.prevent="confirmAcceptQuote">
+          <h3 class="text-base font-bold text-solar-text-heading">قبول العرض وإنشاء طلب الشراء</h3>
+          <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 flex flex-col gap-1">
+            <span class="font-bold">{{ acceptingQuote.store_product?.title }} — {{ acceptingQuote.store_product?.store?.company_name }}</span>
+            <span>{{ acceptingQuote.quantity }} وحدة × {{ Number(acceptingQuote.offered_unit_price || 0).toLocaleString('ar-YE') }} ر.ي</span>
+            <span class="font-black text-solar-navy-dark">الإجمالي: {{ quoteTotal(acceptingQuote).toLocaleString('ar-YE') }} ر.ي</span>
+          </div>
+          <p class="text-[11px] text-solar-text-muted">
+            سيُنشأ طلب شراء بهذا السعر. الدفع مسبق (محفظة أو حوالة)، ولن يُشحن الطلب قبل اعتماد إيصال الدفع.
+          </p>
+          <label class="flex flex-col gap-1 text-xs font-bold text-solar-text-heading">
+            محافظة التوصيل
+            <select v-model="acceptGovernorateId" class="solar-input text-xs">
+              <option v-for="gov in governorates" :key="gov.id" :value="gov.id">{{ gov.name_ar }}</option>
+            </select>
+          </label>
+          <label class="flex flex-col gap-1 text-xs font-bold text-solar-text-heading">
+            عنوان التوصيل التفصيلي
+            <textarea v-model="acceptAddress" rows="2" maxlength="500" class="solar-input text-xs" placeholder="المديرية، الحي، الشارع، أقرب معلم" />
+          </label>
+          <p v-if="acceptError" class="text-xs font-bold text-red-600" role="alert">{{ acceptError }}</p>
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-solar-border-card">
+            <button type="button" class="btn-outline h-9 px-4 text-xs font-bold" :disabled="isActionLoading" @click="acceptingQuote = null">إلغاء</button>
+            <button type="submit" class="btn-primary h-9 px-5 text-xs font-bold gap-2" :disabled="isActionLoading">
+              <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+              <span>{{ isActionLoading ? 'جارٍ إنشاء الطلب...' : 'تأكيد وإنشاء الطلب' }}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </Teleport>
+
     <CustomerOrdersPaymentReceiptModal
       v-model="receiptOpen"
       :order="receiptOrder"
