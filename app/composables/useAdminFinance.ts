@@ -4,6 +4,16 @@ import type { OrderPayment, StorePayout, PlatformSetting } from '../../types/api
  * كل الطلبات تذهب لمسارات Laravel المحمية (auth + admin + permission)
  * بدل مسارات خادم Nuxt القديمة /api/admin/* التي كانت تعدّل قاعدة البيانات بدون مصادقة.
  */
+export interface EligiblePayout {
+  order_store_id: number
+  order_number: string | null
+  store_name: string | null
+  subtotal: number
+  completed_at: string | null
+  previous_payout_failed: boolean
+  wallets: { id: number; provider: string | null; account_name: string | null; account_last4: string; is_default: boolean }[]
+}
+
 export const useAdminFinance = () => {
   const { $api } = useNuxtApp()
   const { notify } = useAdminNotice()
@@ -126,6 +136,38 @@ export const useAdminFinance = () => {
     }
   }
 
+  /** طلبات فرعية أكّد العميل استلامها ولا توجد لها مستحقات (أو فشلت السابقة) */
+  const eligiblePayouts = useState<EligiblePayout[]>('admin_finance_eligible_payouts', () => [])
+
+  const fetchEligiblePayouts = async (): Promise<EligiblePayout[]> => {
+    try {
+      const res: any = await $api('/admin/finance/payouts/eligible')
+      eligiblePayouts.value = Array.isArray(res?.data) ? res.data : []
+    } catch (err: any) {
+      notify(err?.data?.message || 'تعذر جلب الطلبات المؤهلة للمستحقات')
+    }
+    return eligiblePayouts.value
+  }
+
+  /** إنشاء مستحقات لمورد: الـ API يحسب العمولة والصافي من إجمالي الطلب الفرعي */
+  const createPayout = async (payload: { order_store_id: number; commission_rate: number; user_wallet_id?: number | null }): Promise<{ ok: boolean; message?: string }> => {
+    isActionLoading.value = true
+    try {
+      await $api('/store_payouts', {
+        method: 'POST',
+        body: { ...payload, user_wallet_id: payload.user_wallet_id || undefined },
+      })
+      notify('تم إنشاء سجل المستحقات، وهو الآن بانتظار الصرف.')
+      // التحديث في الخلفية: لا نُبقي النافذة مشغولة حتى تُعاد القوائم من الخادم
+      Promise.all([fetchPayouts(true), fetchEligiblePayouts()])
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, message: err?.data?.message || 'تعذر إنشاء المستحقات' }
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
   /**
    * جلب الإحصائيات والملخص المالي العام
    */
@@ -196,6 +238,9 @@ export const useAdminFinance = () => {
     updatePaymentStatus,
     fetchPayouts,
     updatePayoutStatus,
+    eligiblePayouts,
+    fetchEligiblePayouts,
+    createPayout,
     fetchStats,
     fetchSettings,
     updateSettings,
