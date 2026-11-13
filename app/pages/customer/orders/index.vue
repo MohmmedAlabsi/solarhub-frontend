@@ -148,15 +148,40 @@ function getStatusBadge(status: string) {
   }
 }
 
-// إلغاء طلب شراء
-async function handleCancelOrder(orderId: number) {
-  if (!confirm('هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟')) return
+// تأكيد الإجراءات داخل الصفحة بدل confirm()/alert() من المتصفح
+const actionError = ref<string | null>(null)
+const pendingConfirm = ref<{ title: string; message: string; confirmLabel: string; run: () => Promise<void> } | null>(null)
+
+function showError(message: string) {
+  actionError.value = message
+  setTimeout(() => { actionError.value = null }, 6000)
+}
+
+async function runConfirmed() {
+  const action = pendingConfirm.value
+  if (!action) return
   try {
-    await cancelOrder(orderId)
-    actionNotice.value = 'تم إلغاء الطلب بنجاح.'
-    setTimeout(() => { actionNotice.value = null }, 3500)
-  } catch (err: any) {
-    alert(err?.userMessage || 'تعذر إلغاء الطلب.')
+    await action.run()
+  } finally {
+    pendingConfirm.value = null
+  }
+}
+
+// إلغاء طلب شراء
+function handleCancelOrder(orderId: number) {
+  pendingConfirm.value = {
+    title: 'إلغاء الطلب',
+    message: 'هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟ لا يمكن التراجع عن الإلغاء.',
+    confirmLabel: 'نعم، ألغِ الطلب',
+    run: async () => {
+      try {
+        await cancelOrder(orderId)
+        actionNotice.value = 'تم إلغاء الطلب بنجاح.'
+        setTimeout(() => { actionNotice.value = null }, 3500)
+      } catch (err: any) {
+        showError(err?.data?.message || err?.userMessage || 'تعذر إلغاء الطلب.')
+      }
+    },
   }
 }
 
@@ -201,14 +226,20 @@ async function confirmAcceptQuote() {
 }
 
 // رفض عرض سعر
-async function handleRejectQuote(quoteId: number) {
-  if (!confirm('هل أنت متأكد من رفض أو إلغاء طلب عرض السعر هذا؟')) return
-  try {
-    await rejectQuoteRequest(quoteId)
-    actionNotice.value = 'تم تحديث حالة طلب عرض السعر.'
-    setTimeout(() => { actionNotice.value = null }, 3500)
-  } catch (err: any) {
-    alert(err?.userMessage || 'تعذر رفض عرض السعر.')
+function handleRejectQuote(quoteId: number) {
+  pendingConfirm.value = {
+    title: 'رفض طلب عرض السعر',
+    message: 'هل أنت متأكد من رفض أو إلغاء طلب عرض السعر هذا؟',
+    confirmLabel: 'نعم، ارفض العرض',
+    run: async () => {
+      try {
+        await rejectQuoteRequest(quoteId)
+        actionNotice.value = 'تم تحديث حالة طلب عرض السعر.'
+        setTimeout(() => { actionNotice.value = null }, 3500)
+      } catch (err: any) {
+        showError(err?.data?.message || err?.userMessage || 'تعذر رفض عرض السعر.')
+      }
+    },
   }
 }
 
@@ -265,6 +296,10 @@ onMounted(async () => {
     <div v-if="actionNotice" class="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-xs text-emerald-800 border border-emerald-200">
       <CheckCircle2 class="size-5 shrink-0" />
       <span>{{ actionNotice }}</span>
+    </div>
+    <div v-if="actionError" class="flex items-center gap-2 rounded-xl bg-red-50 p-4 text-xs font-bold text-red-700 border border-red-200" role="alert" data-testid="orders-action-error">
+      <AlertCircle class="size-5 shrink-0" />
+      <span>{{ actionError }}</span>
     </div>
 
     <!-- شريط البحث السريع -->
@@ -515,6 +550,24 @@ onMounted(async () => {
       </div>
     </div>
   
+    <!-- نافذة تأكيد الإجراءات (إلغاء الطلب / رفض العرض) -->
+    <Teleport to="body">
+      <div v-if="pendingConfirm" class="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl" role="alertdialog" aria-modal="true" :aria-label="pendingConfirm.title" data-testid="orders-confirm-dialog">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-xs" @click="!isActionLoading && (pendingConfirm = null)" />
+        <div class="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-solar-border-card flex flex-col gap-3 text-right">
+          <h3 class="text-base font-bold text-solar-text-heading">{{ pendingConfirm.title }}</h3>
+          <p class="text-xs text-solar-text-body leading-relaxed">{{ pendingConfirm.message }}</p>
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-solar-border-card">
+            <button type="button" class="btn-outline h-9 px-4 text-xs font-bold" :disabled="isActionLoading" @click="pendingConfirm = null">تراجع</button>
+            <button type="button" class="h-9 px-5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 inline-flex items-center gap-2" :disabled="isActionLoading" @click="runConfirmed">
+              <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+              <span>{{ pendingConfirm.confirmLabel }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- نافذة قبول العرض: عنوان التوصيل ثم إنشاء الطلب بالسعر المتفق عليه -->
     <Teleport to="body">
       <div v-if="acceptingQuote" class="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl" role="dialog" aria-modal="true" aria-label="قبول عرض السعر وإنشاء الطلب">
