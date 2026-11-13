@@ -274,7 +274,7 @@ export function useVisitorLanding() {
   // Non-Blocking SSR via useLazyAsyncData:
   // server: false guarantees instant TTFB (< 50ms) without SSR network pauses.
   // lazy: true ensures hydration proceeds immediately, showing skeletons while data loads in background.
-  const { data: landingPayload, pending, error: fetchError, refresh } = useLazyAsyncData(
+  const { data: landingPayload, pending, status: landingStatus, error: fetchError, refresh } = useLazyAsyncData(
     'visitor_landing_showcase',
     async () => {
       // 1. Try unified fast showcase endpoint first
@@ -365,7 +365,9 @@ export function useVisitorLanding() {
     if (allProducts.value.length > 0 || allStores.value.length > 0 || allEngineers.value.length > 0) {
       return false
     }
-    return pending.value
+    // مع server: false تكون الحالة 'idle' أثناء SSR (لم يبدأ الجلب بعد)، و'pending' عند أول رسم في المتصفح.
+    // اعتبار idle تحميلاً يجعل الخادم والمتصفح يرسمان الهيكل نفسه (skeleton)، فلا يحدث hydration mismatch.
+    return pending.value || landingStatus.value === 'idle'
   })
 
   // Error message formatting
