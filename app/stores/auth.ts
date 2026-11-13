@@ -618,14 +618,25 @@ export const useAuthStore = defineStore('auth', () => {
    * Logout user and revoke Sanctum access token
    */
   async function logout() {
-    try {
-      if (token.value) {
-        await apiRequest('/auth/logout', { method: 'POST' }).catch(() => {})
-      }
-    } finally {
-      clearAuth()
-      navigateTo('/auth/login', { replace: true })
+    // خروج فوري، وإبطال التوكن على الخادم في الخلفية (انظر useAuth().logout)
+    const previousToken = token.value
+    if (import.meta.client) {
+      // صفحة الدخول تستخدمه لإعادة زر الرجوع/التحديث إلى الرئيسية بعد الخروج
+      try { sessionStorage.setItem('solar_just_logged_out', '1') } catch {}
     }
+    clearAuth()
+    const navigation = navigateTo('/auth/login', { replace: true })
+
+    if (previousToken) {
+      // $fetch مباشرة (وليس apiRequest): apiRequest لا يرمي عند الفشل فلا تعمل إعادة المحاولة،
+      // ويكتب رسالة خطأ في حالة المتجر قد تظهر في صفحة الدخول.
+      void revokeTokenInBackground(() => $fetch(`${apiBase}/auth/logout`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${previousToken}` },
+      }))
+    }
+
+    await navigation
   }
 
   return {

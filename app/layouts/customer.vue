@@ -3,7 +3,6 @@ import AppToast from '../components/common/AppToast.vue'
 import CustomerFooter from '../components/customer/CustomerFooter.vue'
 import CustomerHeader from '../components/customer/CustomerHeader.vue'
 import CustomerSidebar from '../components/customer/CustomerSidebar.vue'
-import CustomerLogoutModal from '../components/customer/CustomerLogoutModal.vue'
 
 const route = useRoute()
 useHead({ bodyAttrs: { class: 'customer-portal' } })
@@ -110,7 +109,6 @@ const showUnavailable = (label: string) => {
       </main>
       <CustomerFooter class="mt-auto w-full shrink-0" @unavailable="showUnavailable" />
     </div>
-    <CustomerLogoutModal />
     <AppToast :message="noticeMessage" />
   </div>
 </template>

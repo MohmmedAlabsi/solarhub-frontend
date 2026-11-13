@@ -16,7 +16,7 @@ const route = useRoute()
 
 const authStore = useAuthStore()
 const { user } = storeToRefs(authStore)
-const { openLogoutModal } = useAdminLogoutModal()
+const { logout } = useAuth()
 
 const userName = computed(() => user.value?.name || 'مدير النظام')
 const userEmail = computed(() => user.value?.email || 'admin@solarhub.sa')
@@ -142,7 +142,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeAccountMe
           <button
             type="button"
             class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-right text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
-            @click="() => { isUserMenuOpen = false; openLogoutModal(); }"
+            @click="() => { isUserMenuOpen = false; logout(); }"
           >
             <LogOut class="size-4" />
             <span>تسجيل الخروج من الإدارة</span>
