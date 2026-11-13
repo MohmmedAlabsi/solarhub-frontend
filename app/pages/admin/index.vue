@@ -68,12 +68,12 @@ async function handleRefresh() {
 
 const today = ref('')
 onMounted(() => {
-  today.value = new Intl.DateTimeFormat('ar-SA', {
+  today.value = new Intl.DateTimeFormat('ar-YE', {
     calendar: 'gregory',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    timeZone: 'Asia/Riyadh',
+    timeZone: 'Asia/Aden',
   }).format(new Date())
 })
 
@@ -192,7 +192,7 @@ const tasks = computed(() => [
           <div class="mt-2 flex items-baseline gap-2">
             <span v-if="pending" class="size-5 animate-pulse rounded bg-slate-200"></span>
             <p v-else class="text-2xl font-bold tracking-tight text-solar-navy">
-              {{ stat.value.toLocaleString('ar-SA', { numberingSystem: 'latn' }) }}
+              {{ stat.value.toLocaleString('ar-YE', { numberingSystem: 'latn' }) }}
             </p>
             <span class="text-xs text-solar-text-muted truncate">{{ stat.detail }}</span>
           </div>

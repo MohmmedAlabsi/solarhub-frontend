@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckCircle, Download, Eye, FileText, Loader2, Trash2, X } from 'lucide-vue-next'
+import { CheckCircle, Download, Eye, FileText, Loader2, PlayCircle, Trash2, X } from 'lucide-vue-next'
 import type { EngineerOffer } from '~~/app/composables/useEngineerOffers'
 
 const props = defineProps<{
@@ -10,10 +10,50 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
   (e: 'withdrawn', offerId: number): void
+  (e: 'updated', request: { status?: string; started_at?: string | null; engineer_completed_at?: string | null }): void
 }>()
 
 const { $api } = useNuxtApp()
 const isWithdrawing = ref(false)
+const actionError = ref('')
+const actionNotice = ref('')
+
+// ===== دورة حياة طلب الخدمة للعرض المقبول =====
+type LifecycleAction = 'start' | 'mark-done'
+const pendingAction = ref<LifecycleAction | null>(null)
+const isActing = ref(false)
+
+const stage = computed(() => {
+  const o = props.offer
+  if (!o || o.status !== 'approved') return null
+  if (o.requestStatus === 'completed') return 'completed'
+  if (o.requestStatus === 'in_progress') return o.requestDoneAt ? 'awaiting_confirmation' : 'in_progress'
+  if (o.requestStatus === 'awarded') return 'awarded'
+  return null
+})
+
+watch(() => props.offer?.rawId, () => {
+  actionError.value = ''
+  actionNotice.value = ''
+  pendingAction.value = null
+})
+
+async function runLifecycleAction() {
+  if (!props.offer || !pendingAction.value) return
+  isActing.value = true
+  actionError.value = ''
+  try {
+    const res: any = await $api(`/service-requests/${props.offer.rawRequestId}/${pendingAction.value}`, { method: 'POST' })
+    actionNotice.value = res?.message || (pendingAction.value === 'start' ? 'تم بدء التنفيذ.' : 'تم إبلاغ العميل بإنهاء العمل.')
+    pendingAction.value = null
+    // تحديث فوري من الاستجابة نفسها (الطلب المحدَّث)، ثم تعيد الصفحة تحميل القائمة في الخلفية
+    emit('updated', res?.data || {})
+  } catch (err: any) {
+    actionError.value = err?.data?.message || 'تعذر تنفيذ الإجراء، حاول مرة أخرى.'
+  } finally {
+    isActing.value = false
+  }
+}
 
 function close() { emit('update:modelValue', false) }
 
@@ -37,7 +77,7 @@ async function handleWithdraw() {
     emit('withdrawn', props.offer.rawId)
     close()
   } catch (err: any) {
-    alert(err?.data?.message || 'تعذر سحب العرض')
+    actionError.value = err?.data?.message || 'تعذر سحب العرض'
   } finally {
     isWithdrawing.value = false
   }
@@ -151,6 +191,49 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
               </div>
             </section>
           </div>
+
+          <!-- مرحلة تنفيذ المشروع (للعرض المقبول فقط) -->
+          <section v-if="stage" class="mx-6 mb-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs leading-relaxed" data-testid="engineer-lifecycle">
+            <h3 class="mb-2 text-sm font-bold text-emerald-900">مرحلة تنفيذ المشروع</h3>
+            <p v-if="stage === 'awarded'" class="text-solar-text-body">تم قبول عرضك. ابدأ التنفيذ عندما تكون جاهزاً ليتم إشعار العميل.</p>
+            <p v-else-if="stage === 'in_progress'" class="text-solar-text-body">المشروع قيد التنفيذ. عند إنهاء العمل أبلغ العميل ليؤكد الاكتمال.</p>
+            <p v-else-if="stage === 'awaiting_confirmation'" class="text-solar-text-body">أبلغت العميل بإنهاء العمل، بانتظار تأكيده للاكتمال.</p>
+            <p v-else class="font-bold text-emerald-800">اكتمل المشروع وأكده العميل.</p>
+
+            <div v-if="stage === 'awarded' || stage === 'in_progress'" class="mt-3">
+              <div v-if="pendingAction" class="flex flex-wrap items-center gap-2">
+                <span class="font-bold text-solar-text-heading">
+                  {{ pendingAction === 'start' ? 'تأكيد بدء التنفيذ؟' : 'تأكيد إنهاء العمل وإبلاغ العميل؟' }}
+                </span>
+                <button type="button" class="btn-primary h-8 px-4 text-xs font-bold gap-1.5" :disabled="isActing" @click="runLifecycleAction">
+                  <Loader2 v-if="isActing" class="size-3.5 animate-spin" />
+                  <span>نعم، تأكيد</span>
+                </button>
+                <button type="button" class="btn-outline h-8 px-3 text-xs font-bold" :disabled="isActing" @click="pendingAction = null">تراجع</button>
+              </div>
+              <button
+                v-else-if="stage === 'awarded'"
+                type="button"
+                class="btn-primary h-9 px-4 text-xs font-bold gap-1.5"
+                @click="pendingAction = 'start'"
+              >
+                <PlayCircle class="size-4" />
+                <span>بدء التنفيذ</span>
+              </button>
+              <button
+                v-else
+                type="button"
+                class="btn-primary h-9 px-4 text-xs font-bold gap-1.5"
+                @click="pendingAction = 'mark-done'"
+              >
+                <CheckCircle class="size-4" />
+                <span>تم إنهاء العمل</span>
+              </button>
+            </div>
+          </section>
+
+          <p v-if="actionNotice" class="mx-6 mb-3 rounded-lg bg-emerald-50 p-2.5 text-xs font-bold text-emerald-800" role="status">{{ actionNotice }}</p>
+          <p v-if="actionError" class="mx-6 mb-3 rounded-lg bg-red-50 p-2.5 text-xs font-bold text-red-700" role="alert">{{ actionError }}</p>
 
           <!-- فوتر المودال -->
           <div class="border-t border-solar-border-card px-6 py-4 shrink-0 flex items-center justify-between gap-3">

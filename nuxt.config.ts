@@ -64,8 +64,12 @@ export default defineNuxtConfig({
   // Laravel API المتغيرات البيئية ورابط
   runtimeConfig: {
     public: {
+      // رابط واحد للـ API. في الإنتاج اضبط NUXT_PUBLIC_API_BASE=https://your-api/api
+      // (apiBaseUrl تُرك فارغاً حتى لا يطغى على apiBase بقيمة localhost كما كان يحدث)
       apiBase: 'http://127.0.0.1:8000/api',
-      apiBaseUrl: 'http://127.0.0.1:8000/api',
+      // يُضبط عبر NUXT_PUBLIC_API_BASE في .env (مثلاً http://solarhub-api.test/api مع Herd)
+      // apiBaseUrl فارغ افتراضياً حتى يكون apiBase هو المصدر الوحيد (كل الكود يستخدم apiBaseUrl || apiBase)
+      apiBaseUrl: '',
       appName: 'SolarHub',
     }
   },
@@ -76,23 +80,16 @@ export default defineNuxtConfig({
     defaults: {
       nuxtLink: {
         prefetch: false,
-        noPrefetch: true,
       },
-    },
-  },
-
-  // تعطيل فئة البريفيتش الافتراضية
-  router: {
-    options: {
-      linkPrefetchedClass: undefined,
     },
   },
 
   // سياسة الرندرة الهجينة (Hybrid Rendering Policy) حسب معايير سولار هب
   routeRules: {
-    '/products/**': { swr: 3600 },
+    '/products/**': { swr: 300 }, // الأسعار والمخزون تتغير؛ 5 دقائق بدل ساعة
     '/customer/**': { ssr: false },
     '/engineer/**': { ssr: false },
+    '/supplier/**': { ssr: false },
     '/auth/**': { ssr: false },
     '/admin/**': { ssr: false },
     '/profile/**': { ssr: false },

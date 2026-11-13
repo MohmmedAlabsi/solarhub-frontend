@@ -57,7 +57,8 @@ export const useAdminServices = () => {
         const offers = Array.isArray(item.offers)
           ? item.offers.map((offer: any) => ({
               id: String(offer.id),
-              engineerId: String(offer.engineer_id || offer.engineer?.id || '1'),
+              engineerId: String(offer.engineer_id || offer.engineer?.id || ''),
+              engineerName: offer.engineer_name || offer.engineer?.name || offer.engineer?.user?.name || '',
               price: Number(offer.proposed_cost) || 0,
               duration: Number(offer.execution_time_days) || 7,
               proposal: offer.technical_proposal || '',

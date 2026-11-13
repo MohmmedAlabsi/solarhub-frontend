@@ -173,7 +173,7 @@ export function useSupplierFinance() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(val || 0)
-    return includeCurrency ? `${formatted} ر.س` : formatted
+    return includeCurrency ? `${formatted} ر.ي` : formatted
   }
 
   const changePage = (page: number) => {
@@ -185,29 +185,21 @@ export function useSupplierFinance() {
   const requestWithdraw = async (input: WithdrawRequestInput): Promise<boolean> => {
     isWithdrawing.value = true
     try {
-      try {
-        await $api<any>('/my/store-payouts/request', {
-          method: 'POST',
-          body: {
-            amount: input.amount,
-            notes: input.notes || undefined,
-          },
-        })
-      } catch (e: any) {
-        await $api<any>('/store_payouts', {
-          method: 'POST',
-          body: {
-            amount: input.amount,
-            notes: input.notes || undefined,
-          },
-        })
-      }
-      showNotice('تم إرسال طلب سحب المستحقات بنجاح، جاري مراجعة الطلب وتحويل المبلغ.')
+      // مسار واحد في الخادم يرسل طلب الصرف للإدارة (سابقاً كان المسار غير موجود
+      // ثم يحاول /store_payouts الخاص بالإدارة فيفشل دائماً)
+      await $api<any>('/my/store-payouts/request', {
+        method: 'POST',
+        body: {
+          amount: input.amount,
+          notes: input.notes || undefined,
+        },
+      })
+      showNotice('تم إرسال طلب صرف المستحقات للإدارة، وسيتم التحويل بعد المراجعة.')
       await fetchSettlements()
       return true
     } catch (err: any) {
       console.error('Failed to submit withdraw request:', err)
-      const msg = err?.data?.message || 'حدث خطأ أثناء رفع طلب السحب. يرجى المحاولة لاحقاً.'
+      const msg = err?.data?.userMessage || err?.data?.message || 'حدث خطأ أثناء رفع طلب السحب. يرجى المحاولة لاحقاً.'
       showNotice(msg)
       return false
     } finally {

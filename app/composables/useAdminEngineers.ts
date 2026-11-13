@@ -21,7 +21,7 @@ export const useAdminEngineers = () => {
 
     try {
       const [approvedSettled, pendingSettled] = await Promise.allSettled([
-        $api('/engineers?per_page=30'),
+        $api('/engineers?per_page=100'),
         $api('/admin/engineers/pending'),
       ])
 

@@ -157,7 +157,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
               <!-- التكلفة الإجمالية -->
               <div class="flex flex-col gap-1.5">
                 <label for="offer-cost" class="text-xs font-bold text-solar-text-heading">
-                  التكلفة الإجمالية المقترحة (ر.س)*
+                  التكلفة الإجمالية المقترحة (ر.ي)*
                 </label>
                 <div class="relative">
                   <input
@@ -170,7 +170,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
                     :class="{ 'border-red-400 focus:border-red-400 focus:ring-red-100': errors.totalCost }"
                     aria-describedby="offer-cost-unit"
                   />
-                  <span id="offer-cost-unit" class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-solar-text-muted">ر.س</span>
+                  <span id="offer-cost-unit" class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-solar-text-muted">ر.ي</span>
                 </div>
                 <p v-if="errors.totalCost" class="text-xs text-red-500">{{ errors.totalCost }}</p>
               </div>

@@ -2,13 +2,13 @@ import { ref, computed, onMounted } from 'vue'
 import type {
   SupplierProductItem,
   MasterProductSummary,
-  GovernorateItem,
+  SupplierGovernorateItem,
   CreateSupplierProductInput,
   UpdateSupplierProductInput,
 } from '~/types/supplier-product'
 
 // دالة ذكية وموثوقة لاستخراج الرابط الكامل لصورة المنتج من Supabase Storage أو البدائل المحلية
-export function resolveProductImage(mp: any): string {
+export function resolveSupplierProductImage(mp: any): string {
   if (Array.isArray(mp?.images) && mp.images.length > 0) {
     const featured = mp.images.find((img: any) => img.is_featured)
     const target = featured || mp.images[0]
@@ -40,7 +40,7 @@ export function useSupplierProducts() {
   const masterCatalog = ref<MasterProductSummary[]>([])
   const categories = ref<string[]>([])
   const brands = ref<string[]>([])
-  const governorates = ref<GovernorateItem[]>([])
+  const governorates = ref<SupplierGovernorateItem[]>([])
 
   const isLoading = ref(false)
   const isActionLoading = ref(false)
@@ -81,7 +81,7 @@ export function useSupplierProducts() {
     const brandName = mp.brand?.name || (typeof mp.brand === 'string' ? mp.brand : 'طاقة شمسية')
     const categoryName = mp.category?.name_ar || (typeof mp.category === 'string' ? mp.category : 'عام')
     const sku = mp.model_number || `SKU-${item.id}`
-    const img = resolveProductImage(mp)
+    const img = resolveSupplierProductImage(mp)
 
     const stock = Number(item.stock_quantity ?? item.stockQuantity ?? 0)
     let status: 'active' | 'out_of_stock' | 'inactive' = 'active'
@@ -186,7 +186,7 @@ export function useSupplierProducts() {
             category: m.category,
             brand: m.brand,
             images: Array.isArray(m.images) ? m.images : [],
-            image: resolveProductImage(m),
+            image: resolveSupplierProductImage(m),
           }))
         }
       }
@@ -397,39 +397,36 @@ export function useSupplierProducts() {
     const target = products.value.find(p => p.id === id)
     if (!target) return
 
-    const previousStatus = target.status
     const newStatus: 'active' | 'inactive' = target.status === 'active' ? 'inactive' : 'active'
-    target.status = newStatus
 
+    // لا نغيّر الحالة في الواجهة إلا بعد نجاح الطلب؛ عند الفشل تبقى كما هي مع رسالة الخطأ
     try {
       await $api<any>(`/store-products/${id}`, {
         method: 'PUT',
         body: { status: newStatus },
       })
+      target.status = newStatus
       showNotice(newStatus === 'active' ? 'تم تنشيط المنتج وعرضه في المتجر.' : 'تم إخفاء المنتج مؤقتاً.')
-    } catch (err) {
-      // Revert if error
+    } catch (err: any) {
       console.warn('API toggle failed:', err)
-      showNotice(newStatus === 'active' ? 'تم تنشيط المنتج محلياً.' : 'تم تعطيل المنتج محلياً.')
+      showNotice(err?.data?.userMessage || err?.data?.message || 'تعذر تغيير حالة المنتج، لم يتم حفظ أي تغيير. حاول مرة أخرى.')
     }
   }
 
   // 6. حذف المنتج من المتجر
   async function deleteProduct(id: number) {
-    const prevIndex = products.value.findIndex(p => p.id === id)
-    if (prevIndex === -1) return
+    if (!products.value.some(p => p.id === id)) return
 
-    const removedItem = products.value[prevIndex]
-    products.value.splice(prevIndex, 1)
-
+    // لا نحذف من القائمة إلا بعد نجاح الطلب؛ عند الفشل يبقى المنتج ظاهراً مع رسالة الخطأ
     try {
       await $api<any>(`/store-products/${id}`, {
         method: 'DELETE',
       })
+      products.value = products.value.filter(p => p.id !== id)
       showNotice('تم حذف المنتج من متجرك بنجاح.')
     } catch (err: any) {
       console.warn('API delete failed:', err)
-      showNotice(err?.data?.message || 'تم حذف المنتج من العرض.')
+      showNotice(err?.data?.userMessage || err?.data?.message || 'تعذر حذف المنتج، لم يتم حذف أي شيء. حاول مرة أخرى.')
     }
   }
 

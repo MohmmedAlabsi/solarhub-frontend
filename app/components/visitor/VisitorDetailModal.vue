@@ -126,7 +126,7 @@ const engineer = computed(() => (props.type === 'engineer' ? (props.item as Visi
           <div v-if="product.price" class="p-4 rounded-2xl bg-solar-yellow/10 border border-solar-yellow/30 flex items-center justify-between">
             <span class="text-xs font-bold text-solar-text-muted">السعر الاسترشادي:</span>
             <span class="text-lg font-black font-mono text-solar-navy-dark dark:text-solar-yellow">
-              {{ product.price.toLocaleString('en-US') }} ر.س
+              {{ product.price.toLocaleString('en-US') }} ر.ي
             </span>
           </div>
 

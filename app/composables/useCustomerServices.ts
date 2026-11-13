@@ -48,6 +48,11 @@ export interface ApiCustomerServiceRequest {
   status: 'open_for_bids' | 'awarded' | 'in_progress' | 'completed' | 'cancelled'
   offers?: ApiServiceOffer[]
   created_at: string
+  // دورة حياة الطلب بعد قبول العرض
+  started_at?: string | null
+  engineer_completed_at?: string | null
+  completed_at?: string | null
+  rating?: { id: number; rating: number; comment?: string | null; created_at?: string } | null
 }
 
 export const requestStatusLabels: Record<string, { label: string; class: string }> = {
@@ -224,6 +229,49 @@ export function useCustomerServices() {
   }
 
   /**
+   * تأكيد اكتمال المشروع (بعد أن يبلغ المهندس بإنهاء العمل): in_progress → completed
+   */
+  const confirmCompletion = async (requestId: number): Promise<ApiCustomerServiceRequest> => {
+    isActionLoading.value = true
+    error.value = null
+    try {
+      const res: any = await $api(`/service-requests/${requestId}/confirm-completion`, { method: 'POST' })
+      const updated: ApiCustomerServiceRequest = res?.data || res
+      if (currentRequest.value && currentRequest.value.id === requestId) {
+        currentRequest.value = { ...currentRequest.value, ...updated }
+      }
+      myRequests.value = myRequests.value.map(r => r.id === requestId ? { ...r, status: 'completed' } : r)
+      return updated
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
+  /**
+   * تقييم المهندس مرة واحدة بعد اكتمال الطلب
+   */
+  const rateEngineer = async (requestId: number, rating: number, comment?: string) => {
+    isActionLoading.value = true
+    error.value = null
+    try {
+      const res: any = await $api('/engineer-ratings', {
+        method: 'POST',
+        body: { service_request_id: requestId, rating, comment: comment?.trim() || undefined },
+      })
+      const saved = res?.data || res
+      if (currentRequest.value && currentRequest.value.id === requestId) {
+        currentRequest.value = {
+          ...currentRequest.value,
+          rating: { id: saved?.id, rating, comment: comment?.trim() || null },
+        }
+      }
+      return saved
+    } finally {
+      isActionLoading.value = false
+    }
+  }
+
+  /**
    * إلغاء طلب خدمة
    */
   const cancelServiceRequest = async (requestId: number): Promise<ApiCustomerServiceRequest> => {
@@ -264,5 +312,7 @@ export function useCustomerServices() {
     createServiceRequest,
     acceptOffer,
     cancelServiceRequest,
+    confirmCompletion,
+    rateEngineer,
   }
 }

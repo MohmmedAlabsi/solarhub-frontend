@@ -11,14 +11,14 @@ import {
 } from 'lucide-vue-next'
 import type {
   SupplierProductItem,
-  GovernorateItem,
+  SupplierGovernorateItem,
   UpdateSupplierProductInput,
 } from '~/types/supplier-product'
 
 const props = defineProps<{
   isOpen: boolean
   product: SupplierProductItem | null
-  governorates: GovernorateItem[]
+  governorates: SupplierGovernorateItem[]
   isSubmitting?: boolean
 }>()
 
@@ -181,7 +181,7 @@ function handleSubmit() {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                السعر الفردي للبيع (ر.س) <span class="text-rose-500">*</span>
+                السعر الفردي للبيع (ر.ي) <span class="text-rose-500">*</span>
               </label>
               <div class="relative flex items-center">
                 <input
@@ -193,7 +193,7 @@ function handleSubmit() {
                   :class="errors.price ? 'border-rose-400' : ''"
                 />
                 <span class="pointer-events-none absolute left-3 text-xs font-bold text-solar-text-muted">
-                  ر.س
+                  ر.ي
                 </span>
               </div>
               <p v-if="errors.price" class="mt-1 text-[11px] text-rose-500 font-bold">

@@ -9,13 +9,15 @@ const authStore = useAuthStore()
 const { isDark } = useTheme()
 
 const dashboardPath = computed(() => authStore.getDashboardPath())
+// اسم الدور يظهر كشارة صغيرة بجانب زر "لوحة التحكم" وفي التلميح (title)
 const roleLabel = computed(() => {
   const role = authStore.userRole
-  if (role === 'admin') return 'مدير النظام'
-  if (role === 'supplier') return 'بوابة المورد'
-  if (role === 'engineer') return 'مهندس معتمد'
-  return 'بوابة العميل'
+  if (role === 'admin') return 'مدير'
+  if (role === 'supplier') return 'مورد'
+  if (role === 'engineer') return 'مهندس'
+  return 'عميل'
 })
+const dashboardTitle = computed(() => `لوحة التحكم — حساب ${roleLabel.value}`)
 
 const navLinks = [
   { label: 'الرئيسية', to: '/' },
@@ -84,10 +86,12 @@ const isMobileOpen = ref(false)
             :prefetch="false"
             no-prefetch
             class="btn-primary px-3.5 py-2 text-xs font-black gap-1.5 shadow-sm"
-            :title="`الانتقال إلى ${roleLabel}`"
+            :title="dashboardTitle"
+            :aria-label="dashboardTitle"
           >
-            <LayoutDashboard class="size-4" />
-            <span>{{ roleLabel }}</span>
+            <LayoutDashboard class="size-4" aria-hidden="true" />
+            <span>لوحة التحكم</span>
+            <span class="rounded-md bg-solar-navy-dark/10 px-1.5 py-0.5 text-[10px] font-bold leading-none" aria-hidden="true">{{ roleLabel }}</span>
           </NuxtLink>
 
           <!-- زر لوحة الإدارة إذا كان المستخدم أدمن -->
@@ -179,10 +183,13 @@ const isMobileOpen = ref(false)
               :prefetch="false"
               no-prefetch
               class="btn-primary w-full text-center py-2.5 text-xs font-black flex items-center justify-center gap-1.5"
+              :title="dashboardTitle"
+              :aria-label="dashboardTitle"
               @click="isMobileOpen = false"
             >
-              <LayoutDashboard class="size-4" />
-              <span>{{ roleLabel }}</span>
+              <LayoutDashboard class="size-4" aria-hidden="true" />
+              <span>لوحة التحكم</span>
+              <span class="rounded-md bg-solar-navy-dark/10 px-1.5 py-0.5 text-[10px] font-bold leading-none" aria-hidden="true">{{ roleLabel }}</span>
             </NuxtLink>
             <button
               type="button"

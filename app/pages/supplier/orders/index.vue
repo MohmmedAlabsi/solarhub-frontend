@@ -287,7 +287,7 @@ async function handleStatusUpdate(newStatus: SupplierOrderStatus, notes?: string
                 <div class="font-black text-sm text-solar-text-heading font-mono">
                   {{ order.subtotal.toLocaleString('en-US') }}
                 </div>
-                <div class="text-[10px] text-solar-text-muted font-bold">ر.س</div>
+                <div class="text-[10px] text-solar-text-muted font-bold">ر.ي</div>
               </td>
 
               <!-- 6. حالة الطلب (Pills ملونة ومطابقة تماماً للنظام) -->

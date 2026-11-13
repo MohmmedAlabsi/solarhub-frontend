@@ -1,5 +1,29 @@
 import type { Brand, Category, Governorate, ServiceType, Specialization, WalletProvider } from '../../types/api'
 
+/**
+ * تحويل بيانات المحفظة (بما فيها شعار base64) إلى FormData لمسارات Laravel /wallet_providers.
+ */
+function walletProviderFormData(
+  data: { code?: string; name_ar?: string; name_en?: string | null; is_active?: boolean; logo_base64?: string | null; logo_filename?: string | null },
+  method?: 'PUT'
+): FormData {
+  const fd = new FormData()
+  if (method) fd.append('_method', method)
+  if (data.code !== undefined) fd.append('code', String(data.code).trim().toUpperCase())
+  if (data.name_ar !== undefined) fd.append('name_ar', String(data.name_ar).trim())
+  if (data.name_en) fd.append('name_en', String(data.name_en).trim())
+  if (data.is_active !== undefined) fd.append('is_active', data.is_active ? '1' : '0')
+  if (data.logo_base64) {
+    const raw = data.logo_base64.includes(',') ? data.logo_base64.split(',').pop()! : data.logo_base64
+    const bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0))
+    const name = data.logo_filename || 'logo.png'
+    const ext = (name.split('.').pop() || 'png').toLowerCase()
+    const type = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : ext === 'webp' ? 'image/webp' : 'image/png'
+    fd.append('logo', new File([bytes], name, { type }))
+  }
+  return fd
+}
+
 export const useAdminMasterData = () => {
   const { $api } = useNuxtApp()
   const { notify } = useAdminNotice()
@@ -546,12 +570,7 @@ export const useAdminMasterData = () => {
     if (!force && walletProviders.value.length > 0) return walletProviders.value
     isLoading.value = true
     try {
-      let res: any
-      try {
-        res = await $api('/admin/wallet-providers')
-      } catch {
-        res = await $fetch('/api/admin/wallet-providers')
-      }
+      const res: any = await $api('/admin/wallet-providers')
       const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
       walletProviders.value = data
       return data
@@ -566,16 +585,16 @@ export const useAdminMasterData = () => {
   const createWalletProvider = async (data: { code: string; name_ar: string; name_en?: string | null; is_active?: boolean; logo_path?: string | null; logo_base64?: string | null; logo_filename?: string | null }): Promise<WalletProvider | null> => {
     isActionLoading.value = true
     try {
-      const res: any = await $fetch('/api/admin/wallet-providers', {
+      const res: any = await $api('/wallet_providers', {
         method: 'POST',
-        body: data,
+        body: walletProviderFormData(data),
       })
       const created = res?.data || res
       walletProviders.value.unshift(created)
       notify('تمت إضافة مزود المحفظة بنجاح')
       return created
     } catch (err: any) {
-      notify(err?.message || 'حدث خطأ أثناء إضافة المحفظة.')
+      notify(err?.data?.userMessage || err?.message || 'حدث خطأ أثناء إضافة المحفظة.')
       throw err
     } finally {
       isActionLoading.value = false
@@ -585,9 +604,10 @@ export const useAdminMasterData = () => {
   const updateWalletProvider = async (id: number | string, data: { code?: string; name_ar?: string; name_en?: string | null; is_active?: boolean; logo_path?: string | null; logo_base64?: string | null; logo_filename?: string | null }): Promise<WalletProvider | null> => {
     isActionLoading.value = true
     try {
-      const res: any = await $fetch(`/api/admin/wallet-providers/${id}`, {
-        method: 'PUT',
-        body: data,
+      // POST + _method=PUT لأن PHP لا يقرأ الملفات في طلبات PUT متعددة الأجزاء
+      const res: any = await $api(`/wallet_providers/${id}`, {
+        method: 'POST',
+        body: walletProviderFormData(data, 'PUT'),
       })
       const updated = res?.data || res
       const idx = walletProviders.value.findIndex(w => String(w.id) === String(id))
@@ -597,7 +617,7 @@ export const useAdminMasterData = () => {
       notify('تم تحديث بيانات المحفظة بنجاح')
       return updated
     } catch (err: any) {
-      notify(err?.message || 'حدث خطأ أثناء تحديث المحفظة.')
+      notify(err?.data?.userMessage || err?.message || 'حدث خطأ أثناء تحديث المحفظة.')
       throw err
     } finally {
       isActionLoading.value = false
@@ -607,15 +627,21 @@ export const useAdminMasterData = () => {
   const deleteWalletProvider = async (id: number | string): Promise<boolean> => {
     isActionLoading.value = true
     try {
-      const res: any = await $fetch(`/api/admin/wallet-providers/${id}`, {
+      const res: any = await $api(`/wallet_providers/${id}`, {
         method: 'DELETE',
       })
       const message = res?.message || 'تم حذف المحفظة بنجاح'
-      walletProviders.value = walletProviders.value.filter(w => String(w.id) !== String(id))
+      if (res?.data && res.data.is_active === false) {
+        // المحفظة مستخدمة في معاملات سابقة: الخادم عطّلها بدل حذفها
+        const idx = walletProviders.value.findIndex(w => String(w.id) === String(id))
+        if (idx !== -1) walletProviders.value[idx] = { ...walletProviders.value[idx], is_active: false }
+      } else {
+        walletProviders.value = walletProviders.value.filter(w => String(w.id) !== String(id))
+      }
       notify(message)
       return true
     } catch (err: any) {
-      notify(err?.message || 'تعذر حذف المحفظة.')
+      notify(err?.data?.userMessage || err?.message || 'تعذر حذف المحفظة.')
       return false
     } finally {
       isActionLoading.value = false

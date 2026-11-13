@@ -54,9 +54,54 @@ const notes = ref('')
 const deliveryCoordinates = ref<string | null>(null)
 
 // طريقة الدفع
-const paymentMethod = ref<'wallet' | 'cod' | 'bank_transfer'>('wallet')
+// كل الطلبات مدفوعة مسبقاً (لا يوجد دفع عند الاستلام): محفظة إلكترونية أو حوالة فقط
+const paymentMethod = ref<'wallet' | 'bank_transfer'>('wallet')
 const selectedWalletId = ref<number | null>(null)
 const selectedWallet = computed(() => walletProviders.value.find(p => p.id === selectedWalletId.value))
+
+// إرفاق إيصال الدفع بعد إنشاء الطلب (المحفظة / الحوالة)
+// سابقاً كانت طريقة الدفع تُختار ولا تُرسل للخادم ولا توجد أي صفحة لرفع الإيصال.
+const { $api } = useNuxtApp()
+const receiptFile = ref<File | null>(null)
+const transactionReference = ref('')
+const isSubmittingPayment = ref(false)
+const paymentSubmitted = ref(false)
+const paymentError = ref<string | null>(null)
+
+function onReceiptSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  receiptFile.value = input.files?.[0] || null
+}
+
+async function submitPaymentReceipt() {
+  if (!createdOrder.value) return
+  if (!receiptFile.value) {
+    paymentError.value = 'يرجى اختيار صورة أو ملف PDF لإيصال الدفع.'
+    return
+  }
+
+  isSubmittingPayment.value = true
+  paymentError.value = null
+  try {
+    const formData = new FormData()
+    formData.append('order_id', String(createdOrder.value.id))
+    formData.append('amount', String(createdOrder.value.total_amount))
+    if (paymentMethod.value === 'wallet' && selectedWalletId.value) {
+      formData.append('wallet_provider_id', String(selectedWalletId.value))
+    }
+    if (transactionReference.value.trim()) {
+      formData.append('transaction_reference', transactionReference.value.trim())
+    }
+    formData.append('receipt', receiptFile.value)
+
+    await $api('/order_payments', { method: 'POST', body: formData })
+    paymentSubmitted.value = true
+  } catch (err: any) {
+    paymentError.value = err?.data?.userMessage || err?.data?.message || 'تعذر رفع إيصال الدفع، حاول مرة أخرى.'
+  } finally {
+    isSubmittingPayment.value = false
+  }
+}
 
 // نافذة نجاح الطلب
 const isSuccessModalOpen = ref(false)
@@ -269,7 +314,7 @@ onMounted(async () => {
             <h2 class="text-base font-bold text-solar-text-heading">3. طريقة الدفع المعتمدة</h2>
           </div>
 
-          <div class="grid gap-3 sm:grid-cols-3">
+          <div class="grid gap-3 sm:grid-cols-2">
             <!-- خيار المحافظ الإلكترونية -->
             <label
               class="flex flex-col gap-2 rounded-xl border p-4 cursor-pointer transition-all"
@@ -285,23 +330,6 @@ onMounted(async () => {
                 />
               </div>
               <p class="text-[11px] text-solar-text-muted">الدفع عبر الكريمي، ون كاش، فلوسك، جايبي...</p>
-            </label>
-
-            <!-- خيار الدفع عند الاستلام -->
-            <label
-              class="flex flex-col gap-2 rounded-xl border p-4 cursor-pointer transition-all"
-              :class="paymentMethod === 'cod' ? 'border-amber-500 bg-amber-50/30 ring-1 ring-amber-500' : 'border-solar-border-card hover:bg-solar-bg-subtle'"
-            >
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-solar-text-heading">الدفع عند الاستلام</span>
-                <input
-                  v-model="paymentMethod"
-                  type="radio"
-                  value="cod"
-                  class="accent-amber-600"
-                />
-              </div>
-              <p class="text-[11px] text-solar-text-muted">الدفع نقداً بعد فحص ومطابقة الشحنة في الموقع</p>
             </label>
 
             <!-- خيار الحوالة البنكية -->
@@ -387,7 +415,7 @@ onMounted(async () => {
                   </span>
                 </div>
                 <p class="text-[11px] text-amber-900/80 leading-relaxed">
-                  سيتم تزويدك برقم حساب المحفظة المعتمد لدى SolarHub فور تأكيد الطلب، مع إمكانية رفع إشعار السداد مباشرة لتجهيز الشحنة والتوصيل دون أي تأخير.
+                  بعد تأكيد الطلب ستظهر لك خانة لرفع إيصال الدفع، وتتم مراجعته من الإدارة قبل اعتماده.
                 </p>
               </div>
             </div>
@@ -416,7 +444,7 @@ onMounted(async () => {
                 <span class="truncate font-semibold text-solar-text-heading">{{ item.product.name }}</span>
               </div>
               <span class="font-bold text-solar-navy-dark shrink-0">
-                {{ Number(item.line_total ?? (item.product.price * item.quantity)).toLocaleString() }} ر.س
+                {{ Number(item.line_total ?? (item.product.price * item.quantity)).toLocaleString() }} ر.ي
               </span>
             </div>
           </div>
@@ -425,26 +453,16 @@ onMounted(async () => {
           <div class="flex flex-col gap-2.5 text-xs pt-2">
             <div class="flex items-center justify-between text-solar-text-body">
               <span>المجموع الفرعي</span>
-              <span class="font-bold text-solar-text-heading">{{ cartStore.subtotal.toLocaleString() }} ر.س</span>
+              <span class="font-bold text-solar-text-heading">{{ cartStore.subtotal.toLocaleString() }} ر.ي</span>
             </div>
 
-            <div class="flex items-center justify-between text-solar-text-body">
-              <span>ضريبة القيمة المضافة (15%)</span>
-              <span class="font-bold text-solar-text-heading">{{ cartStore.vat.toLocaleString() }} ر.س</span>
-            </div>
-
-            <div class="flex items-center justify-between text-solar-text-body">
-              <span>رسوم الشحن والتوصيل</span>
-              <span class="font-bold text-emerald-600">
-                {{ cartStore.shippingFee === 0 ? 'مجاني' : `${cartStore.shippingFee} ر.س` }}
-              </span>
-            </div>
+            <p class="text-[11px] text-solar-text-muted">رسوم التوصيل (إن وُجدت) يتم الاتفاق عليها مع المتجر.</p>
 
             <div class="border-t border-solar-border-card pt-3 flex items-baseline justify-between text-base">
               <span class="font-bold text-solar-text-heading">الإجمالي المستحق:</span>
               <div class="flex items-baseline gap-1">
                 <span class="text-xl font-black text-solar-navy-dark">{{ cartStore.total.toLocaleString() }}</span>
-                <span class="text-xs font-bold text-solar-text-muted">ر.س</span>
+                <span class="text-xs font-bold text-solar-text-muted">ر.ي</span>
               </div>
             </div>
           </div>
@@ -465,7 +483,7 @@ onMounted(async () => {
           <div class="flex flex-col gap-2 pt-3 border-t border-solar-border-card text-[11px] text-solar-text-muted">
             <div class="flex items-center gap-2">
               <ShieldCheck class="size-4 text-emerald-600 shrink-0" />
-              <span>فواتير ضريبية إلكترونية معتمدة للمعدات</span>
+              <span>متاجر وموردون معتمدون من المنصة</span>
             </div>
             <div class="flex items-center gap-2">
               <Truck class="size-4 text-blue-600 shrink-0" />
@@ -494,6 +512,46 @@ onMounted(async () => {
           <p class="text-xs text-solar-text-secondary max-w-xs mb-6 leading-relaxed">
             تم إرسال تفاصيل الطلب إلى المتاجر المعتمدة لبدء تجهيز المعدات وفحصها قبل التسليم لأسطول الشحن.
           </p>
+
+          <!-- رفع إيصال الدفع (للمحفظة والحوالة) -->
+          <div class="w-full mb-6 rounded-xl border border-amber-500/30 bg-amber-50/50 p-4 text-right">
+            <p class="text-xs font-bold text-solar-text-heading mb-1">إرفاق إيصال الدفع</p>
+            <p class="text-[11px] text-solar-text-muted mb-3">
+              المبلغ المطلوب: <span class="font-bold">{{ Number(createdOrder.total_amount).toLocaleString() }} ر.ي</span>
+              <span v-if="selectedWallet"> — عبر {{ selectedWallet.name_ar }}</span>
+            </p>
+
+            <div v-if="paymentSubmitted" class="flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-700">
+              <CheckCircle2 class="size-4 shrink-0" />
+              <span>تم رفع الإيصال وهو الآن قيد المراجعة من الإدارة.</span>
+            </div>
+
+            <div v-else class="flex flex-col gap-2">
+              <input
+                v-model="transactionReference"
+                type="text"
+                maxlength="150"
+                placeholder="رقم العملية / المرجع (اختياري)"
+                class="solar-input text-xs"
+              />
+              <input
+                type="file"
+                accept="image/jpeg,image/png,application/pdf"
+                class="text-xs"
+                @change="onReceiptSelected"
+              />
+              <p v-if="paymentError" class="text-[11px] text-red-600">{{ paymentError }}</p>
+              <button
+                type="button"
+                class="btn-primary text-xs py-2.5 justify-center gap-2"
+                :disabled="isSubmittingPayment"
+                @click="submitPaymentReceipt"
+              >
+                <Loader2 v-if="isSubmittingPayment" class="size-4 animate-spin" />
+                <span>{{ isSubmittingPayment ? 'جارٍ الرفع...' : 'رفع الإيصال' }}</span>
+              </button>
+            </div>
+          </div>
 
           <div class="flex flex-col sm:flex-row gap-3 w-full">
             <NuxtLink

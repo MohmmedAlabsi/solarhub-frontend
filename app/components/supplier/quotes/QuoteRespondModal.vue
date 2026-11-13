@@ -131,7 +131,7 @@ function handleSubmit() {
           <div class="flex items-center justify-between">
             <span class="font-bold text-amber-800 dark:text-amber-300">السعر المستهدف المقترح من العميل:</span>
             <span class="font-black font-mono text-amber-900 dark:text-amber-200">
-              {{ quote.customerTargetPrice.toLocaleString('en-US') }} ر.س
+              {{ quote.customerTargetPrice.toLocaleString('en-US') }} ر.ي
             </span>
           </div>
         </div>
@@ -155,7 +155,7 @@ function handleSubmit() {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label class="block text-xs font-bold text-solar-text-heading mb-1.5">
-                سعر الوحدة المعروض (ر.س) <span class="text-red-500">*</span>
+                سعر الوحدة المعروض (ر.ي) <span class="text-red-500">*</span>
               </label>
               <div class="relative flex items-center">
                 <input
@@ -169,7 +169,7 @@ function handleSubmit() {
                   required
                 />
                 <span class="pointer-events-none absolute left-3 text-xs font-bold text-solar-text-muted">
-                  ر.س
+                  ر.ي
                 </span>
               </div>
             </div>
@@ -180,7 +180,7 @@ function handleSubmit() {
               </label>
               <div class="h-11 rounded-xl border border-solar-border-card bg-blue-50/50 dark:bg-blue-950/40 px-3.5 flex items-center justify-between text-xs font-mono font-black text-solar-navy-dark dark:text-solar-yellow">
                 <span>{{ calculatedTotalPrice ? calculatedTotalPrice.toLocaleString('en-US') : 'يُحسب تلقائياً...' }}</span>
-                <span class="text-solar-text-muted text-[11px]">ر.س</span>
+                <span class="text-solar-text-muted text-[11px]">ر.ي</span>
               </div>
             </div>
           </div>

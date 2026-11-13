@@ -3,7 +3,6 @@ import AppToast from '../components/common/AppToast.vue'
 import SupplierFooter from '../components/supplier/SupplierFooter.vue'
 import SupplierHeader from '../components/supplier/SupplierHeader.vue'
 import SupplierSidebar from '../components/supplier/SupplierSidebar.vue'
-import CustomerLogoutModal from '../components/customer/CustomerLogoutModal.vue'
 
 const route = useRoute()
 useHead({ bodyAttrs: { class: 'supplier-portal' } })
@@ -144,8 +143,7 @@ const showUnavailable = (label: string) => {
       <SupplierFooter class="mt-auto w-full shrink-0" @unavailable="showUnavailable" />
     </div>
 
-    <!-- نافذة تأكيد تسجيل الخروج وتنبيهات النظام -->
-    <CustomerLogoutModal />
+    <!-- تنبيهات النظام -->
     <AppToast :message="noticeMessage" />
   </div>
 </template>

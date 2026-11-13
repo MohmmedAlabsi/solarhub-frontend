@@ -35,7 +35,7 @@ export const useAdminUsers = () => {
       let rawList: any[] = []
 
       // 1. طلب قائمة المستخدمين مع تحديد حد أقصى (per_page=100) لجلب الجميع دفعة واحدة
-      const res: any = await $api('/users?per_page=50')
+      const res: any = await $api('/users?per_page=100')
 
       if (Array.isArray(res)) {
         rawList = res

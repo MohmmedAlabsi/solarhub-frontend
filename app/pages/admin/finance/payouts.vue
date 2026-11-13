@@ -10,6 +10,7 @@ import {
   Landmark,
   Loader2,
   Percent,
+  Plus,
   RefreshCw,
   Search,
   Wallet,
@@ -30,7 +31,53 @@ const {
   isActionLoading,
   fetchPayouts,
   updatePayoutStatus,
+  eligiblePayouts,
+  fetchEligiblePayouts,
+  createPayout,
 } = useAdminFinance()
+
+onMounted(() => { fetchEligiblePayouts() })
+
+// ===== إنشاء مستحقات لمورد (طلب فرعي أكّد العميل استلامه) =====
+const isCreateModalOpen = ref(false)
+const createOrderStoreId = ref<number | null>(null)
+const createCommissionRate = ref<number | null>(null)
+const createWalletId = ref<number | null>(null)
+const createError = ref('')
+
+const selectedEligible = computed(() => eligiblePayouts.value.find(e => e.order_store_id === createOrderStoreId.value) || null)
+const createPreview = computed(() => {
+  const e = selectedEligible.value
+  const rate = Number(createCommissionRate.value)
+  if (!e || createCommissionRate.value === null || Number.isNaN(rate)) return null
+  const commission = Math.round(e.subtotal * rate) / 100
+  return { commission, net: Math.round((e.subtotal - commission) * 100) / 100 }
+})
+
+watch(createOrderStoreId, () => {
+  createWalletId.value = selectedEligible.value?.wallets.find(w => w.is_default)?.id ?? selectedEligible.value?.wallets[0]?.id ?? null
+})
+
+async function openCreateModal(orderStoreId?: number) {
+  createError.value = ''
+  createCommissionRate.value = null
+  await fetchEligiblePayouts()
+  createOrderStoreId.value = orderStoreId ?? eligiblePayouts.value[0]?.order_store_id ?? null
+  isCreateModalOpen.value = true
+}
+
+async function handleCreatePayout() {
+  createError.value = ''
+  if (!createOrderStoreId.value) { createError.value = 'اختر الطلب الفرعي.'; return }
+  const rate = Number(createCommissionRate.value)
+  if (createCommissionRate.value === null || Number.isNaN(rate) || rate < 0 || rate > 100) {
+    createError.value = 'أدخل نسبة عمولة المنصة بين 0 و100.'
+    return
+  }
+  const res = await createPayout({ order_store_id: createOrderStoreId.value, commission_rate: rate, user_wallet_id: createWalletId.value })
+  if (res.ok) isCreateModalOpen.value = false
+  else createError.value = res.message || 'تعذر إنشاء المستحقات'
+}
 
 // Non-blocking lazy SSR Data Fetching
 const { pending } = useLazyAsyncData('admin_finance_payouts', () => fetchPayouts(false), {
@@ -121,7 +168,8 @@ async function handleRefreshPayouts() {
 
 function openDisburseModal(payout: StorePayout) {
   selectedPayout.value = payout
-  transferRefInput.value = payout.transfer_reference || `TRX-${Date.now().toString().slice(-8)}`
+  // رقم المرجع يُدخله المدير من إشعار التحويل الفعلي (لا نولّد رقماً وهمياً)
+  transferRefInput.value = payout.transfer_reference || ''
   isDisburseModalOpen.value = true
 }
 
@@ -174,10 +222,23 @@ function exportPayoutsCsv() {
           </p>
         </div>
 
-        <div class="flex items-center gap-2 self-start sm:self-auto">
+        <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
             type="button"
-            @click="handleRefreshPayouts"
+            data-testid="create-payout-btn"
+            class="btn-primary h-10 px-4 text-xs font-bold gap-2"
+            :disabled="!eligiblePayouts.length"
+            :title="eligiblePayouts.length ? 'إنشاء مستحقات لطلب أكّد العميل استلامه' : 'لا توجد طلبات مكتملة بانتظار إنشاء مستحقات'"
+            @click="openCreateModal()"
+          >
+            <Plus class="size-4" />
+            <span>إنشاء مستحقات</span>
+            <span v-if="eligiblePayouts.length" class="rounded-full bg-white/80 px-2 text-[11px] font-black text-solar-navy-dark">{{ eligiblePayouts.length }}</span>
+          </button>
+
+          <button
+            type="button"
+            @click="handleRefreshPayouts(); fetchEligiblePayouts()"
             :disabled="isRefreshing || pending || isLoading"
             class="btn-outline h-10 px-4 text-xs font-bold gap-2 text-solar-text-body hover:bg-solar-bg-subtle"
             title="تحديث قائمة المستحقات من السيرفر"
@@ -423,6 +484,67 @@ function exportPayoutsCsv() {
       />
     </div>
 
+    <!-- نافذة إنشاء مستحقات لمورد -->
+    <AdminModal
+      v-model="isCreateModalOpen"
+      title="إنشاء مستحقات للمورد"
+      subtitle="لطلب فرعي أكّد العميل استلامه. العمولة والصافي يحسبهما الخادم من إجمالي الطلب."
+      :icon="Coins"
+      max-width="md"
+      :busy="isActionLoading"
+    >
+      <form class="flex flex-col gap-4" data-testid="create-payout-form" @submit.prevent="handleCreatePayout">
+        <label class="flex flex-col gap-1.5 text-xs font-bold text-solar-text-body">
+          الطلب الفرعي المكتمل *
+          <select v-model="createOrderStoreId" class="solar-input h-11 text-xs w-full">
+            <option v-for="e in eligiblePayouts" :key="e.order_store_id" :value="e.order_store_id">
+              {{ e.order_number || `SUB-${e.order_store_id}` }} — {{ e.store_name }} — {{ e.subtotal.toLocaleString('ar-YE') }} ر.ي{{ e.previous_payout_failed ? ' (إعادة بعد فشل)' : '' }}
+            </option>
+          </select>
+        </label>
+
+        <label class="flex flex-col gap-1.5 text-xs font-bold text-solar-text-body">
+          نسبة عمولة المنصة (%) *
+          <input v-model.number="createCommissionRate" type="number" min="0" max="100" step="0.01" required dir="ltr" class="solar-input h-11 text-xs w-full font-mono text-left" placeholder="مثال: 5" />
+        </label>
+
+        <label class="flex flex-col gap-1.5 text-xs font-bold text-solar-text-body">
+          محفظة التحويل
+          <select v-model="createWalletId" class="solar-input h-11 text-xs w-full" :disabled="!selectedEligible?.wallets.length">
+            <option v-if="!selectedEligible?.wallets.length" :value="null">لم يُضف المورد أي محفظة فعّالة</option>
+            <option v-for="w in selectedEligible?.wallets || []" :key="w.id" :value="w.id">
+              {{ w.provider || 'محفظة' }} — {{ w.account_name }} — ****{{ w.account_last4 }}{{ w.is_default ? ' (الافتراضية)' : '' }}
+            </option>
+          </select>
+        </label>
+
+        <div v-if="selectedEligible" class="p-4 rounded-xl bg-solar-bg-subtle border border-solar-border-card text-xs flex flex-col gap-2" data-testid="create-payout-preview">
+          <div class="flex items-center justify-between">
+            <span class="text-solar-text-muted">إجمالي الطلب الفرعي:</span>
+            <span class="font-bold font-mono">{{ selectedEligible.subtotal.toLocaleString('ar-YE') }} ر.ي</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-solar-text-muted">عمولة المنصة:</span>
+            <span class="font-bold font-mono">{{ createPreview ? createPreview.commission.toLocaleString('ar-YE') + ' ر.ي' : '—' }}</span>
+          </div>
+          <div class="flex items-center justify-between border-t border-solar-border-card/60 pt-2 font-black text-sm">
+            <span>صافي المستحق للمورد:</span>
+            <span class="text-emerald-700 font-mono">{{ createPreview ? createPreview.net.toLocaleString('ar-YE') + ' ر.ي' : '—' }}</span>
+          </div>
+        </div>
+
+        <p v-if="createError" class="text-xs font-bold text-red-600" role="alert">{{ createError }}</p>
+
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-solar-border-card mt-2">
+          <button type="button" class="btn-outline h-10 px-5 text-xs font-bold" :disabled="isActionLoading" @click="isCreateModalOpen = false">إلغاء</button>
+          <button type="submit" class="btn-primary h-10 px-6 text-xs font-bold gap-2" :disabled="isActionLoading || !createOrderStoreId">
+            <Loader2 v-if="isActionLoading" class="size-4 animate-spin" />
+            <span>إنشاء المستحقات</span>
+          </button>
+        </div>
+      </form>
+    </AdminModal>
+
     <!-- نافذة تأكيد واعتماد صرف المستحقات للمورد -->
     <AdminModal
       v-model="isDisburseModalOpen"
@@ -439,7 +561,7 @@ function exportPayoutsCsv() {
           </div>
           <div class="flex items-center justify-between">
             <span class="text-solar-text-muted">محفظة التحويل:</span>
-            <span class="font-mono font-bold text-solar-navy">{{ selectedPayout.user_wallet?.wallet_provider?.name_ar || 'جوالي' }} - {{ selectedPayout.user_wallet?.account_number }}</span>
+            <span class="font-mono font-bold text-solar-navy">{{ selectedPayout.user_wallet ? `${selectedPayout.user_wallet.wallet_provider?.name_ar || 'محفظة'} - ${selectedPayout.user_wallet.account_number}` : 'لا توجد محفظة محددة للمورد' }}</span>
           </div>
           <div class="flex items-center justify-between border-t border-solar-border-card/60 pt-2 font-black text-sm">
             <span>صافي المبلغ المحول:</span>

@@ -33,13 +33,7 @@ export const useCartStore = defineStore('cart', () => {
   const isInitialized = ref(false)
 
   // هل المستخدم مسجل دخول؟
-  const isAuthenticated = computed(() => {
-    if (tokenCookie.value) return true
-    if (import.meta.client) {
-      return Boolean(localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token'))
-    }
-    return false
-  })
+  const isAuthenticated = computed(() => Boolean(tokenCookie.value))
 
   // إجمالي عدد العناصر في السلة
   const totalItemsCount = computed(() => {
@@ -55,21 +49,13 @@ export const useCartStore = defineStore('cart', () => {
     }, 0)
   })
 
-  // ضريبة القيمة المضافة 15%
-  const vat = computed(() => {
-    return Math.round(subtotal.value * 0.15 * 100) / 100
-  })
+  // الخادم لا يحسب ضريبة ولا رسوم شحن: إجمالي الطلب = مجموع المنتجات فقط.
+  // (كانت الواجهة تضيف 15% ضريبة + 50 شحن فيرى العميل مبلغاً غير الذي يُسجَّل في الطلب.)
+  const vat = computed(() => 0)
+  const shippingFee = computed(() => 0)
 
-  // رسوم الشحن (مجاني إذا تجاوز 1000 ر.س)
-  const shippingFee = computed(() => {
-    if (items.value.length === 0) return 0
-    return subtotal.value >= 1000 ? 0 : 50
-  })
-
-  // الإجمالي الكلي
-  const total = computed(() => {
-    return Math.round((subtotal.value + vat.value + shippingFee.value) * 100) / 100
-  })
+  // الإجمالي الكلي = نفس total_amount الذي يحفظه الخادم
+  const total = computed(() => Math.round(subtotal.value * 100) / 100)
 
   /**
    * حفظ محتويات السلة في التخزين المحلي للزوار غير المسجلين
@@ -120,7 +106,7 @@ export const useCartStore = defineStore('cart', () => {
       storeName: storeObj.company_name || 'المتجر المعتمد',
       storeCity: 'اليمن',
       price,
-      currency: 'ر.س',
+      currency: 'ر.ي',
       rating: 4.9,
       reviewsCount: 35,
       image: resolveProductImage(sp),
@@ -140,7 +126,18 @@ export const useCartStore = defineStore('cart', () => {
   /**
    * جلب سلة المشتريات من مخدم Laravel
    */
+  // دمج الطلبات المتزامنة: الهيدر والصفحة كانا يطلبان السلة معاً في نفس اللحظة
+  let inFlightCart: Promise<void> | null = null
+
   const fetchCart = async () => {
+    if (inFlightCart) return inFlightCart
+    inFlightCart = doFetchCart().finally(() => {
+      inFlightCart = null
+    })
+    return inFlightCart
+  }
+
+  const doFetchCart = async () => {
     if (!isAuthenticated.value) {
       loadLocalCart()
       isInitialized.value = true
@@ -218,7 +215,7 @@ export const useCartStore = defineStore('cart', () => {
         storeName: productOrStoreProduct.storeName || 'المتجر المعتمد',
         storeCity: productOrStoreProduct.storeCity || 'اليمن',
         price: Number(productOrStoreProduct.price) || 0,
-        currency: productOrStoreProduct.currency || 'ر.س',
+        currency: productOrStoreProduct.currency || 'ر.ي',
         rating: productOrStoreProduct.rating || 4.9,
         reviewsCount: productOrStoreProduct.reviewsCount || 20,
         image: productOrStoreProduct.image || '/images/product-panel.png',
@@ -343,7 +340,7 @@ export const useCartStore = defineStore('cart', () => {
       storeName: sp?.store?.company_name || 'متجر معتمد',
       storeCity: sp?.store?.address_details || 'اليمن',
       price: Number(sp?.price || sp?.unit_price || 0),
-      currency: 'ر.س',
+      currency: 'ر.ي',
       rating: 4.8,
       reviewsCount: 12,
       image: resolveProductImage(sp, cat),

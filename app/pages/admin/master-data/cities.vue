@@ -293,7 +293,7 @@ async function executeDelete() {
             v-model="form.name_ar"
             type="text"
             required
-            placeholder="مثال: الرياض أو صنعاء أو عدن"
+            placeholder="مثال: صنعاء أو عدن أو تعز"
             class="solar-input h-11 text-xs w-full"
           />
         </div>

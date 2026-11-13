@@ -48,7 +48,7 @@ function formatRelativeTime(dateStr: string | null | undefined): string {
   if (!dateStr) return 'الآن'
   try {
     const d = new Date(dateStr)
-    return d.toLocaleDateString('ar-SA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleDateString('ar-YE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   } catch {
     return dateStr
   }

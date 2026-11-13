@@ -28,7 +28,7 @@ export const useAdminStores = () => {
 
     try {
       const [approvedSettled, pendingSettled] = await Promise.allSettled([
-        $api('/stores?per_page=30'),
+        $api('/stores?per_page=100'),
         $api('/admin/stores/pending'),
       ])
 

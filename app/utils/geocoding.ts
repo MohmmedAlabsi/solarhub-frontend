@@ -33,6 +33,18 @@ export interface GeocodedLocation {
 // In-memory cache keyed by rounded coordinates (~11m resolution)
 const geocodeCache = new Map<string, GeocodedLocation>()
 
+/**
+ * حدود اليمن التقريبية (تشمل سقطرى شرقاً وجزر البحر الأحمر غرباً)، مع هامش صغير.
+ * تُستخدم لتقييد الخريطة ورفض اختيار موقع خارج اليمن.
+ */
+export const YEMEN_BOUNDS: [[number, number], [number, number]] = [[11.9, 41.6], [19.2, 54.8]]
+
+export function isInYemen(lat: number, lng: number): boolean {
+  const [[south, west], [north, east]] = YEMEN_BOUNDS
+  return lat >= south && lat <= north && lng >= west && lng <= east
+}
+
+// مواقع يمنية فقط: البحث المحلي وأقرب موقع ونص العنوان الاحتياطي كلها تعتمد على هذه القائمة.
 export const popularLocations: PopularLocationItem[] = [
   // Yemen - Sana'a & Districts
   { name: 'صنعاء - مركز المحافظة', governorate: 'صنعاء', lat: 15.3694, lng: 44.1910, aliases: ['صنعاء', 'امانه العاصمة', 'أمانة العاصمة'] },
@@ -105,40 +117,6 @@ export const popularLocations: PopularLocationItem[] = [
   { name: 'عمران - مركز المحافظة', governorate: 'عمران', lat: 15.6594, lng: 43.9442, aliases: ['عمران', 'خمر', 'ريدة'] },
   { name: 'سقطرى - حديبو', governorate: 'سقطرى', lat: 12.6500, lng: 54.0167, aliases: ['سقطرى', 'حديبو', 'قلنسية'] },
 
-  // Saudi Arabia - Riyadh & Districts
-  { name: 'الرياض - مركز المدينة', governorate: 'الرياض', lat: 24.7136, lng: 46.6753, aliases: ['الرياض'] },
-  { name: 'الرياض - العليا', governorate: 'الرياض', lat: 24.7050, lng: 46.6800, aliases: ['العليا', 'طريق الملك فهد'] },
-  { name: 'الرياض - الملز', governorate: 'الرياض', lat: 24.6650, lng: 46.7250, aliases: ['الملز', 'شارع الستين'] },
-  { name: 'الرياض - النسيم', governorate: 'الرياض', lat: 24.7300, lng: 46.8200, aliases: ['النسيم'] },
-  { name: 'الرياض - الملقا', governorate: 'الرياض', lat: 24.8050, lng: 46.6150, aliases: ['الملقا', 'شمال الرياض'] },
-  { name: 'الرياض - النرجس', governorate: 'الرياض', lat: 24.8450, lng: 46.6600, aliases: ['النرجس'] },
-  { name: 'الرياض - الياسمين', governorate: 'الرياض', lat: 24.8250, lng: 46.6450, aliases: ['الياسمين'] },
-
-  // Saudi Arabia - Makkah & Jeddah & Taif
-  { name: 'مكة المكرمة - الحرم', governorate: 'مكة المكرمة', lat: 21.3891, lng: 39.8579, aliases: ['مكة', 'مكه', 'مكة المكرمة'] },
-  { name: 'مكة المكرمة - العزيزية', governorate: 'مكة المكرمة', lat: 21.4050, lng: 39.8700, aliases: ['العزيزية بمكة'] },
-  { name: 'جدة - مركز المدينة', governorate: 'مكة المكرمة', lat: 21.5433, lng: 39.1728, aliases: ['جدة', 'جده'] },
-  { name: 'جدة - البلد', governorate: 'مكة المكرمة', lat: 21.4850, lng: 39.1850, aliases: ['البلد بجدة', 'المنطقة التاريخية'] },
-  { name: 'جدة - الحمراء', governorate: 'مكة المكرمة', lat: 21.5150, lng: 39.1550, aliases: ['الحمراء', 'كورنيش جدة'] },
-  { name: 'جدة - الروضة', governorate: 'مكة المكرمة', lat: 21.5600, lng: 39.1500, aliases: ['الروضة بجدة'] },
-  { name: 'جدة - الصفا', governorate: 'مكة المكرمة', lat: 21.5850, lng: 39.2000, aliases: ['الصفا بجدة'] },
-  { name: 'الطائف - مركز المدينة', governorate: 'مكة المكرمة', lat: 21.2854, lng: 40.4244, aliases: ['الطائف', 'الهدا', 'الشفا الطائف'] },
-
-  // Saudi Arabia - Madinah & Eastern & Others
-  { name: 'المدينة المنورة - الحرم النبوي', governorate: 'المدينة المنورة', lat: 24.5247, lng: 39.5692, aliases: ['المدينة', 'المدينه', 'المدينة المنورة'] },
-  { name: 'الدمام - مركز المدينة', governorate: 'المنطقة الشرقية', lat: 26.4207, lng: 50.0888, aliases: ['الدمام', 'الشرقية'] },
-  { name: 'الخبر - كورنيش الخبر', governorate: 'المنطقة الشرقية', lat: 26.2818, lng: 50.2084, aliases: ['الخبر', 'العقربية'] },
-  { name: 'الهفوف - الأحساء', governorate: 'المنطقة الشرقية', lat: 25.3646, lng: 49.5883, aliases: ['الأحساء', 'الاحساء', 'الهفوف', 'المبرز'] },
-  { name: 'الجبيل - الجبيل الصناعية', governorate: 'المنطقة الشرقية', lat: 27.0174, lng: 49.6582, aliases: ['الجبيل'] },
-  { name: 'القصيم - بريدة', governorate: 'القصيم', lat: 26.3260, lng: 43.9750, aliases: ['القصيم', 'بريدة', 'بريده'] },
-  { name: 'القصيم - عنيزة', governorate: 'القصيم', lat: 26.0843, lng: 43.9936, aliases: ['عنيزة', 'عنيزه'] },
-  { name: 'عسير - أبها', governorate: 'عسير', lat: 18.2164, lng: 42.5053, aliases: ['عسير', 'أبها', 'ابها'] },
-  { name: 'عسير - خميس مشيط', governorate: 'عسير', lat: 18.3000, lng: 42.7333, aliases: ['خميس مشيط'] },
-  { name: 'تبوك - مركز المدينة', governorate: 'تبوك', lat: 28.3835, lng: 36.5662, aliases: ['تبوك'] },
-  { name: 'حائل - مركز المدينة', governorate: 'حائل', lat: 27.5114, lng: 41.7208, aliases: ['حائل', 'حايل'] },
-  { name: 'جازان - مركز المدينة', governorate: 'جازان', lat: 16.8892, lng: 42.5706, aliases: ['جازان', 'جيزان'] },
-  { name: 'نجران - مركز المدينة', governorate: 'نجران', lat: 17.4924, lng: 44.1277, aliases: ['نجران'] },
-  { name: 'ينبع - ينبع الصناعية', governorate: 'المدينة المنورة', lat: 24.0924, lng: 38.0618, aliases: ['ينبع', 'ينبع البحر'] },
 ]
 
 /**
@@ -203,14 +181,13 @@ export function findNearestLocation(lat: number, lng: number): GeocodedLocation 
 
   const governorate = normalizeGovernorateName(nearest.governorate)
   const shortAddress = nearest.name
-  const formattedAddress = nearest.governorate.includes('الرياض') || nearest.governorate.includes('مكة') || nearest.governorate.includes('المدينة') || nearest.governorate.includes('الشرقية')
-    ? `السعودية - ${nearest.name}`
-    : `اليمن - ${nearest.name}`
+  // المنصة تخدم اليمن فقط
+  const formattedAddress = `اليمن - ${nearest.name}`
 
   return {
     formattedAddress,
     shortAddress,
-    country: formattedAddress.includes('السعودية') ? 'السعودية' : 'اليمن',
+    country: 'اليمن',
     governorate,
     city: nearest.name.split(' - ')[0],
     district: nearest.name.split(' - ')[1],

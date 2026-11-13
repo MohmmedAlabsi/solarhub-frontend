@@ -358,7 +358,7 @@ function handleImageError(e: Event, product: SupplierProductItem) {
                 <div class="font-black text-sm text-solar-text-heading font-mono">
                   {{ product.unitPrice.toLocaleString('en-US') }}
                 </div>
-                <div class="text-[10px] text-solar-text-muted font-bold">ر.س</div>
+                <div class="text-[10px] text-solar-text-muted font-bold">ر.ي</div>
               </td>
 
               <!-- 6. المخزون المتوفر -->

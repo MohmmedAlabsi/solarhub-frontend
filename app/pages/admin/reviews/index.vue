@@ -11,6 +11,7 @@ import {
 import AdminSectionHeading from '../../../components/admin/workspace/AdminSectionHeading.vue'
 import AdminPagination from '../../../components/admin/common/AdminPagination.vue'
 import AdminBadge from '../../../components/admin/common/AdminBadge.vue'
+import AdminModal from '../../../components/admin/common/AdminModal.vue'
 import type { AdminReview } from '../../../../types/admin'
 
 definePageMeta({ layout: 'admin' })
@@ -83,11 +84,33 @@ async function selectTab(tab: 'suppliers' | 'engineers') {
   })
 }
 
-function handleToggleApproval(review: AdminReview) {
-  if (activeTab.value === 'suppliers') {
-    toggleSupplierReview(review)
-  } else {
-    toggleEngineerReview(review)
+// تغيير الاعتماد يتطلب تأكيداً صريحاً (كانت الشارة نفسها زراً يغيّر الحالة بنقرة واحدة)
+const pendingReview = ref<AdminReview | null>(null)
+const confirmOpen = ref(false)
+const isToggling = ref(false)
+// الحالة لحظة فتح النافذة (التحديث التفاؤلي يقلب review.approved أثناء الحفظ)
+const pendingWasApproved = ref(false)
+
+function askToggleApproval(review: AdminReview) {
+  pendingReview.value = review
+  pendingWasApproved.value = review.approved
+  confirmOpen.value = true
+}
+
+async function confirmToggleApproval() {
+  const review = pendingReview.value
+  if (!review) return
+  isToggling.value = true
+  try {
+    if (activeTab.value === 'suppliers') {
+      await toggleSupplierReview(review)
+    } else {
+      await toggleEngineerReview(review)
+    }
+  } finally {
+    isToggling.value = false
+    confirmOpen.value = false
+    pendingReview.value = null
   }
 }
 
@@ -217,17 +240,24 @@ function exportCsv() {
               {{ review.comment }}
             </td>
             <td class="whitespace-nowrap">
-              <button
-                class="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow cursor-pointer"
-                :title="review.approved ? 'إلغاء الاعتماد وإخفاء التقييم' : 'اعتماد التقييم وإظهاره في المنصة'"
-                @click="handleToggleApproval(review)"
-              >
+              <!-- الشارة للعرض فقط؛ تغيير الاعتماد بزر واضح ونافذة تأكيد -->
+              <div class="flex items-center gap-2">
                 <AdminBadge
                   :status="review.approved ? 'معتمد' : 'غير معتمد'"
                   :tone="review.approved ? 'success' : 'warning'"
                   :show-dot="true"
                 />
-              </button>
+                <button
+                  type="button"
+                  class="rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow"
+                  :class="review.approved
+                    ? 'border-red-200 text-red-600 hover:bg-red-50'
+                    : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'"
+                  @click="askToggleApproval(review)"
+                >
+                  {{ review.approved ? 'إلغاء الاعتماد' : 'اعتماد' }}
+                </button>
+              </div>
             </td>
           </tr>
 
@@ -253,5 +283,35 @@ function exportCsv() {
         />
       </div>
     </div>
+
+    <AdminModal
+      v-model="confirmOpen"
+      :title="pendingWasApproved ? 'تأكيد إلغاء اعتماد التقييم' : 'تأكيد اعتماد التقييم'"
+      max-width="md"
+      :busy="isToggling"
+    >
+      <p class="text-sm leading-7">
+        <template v-if="pendingWasApproved">
+          سيُخفى هذا التقييم من صفحة {{ activeTab === 'suppliers' ? 'المتجر' : 'المهندس' }} ولن يُحسب في متوسط التقييم. هل تريد المتابعة؟
+        </template>
+        <template v-else>
+          سيظهر هذا التقييم للعامة ويُحسب في متوسط التقييم. هل تريد المتابعة؟
+        </template>
+      </p>
+      <p v-if="pendingReview?.comment" class="mt-3 rounded-lg bg-solar-bg-subtle p-3 text-xs text-solar-text-muted">
+        «{{ pendingReview.comment }}»
+      </p>
+      <template #footer>
+        <button class="btn-outline" :disabled="isToggling" @click="confirmOpen = false">إلغاء</button>
+        <button
+          class="btn-dark"
+          :class="pendingWasApproved ? 'bg-red-600 hover:bg-red-700' : ''"
+          :disabled="isToggling"
+          @click="confirmToggleApproval"
+        >
+          {{ isToggling ? 'جارٍ الحفظ...' : pendingWasApproved ? 'تأكيد إلغاء الاعتماد' : 'تأكيد الاعتماد' }}
+        </button>
+      </template>
+    </AdminModal>
   </div>
 </template>

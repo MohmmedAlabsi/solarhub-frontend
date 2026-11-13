@@ -64,7 +64,7 @@ onMounted(async () => {
       legalName: s.company_name || 'شركة معتمدة',
       city: s.governorate_name || s.governorate || s.city || 'اليمن',
       address: s.address_details || s.governorate_name || s.governorate || 'المركز الرئيسي',
-      rating: Number(s.average_rating) || 4.9,
+      rating: Number(s.ratings_count) > 0 ? Number(s.average_rating) || 0 : 0, // التقييم الحقيقي فقط
       reviewsCount: Number(s.ratings_count) || 0,
       productsCount: Number(s.store_products_count || s.products_count) || 0,
       verified: s.approval_status === 'approved',
@@ -170,11 +170,12 @@ const filteredStores = computed(() => {
           </p>
 
           <div class="flex flex-wrap items-center gap-4 text-xs text-solar-text-muted border-t border-solar-border-card pt-3">
-            <div class="flex items-center gap-1">
+            <div v-if="store.reviewsCount > 0" class="flex items-center gap-1">
               <Star class="size-3.5 fill-solar-yellow text-solar-yellow" />
               <span class="font-bold text-solar-text-heading">{{ store.rating }}</span>
               <span>({{ store.reviewsCount }} تقييم)</span>
             </div>
+            <span v-else class="text-solar-text-muted">لا تقييمات بعد</span>
             <div v-if="store.phone" class="flex items-center gap-1">
               <Phone class="size-3.5 text-solar-yellow" />
               <bdi>{{ store.phone }}</bdi>

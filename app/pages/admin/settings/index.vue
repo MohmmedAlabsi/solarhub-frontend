@@ -112,8 +112,6 @@ async function handleRefresh() {
           <FormField label="العملة الرسمية للمنظومة" required :error="errors.currency">
             <select v-model="draft.currency" class="solar-input">
               <option value="YER">ريال يمني (YER)</option>
-              <option value="SAR">ريال سعودي (SAR)</option>
-              <option value="USD">دولار أمريكي (USD)</option>
             </select>
           </FormField>
 

@@ -10,7 +10,7 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
-const { openLogoutModal } = useCustomerLogoutModal()
+const { logout } = useAuth()
 const { unreadCount, fetchNotifications } = useNotificationState()
 const isUserMenuOpen = ref(false)
 const accountMenu = ref<HTMLElement>()
@@ -39,7 +39,7 @@ function escapeAccountMenu() {
 
 function handleLogoutClick() {
   isUserMenuOpen.value = false
-  openLogoutModal()
+  logout()
 }
 
 watch(() => route.fullPath, () => {

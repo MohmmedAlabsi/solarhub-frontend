@@ -270,14 +270,14 @@ async function handleRespondSubmit(data: RespondQuoteInput) {
                   {{ quote.requestedQuantity }} {{ quote.unitLabel }}
                 </span>
                 <div class="mt-1 text-[10px] text-solar-text-muted font-medium">
-                  {{ quote.customerTargetPrice ? `المستهدف: ${quote.customerTargetPrice.toLocaleString('en-US')} ر.س` : 'بدون تحديد' }}
+                  {{ quote.customerTargetPrice ? `المستهدف: ${quote.customerTargetPrice.toLocaleString('en-US')} ر.ي` : 'بدون تحديد' }}
                 </div>
               </td>
 
               <!-- 5. السعر المعروض -->
               <td class="py-4 px-4 text-center">
                 <div v-if="quote.offeredUnitPrice" class="font-black font-mono text-xs text-blue-600 dark:text-blue-400">
-                  {{ quote.offeredUnitPrice.toLocaleString('en-US') }} ر.س
+                  {{ quote.offeredUnitPrice.toLocaleString('en-US') }} ر.ي
                   <div class="text-[10px] font-bold text-solar-text-muted">
                     الإجمالي: {{ quote.totalPrice ? quote.totalPrice.toLocaleString('en-US') : '–' }}
                   </div>

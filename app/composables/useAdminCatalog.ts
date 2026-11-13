@@ -1,7 +1,8 @@
 import type { Brand, Category, MasterProduct, PaginationMeta } from '../../types/api'
 
 export const useAdminCatalog = () => {
-  const { $api } = useNuxtApp()
+  const nuxtApp = useNuxtApp()
+  const { $api } = nuxtApp
   const { notify } = useAdminNotice()
 
   const products = useState<MasterProduct[]>('admin_master_products_data', () => [])
@@ -20,7 +21,7 @@ export const useAdminCatalog = () => {
 
     isLoading.value = true
     try {
-      const res: any = await $api('/master-products?per_page=50')
+      const res: any = await $api('/master-products?per_page=500')
       let list: MasterProduct[] = []
 
       if (Array.isArray(res)) {
@@ -45,16 +46,20 @@ export const useAdminCatalog = () => {
   /**
    * جلب التصنيفات
    */
+  // الصفحة ونافذة إضافة المنتج (مركّبة دائماً) تطلبان التصنيفات والعلامات في نفس اللحظة:
+  // shareInflight يجعلها طلباً واحداً.
   const fetchCategories = async (force = false): Promise<Category[]> => {
     if (!force && categories.value.length > 0) return categories.value
-    try {
-      const res: any = await $api('/categories')
-      const list = Array.isArray(res) ? res : (res?.data || [])
-      categories.value = list
-      return list
-    } catch {
-      return categories.value
-    }
+    return shareInflight(nuxtApp, 'admin-catalog:categories', async () => {
+      try {
+        const res: any = await $api('/categories')
+        const list = Array.isArray(res) ? res : (res?.data || [])
+        categories.value = list
+        return list
+      } catch {
+        return categories.value
+      }
+    })
   }
 
   /**
@@ -62,14 +67,16 @@ export const useAdminCatalog = () => {
    */
   const fetchBrands = async (force = false): Promise<Brand[]> => {
     if (!force && brands.value.length > 0) return brands.value
-    try {
-      const res: any = await $api('/brands')
-      const list = Array.isArray(res) ? res : (res?.data || [])
-      brands.value = list
-      return list
-    } catch {
-      return brands.value
-    }
+    return shareInflight(nuxtApp, 'admin-catalog:brands', async () => {
+      try {
+        const res: any = await $api('/brands')
+        const list = Array.isArray(res) ? res : (res?.data || [])
+        brands.value = list
+        return list
+      } catch {
+        return brands.value
+      }
+    })
   }
 
   /**
