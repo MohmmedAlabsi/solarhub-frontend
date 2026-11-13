@@ -273,10 +273,10 @@ async function handleWithdrawSubmit(data: WithdrawRequestInput) {
           <thead class="bg-solar-bg-subtle text-solar-text-muted font-bold border-b border-solar-border-card">
             <tr>
               <th scope="col" class="py-4 pr-6">رقم طلب المتجر</th>
-              <th scope="col" class="py-4 text-center font-bold">إجمالي المبلغ (ر.س)</th>
+              <th scope="col" class="py-4 text-center font-bold">إجمالي المبلغ (ر.ي)</th>
               <th scope="col" class="py-4 text-center font-bold">نسبة العمولة</th>
-              <th scope="col" class="py-4 text-center font-bold">مبلغ العمولة (ر.س)</th>
-              <th scope="col" class="py-4 text-center font-bold">صافي المستحق (ر.س)</th>
+              <th scope="col" class="py-4 text-center font-bold">مبلغ العمولة (ر.ي)</th>
+              <th scope="col" class="py-4 text-center font-bold">صافي المستحق (ر.ي)</th>
               <th scope="col" class="py-4 text-center font-bold">حالة التحويل</th>
               <th scope="col" class="py-4 pl-6 font-bold">تاريخ الدفع</th>
             </tr>

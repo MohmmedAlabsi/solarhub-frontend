@@ -38,7 +38,7 @@ const emit = defineEmits<{
 
 const route = useRoute()
 const { hasPermission } = useAdminPermissions()
-const { openLogoutModal } = useAdminLogoutModal()
+const { logout } = useAuth()
 
 const navItems = [
   { label: 'الرئيسية', to: '/admin', icon: Home, matchPrefixes: ['/admin/dashboard'] },
@@ -153,7 +153,7 @@ function handleLinkClick() {
     <div class="shrink-0 p-3 border-t border-solar-navy-light/40">
       <button
         type="button"
-        @click="openLogoutModal"
+        @click="logout()"
         aria-label="تسجيل الخروج"
         class="group relative flex items-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solar-yellow text-red-200 hover:bg-red-500/20 hover:text-red-100 cursor-pointer"
         :class="[isCollapsed && !isMobile ? 'justify-center p-3 rounded-xl' : 'gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium w-full']"

@@ -54,7 +54,7 @@ function mapServiceIcon(typeName: string): EngineerServiceRequest['serviceIcon']
 function formatDate(dateString: string): string {
   try {
     const d = new Date(dateString)
-    return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })
+    return d.toLocaleDateString('ar-YE', { day: 'numeric', month: 'long', year: 'numeric' })
   } catch {
     return dateString || 'مؤخراً'
   }
@@ -87,7 +87,7 @@ export function useEngineerServiceRequests() {
           rawId,
           serviceType: typeName,
           serviceIcon: mapServiceIcon(typeName),
-          governorate: item.governorate?.name || 'المملكة',
+          governorate: item.governorate?.name_ar || item.governorate?.name || '—',
           location: item.location_details || item.governorate?.name || 'الموقع محدد في الطلب',
           capacityLabel: item.system_capacity_estimate ? `${item.system_capacity_estimate} kWp` : 'تقديرية',
           createdAt: formatDate(item.created_at),
@@ -153,7 +153,17 @@ export function useEngineerServiceRequests() {
     fetchRequests()
   })
 
+  // تصدير الطلبات المعروضة حالياً (بعد البحث والفلترة) إلى CSV
+  function exportCsv() {
+    downloadAdminCsv(
+      'طلبات_الخدمة_المتاحة',
+      ['رقم الطلب', 'نوع الخدمة', 'المحافظة', 'الموقع', 'السعة التقديرية', 'تاريخ الإنشاء', 'عدد العروض', 'الحالة'],
+      filtered.value.map(r => [r.id, r.serviceType, r.governorate, r.location, r.capacityLabel, r.createdAt, r.offersCount ?? 0, statusLabels[r.status] ?? r.status]),
+    )
+  }
+
   return {
+    exportCsv,
     requests,
     search,
     statusFilter,

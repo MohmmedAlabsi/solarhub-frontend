@@ -187,7 +187,7 @@ async function loadCertificates() {
         const path = c.file_path || ''
         const fileName = path.split('/').pop() || `شهادة اعتماد مهني ${index + 1}`
         const isPdf = path.toLowerCase().endsWith('.pdf')
-        const createdDate = c.created_at ? new Date(c.created_at).toLocaleDateString('ar-SA') : 'معتمدة'
+        const createdDate = c.created_at ? new Date(c.created_at).toLocaleDateString('ar-YE') : 'معتمدة'
         return {
           id: c.id,
           title: fileName,

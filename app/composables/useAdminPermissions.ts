@@ -294,12 +294,7 @@ export const useAdminPermissions = () => {
     if (!force && permissions.value.length > 0) return permissions.value
     isLoading.value = true
     try {
-      let res: any
-      try {
-        res = await $api('/admin/permissions')
-      } catch {
-        res = await $fetch('/api/admin/permissions')
-      }
+      const res: any = await $api('/admin/permissions')
       const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
       permissions.value = data
       return data
@@ -362,34 +357,6 @@ export const useAdminPermissions = () => {
         }
       }
 
-      // 3. Fallback احتياطي عبر المسار الداخلي إذا كان متاحاً
-      if (data.length === 0) {
-        try {
-          const internalRes: any = await $fetch('/api/admin/permissions/admins')
-          data = Array.isArray(internalRes?.data) ? internalRes.data : (Array.isArray(internalRes) ? internalRes : [])
-        } catch {}
-      }
-
-      // 4. Fallback أدنى لضمان وجود حساب المدير الرئيسي دائماً
-      if (data.length === 0) {
-        data = [
-          {
-            id: 1,
-            name: 'عبدالباقي الحكيمي (مدير النظام)',
-            email: 'admin@solarhub.com',
-            phone: '777000000',
-            status: 'active',
-            role: 'admin',
-            role_title: 'مدير نظام عام (Super Admin)',
-            roleTitle: 'مدير نظام عام (Super Admin)',
-            direct_permissions: [],
-            all_permissions: permissions.value.map(p => p.name),
-            roles: ['admin'],
-            created_at: new Date().toISOString(),
-          },
-        ]
-      }
-
       adminUsers.value = data
 
       // ضبط الصلاحيات الافتراضية للمستخدم المختار في واجهة إدارة الصلاحيات
@@ -442,18 +409,10 @@ export const useAdminPermissions = () => {
   const saveUserPermissions = async (userId: number | string, permsToSave: string[]): Promise<boolean> => {
     isSaving.value = true
     try {
-      let res: any
-      try {
-        res = await $api(`/admin/permissions/users/${userId}/sync`, {
-          method: 'POST',
-          body: { permissions: permsToSave },
-        })
-      } catch {
-        res = await $fetch(`/api/admin/permissions/users/${userId}/sync`, {
-          method: 'POST',
-          body: { permissions: permsToSave },
-        })
-      }
+      const res: any = await $api(`/admin/permissions/users/${userId}/sync`, {
+        method: 'POST',
+        body: { permissions: permsToSave },
+      })
 
       // تحديث الحالة محلياً للمشرف في القائمة
       const target = adminUsers.value.find(u => String(u.id) === String(userId))
@@ -486,18 +445,10 @@ export const useAdminPermissions = () => {
   const assignRole = async (userId: number | string, role: string): Promise<boolean> => {
     isSaving.value = true
     try {
-      let res: any
-      try {
-        res = await $api(`/admin/permissions/users/${userId}/role`, {
-          method: 'POST',
-          body: { role },
-        })
-      } catch {
-        res = await $fetch(`/api/admin/permissions/users/${userId}/role`, {
-          method: 'POST',
-          body: { role },
-        })
-      }
+      const res: any = await $api(`/admin/permissions/users/${userId}/role`, {
+        method: 'POST',
+        body: { role },
+      })
 
       const target = adminUsers.value.find(u => String(u.id) === String(userId))
       if (target) {

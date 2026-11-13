@@ -110,7 +110,7 @@ async function handleAddToCart(product: any) {
           </NuxtLink>
           <span class="text-xs text-solar-text-muted">{{ product.storeName }}</span>
           <div class="mt-2 flex items-baseline justify-between">
-            <span class="text-base font-black text-solar-navy-dark">{{ product.price.toLocaleString() }} {{ product.currency || 'ر.س' }}</span>
+            <span class="text-base font-black text-solar-navy-dark">{{ product.price.toLocaleString() }} {{ product.currency || 'ر.ي' }}</span>
           </div>
         </div>
 

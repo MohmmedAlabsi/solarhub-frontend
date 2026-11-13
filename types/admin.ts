@@ -192,7 +192,7 @@ export interface AdminEngineer {
 }
 export type AdminServiceStatus = 'open' | 'awarded' | 'executing' | 'completed' | 'cancelled'
 export interface AdminServiceOffer {
-  id: string; engineerId: string; price: number; duration: number; proposal: string
+  id: string; engineerId: string; engineerName?: string; price: number; duration: number; proposal: string
   status: 'قيد الانتظار' | 'مقبول' | 'مرفوض'; document?: AdminDocument
 }
 export interface AdminServiceRequest {

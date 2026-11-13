@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import type { User, UserRole, LoginPayload, RegisterPayload, VerifyOtpPayload } from '~~/types/auth'
+import { SERVER_ERROR_MESSAGE } from '~/utils/errors'
 
 export interface UserProfile {
   id: number | string
@@ -58,13 +59,8 @@ export const useAuthStore = defineStore('auth', () => {
   const apiBase = (config.public.apiBaseUrl as string) || (config.public.apiBase as string) || 'http://127.0.0.1:8000/api'
 
   function setAuth(newUser: any, newToken: string) {
+    // التوكن يُحفظ في الكوكي فقط (مصدر واحد)، وليس في localStorage.
     token.value = newToken
-    if (import.meta.client) {
-      try {
-        localStorage.setItem('solarhub_token', newToken)
-        localStorage.setItem('auth_token', newToken)
-      } catch {}
-    }
     setUser(newUser)
     isInitialized.value = true
   }
@@ -96,28 +92,12 @@ export const useAuthStore = defineStore('auth', () => {
       if (Array.isArray(newUser.permissions) && newUser.permissions.length > 0) {
         authPermissionsCookie.value = newUser.permissions
       }
-      if (import.meta.client) {
-        try {
-          localStorage.setItem('solarhub_user', JSON.stringify(normalizedUser))
-        } catch {}
-      }
     }
     isInitialized.value = true
   }
 
   function setToken(newToken: string | null) {
     token.value = newToken
-    if (import.meta.client) {
-      try {
-        if (newToken) {
-          localStorage.setItem('solarhub_token', newToken)
-          localStorage.setItem('auth_token', newToken)
-        } else {
-          localStorage.removeItem('solarhub_token')
-          localStorage.removeItem('auth_token')
-        }
-      } catch {}
-    }
   }
 
   function clearAuth() {
@@ -160,7 +140,7 @@ export const useAuthStore = defineStore('auth', () => {
       ...options.headers,
     }
 
-    const activeToken = token.value || (import.meta.client ? (localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token')) : null)
+    const activeToken = token.value
     if (activeToken && !headers.Authorization) {
       headers.Authorization = `Bearer ${activeToken}`
     }
@@ -178,8 +158,13 @@ export const useAuthStore = defineStore('auth', () => {
         message: response.message,
       }
     } catch (err: any) {
-      const errResponse = err?.data
-      let message = errResponse?.message || err?.message || 'حدث خطأ في الاتصال بالخادم'
+      const status = err?.status || err?.statusCode
+      // 5xx أو فشل الشبكة: رسالة عامة فقط. لا نعرض نص الخطأ القادم من الخادم (قد يحتوي SQL أو بيانات داخلية)
+      const isServerError = !status || status >= 500
+      const errResponse = isServerError ? null : err?.data
+      let message = isServerError
+        ? (status ? SERVER_ERROR_MESSAGE : 'تعذر الاتصال بالخادم، تحقق من الاتصال وحاول مجدداً.')
+        : (errResponse?.message || 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.')
       const errors = errResponse?.errors || {}
 
       // Friendly translations for common validation errors
@@ -187,8 +172,8 @@ export const useAuthStore = defineStore('auth', () => {
         message = 'البريد الإلكتروني مسجل مسبقاً في المنصة'
       } else if (errors.phone && errors.phone[0]?.includes('already been taken')) {
         message = 'رقم الجوال مسجل مسبقاً في المنصة'
-      } else if (errors.password) {
-        message = 'كلمة المرور يجب أن تتكون من 8 خانات على الأقل، وتحتوي على أحرف كبيرة وصغيرة وأرقام'
+      } else if (errors.password && Array.isArray(errors.password)) {
+        message = errors.password[0] || message
       }
 
       error.value = message
@@ -210,6 +195,11 @@ export const useAuthStore = defineStore('auth', () => {
     const targetId = userId || user.value?.id
     if (!targetId) return []
 
+    // مسار الصلاحيات خاص بالإدارة؛ لغير المدراء يُرجع 403 فلا داعي لطلبه.
+    if (user.value && String(user.value.id) === String(targetId) && user.value.role !== 'admin') {
+      return Array.isArray(user.value.permissions) ? user.value.permissions : []
+    }
+
     // 1. If permissions already exist on user object, sync cookie and return immediately
     if (user.value && String(user.value.id) === String(targetId) && Array.isArray(user.value.permissions) && user.value.permissions.length > 0) {
       authPermissionsCookie.value = user.value.permissions
@@ -218,7 +208,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // 2. Fetch using apiRequest with explicit Authorization Bearer token
     try {
-      const activeToken = explicitToken || token.value || (import.meta.client ? (localStorage.getItem('solarhub_token') || localStorage.getItem('auth_token')) : null)
+      const activeToken = explicitToken || token.value
       const res = await apiRequest<any>(`/admin/permissions/users/${targetId}`, {
         headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : {},
       })
@@ -250,7 +240,7 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await apiRequest<any>('/auth/me')
       if (res.success && res.data) {
         setUser(res.data)
-        if (res.data.id && (!res.data.permissions || res.data.permissions.length === 0)) {
+        if (res.data.id && res.data.role === 'admin' && (!res.data.permissions || res.data.permissions.length === 0)) {
           await fetchUserPermissions(res.data.id).catch(() => {})
         }
         return user.value
@@ -282,7 +272,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (res.success && res.data) {
         setAuth(res.data.user, res.data.token)
-        if (res.data.user?.id && (!res.data.user.permissions || res.data.user.permissions.length === 0)) {
+        if (res.data.user?.id && res.data.user.role === 'admin' && (!res.data.user.permissions || res.data.user.permissions.length === 0)) {
           await fetchUserPermissions(res.data.user.id, res.data.token).catch(() => {})
         }
         return { success: true, user: user.value }
@@ -355,9 +345,9 @@ export const useAuthStore = defineStore('auth', () => {
         formData.append('password', engPayload.password)
         formData.append('password_confirmation', engPayload.password_confirmation)
         
-        // License number (required by backend)
-        const license = engPayload.licenseNumber || engPayload.license_number || `SCE-${Math.floor(100000 + Math.random() * 900000)}`
-        formData.append('license_number', license)
+        // رقم الترخيص يُرسل كما أدخله المستخدم فقط (كان يُولَّد رقم عشوائي مزيف إذا تُرك فارغاً)
+        const license = (engPayload.licenseNumber || engPayload.license_number || '').trim()
+        if (license) formData.append('license_number', license)
 
         // Governorate & Coordinates
         if (engPayload.governorate) formData.append('governorate', engPayload.governorate)
@@ -406,19 +396,20 @@ export const useAuthStore = defineStore('auth', () => {
         formData.append('phone', supPayload.phone.trim())
         formData.append('password', supPayload.password)
         formData.append('password_confirmation', supPayload.password_confirmation)
-        formData.append('company_name', supPayload.companyName?.trim() || supPayload.name.trim())
+        const companyName = (supPayload.companyName || supPayload.company_name || '').trim()
+        if (companyName) formData.append('company_name', companyName)
 
-        // Commercial registry (required by backend)
-        const reg = supPayload.commercialRegistry || supPayload.commercial_registry || `CR-${Math.floor(1000000000 + Math.random() * 9000000000)}`
-        formData.append('commercial_registry', reg)
+        // السجل التجاري يُرسل كما أدخله المستخدم فقط (كان يُولَّد رقم عشوائي مزيف إذا تُرك فارغاً)
+        const reg = (supPayload.commercialRegistry || supPayload.commercial_registry || '').trim()
+        if (reg) formData.append('commercial_registry', reg)
 
         // Store type: wholesaler, retailer, authorized_agent
         const storeType = supPayload.storeType || supPayload.store_type || 'retailer'
         formData.append('store_type', storeType)
 
         // Address details & Governorate
-        const address = supPayload.addressDetails || supPayload.address_details || supPayload.location?.address || supPayload.governorate || 'صنعاء'
-        formData.append('address_details', address)
+        const address = (supPayload.addressDetails || supPayload.address_details || supPayload.location?.address || '').trim()
+        if (address) formData.append('address_details', address)
         if (supPayload.governorate) formData.append('governorate', supPayload.governorate)
         if (supPayload.governorate_id) formData.append('governorate_id', String(supPayload.governorate_id))
 
@@ -627,14 +618,25 @@ export const useAuthStore = defineStore('auth', () => {
    * Logout user and revoke Sanctum access token
    */
   async function logout() {
-    try {
-      if (token.value) {
-        await apiRequest('/auth/logout', { method: 'POST' }).catch(() => {})
-      }
-    } finally {
-      clearAuth()
-      navigateTo('/auth/login', { replace: true })
+    // خروج فوري، وإبطال التوكن على الخادم في الخلفية (انظر useAuth().logout)
+    const previousToken = token.value
+    if (import.meta.client) {
+      // صفحة الدخول تستخدمه لإعادة زر الرجوع/التحديث إلى الرئيسية بعد الخروج
+      try { sessionStorage.setItem('solar_just_logged_out', '1') } catch {}
     }
+    clearAuth()
+    const navigation = navigateTo('/auth/login', { replace: true })
+
+    if (previousToken) {
+      // $fetch مباشرة (وليس apiRequest): apiRequest لا يرمي عند الفشل فلا تعمل إعادة المحاولة،
+      // ويكتب رسالة خطأ في حالة المتجر قد تظهر في صفحة الدخول.
+      void revokeTokenInBackground(() => $fetch(`${apiBase}/auth/logout`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${previousToken}` },
+      }))
+    }
+
+    await navigation
   }
 
   return {

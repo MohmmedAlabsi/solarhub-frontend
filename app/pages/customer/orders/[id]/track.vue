@@ -48,7 +48,7 @@ const trackingSteps = computed(() => {
     return [
       {
         title: 'تم إنشاء الطلب',
-        time: order.value.created_at ? new Date(order.value.created_at).toLocaleDateString('ar-SA') : 'مكتمل',
+        time: order.value.created_at ? new Date(order.value.created_at).toLocaleDateString('ar-YE') : 'مكتمل',
         description: 'تم تسجيل الطلب في المنصة.',
         status: 'completed',
       },
@@ -64,7 +64,7 @@ const trackingSteps = computed(() => {
   const steps = [
     {
       title: 'تم تأكيد الطلب وحجزه إلكترونياً',
-      time: order.value.created_at ? new Date(order.value.created_at).toLocaleString('ar-SA') : '',
+      time: order.value.created_at ? new Date(order.value.created_at).toLocaleString('ar-YE') : '',
       description: 'تم تسجيل طلب الشراء وإرساله للمتاجر والمستودعات المعتمدة.',
       status: 'completed',
     },
@@ -222,7 +222,7 @@ onMounted(async () => {
                 </span>
               </div>
               <span class="text-xs text-solar-text-muted">
-                تاريخ الطلب: {{ new Date(order.created_at).toLocaleDateString('ar-SA') }} • الإجمالي: {{ Number(order.total_amount).toLocaleString() }} ر.س
+                تاريخ الطلب: {{ new Date(order.created_at).toLocaleDateString('ar-YE') }} • الإجمالي: {{ Number(order.total_amount).toLocaleString() }} ر.ي
               </span>
             </div>
           </div>
@@ -351,7 +351,7 @@ onMounted(async () => {
                       </span>
                     </div>
                     <span class="font-bold text-solar-navy-dark">
-                      {{ Number(it.total_price).toLocaleString() }} ر.س
+                      {{ Number(it.total_price).toLocaleString() }} ر.ي
                     </span>
                   </div>
                 </div>

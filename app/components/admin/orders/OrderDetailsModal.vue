@@ -107,7 +107,7 @@ function handleStatusChange(e: Event) {
           <div class="flex items-center gap-2">
             <span class="text-xs text-solar-text-muted">المبلغ الفرعي للمورد:</span>
             <span class="text-sm font-black text-solar-text-heading font-mono">
-              {{ group.subtotal.toLocaleString() }} ر.س
+              {{ group.subtotal.toLocaleString() }} ر.ي
             </span>
           </div>
         </div>
@@ -158,10 +158,10 @@ function handleStatusChange(e: Event) {
                   {{ prod.quantity }}
                 </td>
                 <td class="py-3 px-3 font-mono font-bold text-solar-text-heading">
-                  {{ prod.unitPrice.toLocaleString() }} ر.س
+                  {{ prod.unitPrice.toLocaleString() }} ر.ي
                 </td>
                 <td class="py-3 px-3 text-left font-mono font-black text-solar-navy-dark">
-                  {{ prod.total.toLocaleString() }} ر.س
+                  {{ prod.total.toLocaleString() }} ر.ي
                 </td>
               </tr>
             </tbody>
@@ -176,7 +176,7 @@ function handleStatusChange(e: Event) {
         <div class="flex items-center gap-2">
           <span class="text-xs text-solar-text-muted">إجمالي مبلغ الطلب الكلي:</span>
           <span class="text-base font-black text-solar-navy-dark font-mono">
-            {{ order?.totalAmount.toLocaleString() }} ر.س
+            {{ order?.totalAmount.toLocaleString() }} ر.ي
           </span>
         </div>
 

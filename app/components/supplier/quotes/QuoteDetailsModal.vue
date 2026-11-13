@@ -143,7 +143,7 @@ const emit = defineEmits<{
             <div>
               <span class="text-solar-text-muted text-[11px]">السعر الأساسي بالمتجر:</span>
               <div class="font-mono font-bold text-solar-text-heading">
-                {{ quote.product.listed_price ? `${quote.product.listed_price.toLocaleString('en-US')} ر.س` : '–' }}
+                {{ quote.product.listed_price ? `${quote.product.listed_price.toLocaleString('en-US')} ر.ي` : '–' }}
               </div>
             </div>
             <div>
@@ -164,21 +164,21 @@ const emit = defineEmits<{
             <div class="rounded-lg bg-solar-bg-subtle p-3 border border-solar-border-card">
               <div class="text-[10px] font-semibold text-solar-text-muted">السعر المستهدف من العميل:</div>
               <div class="mt-1 font-black text-sm" :class="quote.customerTargetPrice ? 'text-amber-600' : 'text-solar-text-muted'">
-                {{ quote.customerTargetPrice ? `${quote.customerTargetPrice.toLocaleString('en-US')} ر.س` : 'لم يُحدد' }}
+                {{ quote.customerTargetPrice ? `${quote.customerTargetPrice.toLocaleString('en-US')} ر.ي` : 'لم يُحدد' }}
               </div>
             </div>
 
             <div class="rounded-lg bg-solar-bg-subtle p-3 border border-solar-border-card">
               <div class="text-[10px] font-semibold text-solar-text-muted">سعر الوحدة المعروض من المتجر:</div>
               <div class="mt-1 font-black text-sm" :class="quote.offeredUnitPrice ? 'text-blue-600' : 'text-solar-text-muted'">
-                {{ quote.offeredUnitPrice ? `${quote.offeredUnitPrice.toLocaleString('en-US')} ر.س` : 'بانتظار تقديم العرض' }}
+                {{ quote.offeredUnitPrice ? `${quote.offeredUnitPrice.toLocaleString('en-US')} ر.ي` : 'بانتظار تقديم العرض' }}
               </div>
             </div>
 
             <div class="rounded-lg bg-blue-50/60 dark:bg-blue-950/40 p-3 border border-blue-200/60 dark:border-blue-900/60">
               <div class="text-[10px] font-semibold text-blue-700 dark:text-blue-300">إجمالي العرض المعروض:</div>
               <div class="mt-1 font-black text-sm font-mono text-solar-navy-dark dark:text-solar-yellow">
-                {{ quote.totalPrice ? `${quote.totalPrice.toLocaleString('en-US')} ر.س` : '–' }}
+                {{ quote.totalPrice ? `${quote.totalPrice.toLocaleString('en-US')} ر.ي` : '–' }}
               </div>
             </div>
           </div>

@@ -45,6 +45,19 @@ function handleImageError(e: Event) {
   target.src = '/images/product-panel.png'
 }
 
+// حالة الدفع: كل الطلبات مدفوعة مسبقاً، والشحن لا يُسمح به إلا بعد اعتماد الدفعة
+const paymentBadge = computed(() => {
+  switch (props.order?.paymentStatus) {
+    case 'paid': return { label: 'مدفوع', class: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+    case 'under_review': return { label: 'قيد المراجعة', class: 'bg-amber-50 text-amber-800 border-amber-200' }
+    default: return { label: 'لم يُدفع', class: 'bg-rose-50 text-rose-700 border-rose-200' }
+  }
+})
+const canShip = computed(() => props.order?.paymentStatus === 'paid')
+const shipBlockedReason = computed(() => props.order?.paymentStatus === 'under_review'
+  ? 'لا يمكن الشحن بعد: إيصال الدفع قيد المراجعة من الإدارة.'
+  : 'لا يمكن الشحن قبل أن يدفع العميل وتعتمد الإدارة الدفعة. يمكنك تجهيز الطلب في هذه الأثناء.')
+
 function handleAction(status: SupplierOrderStatus) {
   emit('updateStatus', status, orderNotes.value.trim() || undefined)
 }
@@ -96,6 +109,10 @@ function handleAction(status: SupplierOrderStatus) {
             </div>
             <p class="mt-0.5 text-xs text-solar-text-muted leading-relaxed">
               المعلومات الفنية والمالية للشحنة وعناوين التسليم المعتمدة في المنصة
+            </p>
+            <p class="mt-2 flex items-center gap-2 text-xs" data-testid="supplier-payment-status">
+              <span class="font-bold text-solar-text-muted">حالة الدفع:</span>
+              <span class="rounded-lg border px-2 py-0.5 font-bold" :class="paymentBadge.class">{{ paymentBadge.label }}</span>
             </p>
           </div>
         </div>
@@ -184,10 +201,10 @@ function handleAction(status: SupplierOrderStatus) {
                     {{ item.quantity }} {{ item.unitLabel }}
                   </td>
                   <td class="py-3 px-3 text-center font-bold font-mono text-solar-text-muted">
-                    {{ item.unitPrice.toLocaleString('en-US') }} <span class="text-[10px]">ر.س</span>
+                    {{ item.unitPrice.toLocaleString('en-US') }} <span class="text-[10px]">ر.ي</span>
                   </td>
                   <td class="py-3 px-3 text-center font-black font-mono text-solar-text-heading">
-                    {{ item.totalPrice.toLocaleString('en-US') }} <span class="text-[10px] font-normal text-solar-text-muted">ر.س</span>
+                    {{ item.totalPrice.toLocaleString('en-US') }} <span class="text-[10px] font-normal text-solar-text-muted">ر.ي</span>
                   </td>
                 </tr>
               </tbody>
@@ -199,15 +216,15 @@ function handleAction(status: SupplierOrderStatus) {
         <div class="rounded-2xl border border-solar-border-card bg-solar-bg-subtle p-4 space-y-2 text-xs">
           <div class="flex items-center justify-between text-solar-text-muted">
             <span>إجمالي المنتجات (غير شامل الضريبة):</span>
-            <span class="font-bold font-mono text-solar-text-heading">{{ order.subtotal.toLocaleString('en-US') }} ر.س</span>
+            <span class="font-bold font-mono text-solar-text-heading">{{ order.subtotal.toLocaleString('en-US') }} ر.ي</span>
           </div>
           <div class="flex items-center justify-between text-solar-text-muted">
             <span>ضريبة القيمة المضافة (15%):</span>
-            <span class="font-bold font-mono text-solar-text-heading">{{ order.taxAmount.toLocaleString('en-US') }} ر.س</span>
+            <span class="font-bold font-mono text-solar-text-heading">{{ order.taxAmount.toLocaleString('en-US') }} ر.ي</span>
           </div>
           <div class="flex items-center justify-between pt-2 border-t border-solar-border-card text-sm font-black text-solar-text-heading">
             <span>الإجمالي المستحق لمتجرك:</span>
-            <span class="text-base text-solar-navy-dark dark:text-solar-yellow font-mono">{{ order.totalStoreShare.toLocaleString('en-US') }} ر.س</span>
+            <span class="text-base text-solar-navy-dark dark:text-solar-yellow font-mono">{{ order.totalStoreShare.toLocaleString('en-US') }} ر.ي</span>
           </div>
         </div>
 
@@ -251,10 +268,12 @@ function handleAction(status: SupplierOrderStatus) {
           </div>
 
           <!-- زر تأكيد الشحن للطلبات المقبولة -->
-          <div v-else-if="order.status === 'accepted'" class="flex items-center gap-2.5">
+          <div v-else-if="order.status === 'accepted'" class="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
-              :disabled="isUpdating"
+              :disabled="isUpdating || !canShip"
+              :title="canShip ? undefined : shipBlockedReason"
+              :aria-describedby="canShip ? undefined : 'ship-blocked-reason'"
               @click="handleAction('shipped')"
               class="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-black text-white hover:bg-blue-700 active:scale-95 shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
@@ -262,6 +281,9 @@ function handleAction(status: SupplierOrderStatus) {
               <Truck v-else class="size-4" />
               <span>تأكيد شحن الطلب وتزويد التتبع</span>
             </button>
+            <p v-if="!canShip" id="ship-blocked-reason" class="basis-full text-[11px] font-bold text-amber-800">
+              {{ shipBlockedReason }}
+            </p>
 
             <button
               type="button"

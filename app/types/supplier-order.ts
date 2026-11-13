@@ -48,4 +48,6 @@ export interface SupplierOrderItem {
   deliveredAt?: string | null
   customerConfirmedAt?: string | null
   items: SupplierOrderProductItem[]
+  /** حالة دفع الطلب الرئيسي: الشحن ممنوع حتى تصبح paid */
+  paymentStatus?: 'paid' | 'under_review' | 'unpaid'
 }

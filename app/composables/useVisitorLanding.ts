@@ -55,7 +55,7 @@ export function useVisitorLanding() {
   const allProducts = ref<VisitorProductItem[]>([])
   const allStores = ref<VisitorStoreItem[]>([])
   const allEngineers = ref<VisitorEngineerItem[]>([])
-  const backendStats = ref<{ totalProducts: number; totalStores: number; totalEngineers: number } | null>(null)
+  const backendStats = ref<Partial<PlatformStats> | null>(null)
 
   // العناصر المعروضة حالياً في السلايدرات العشوائية المتجددة كل 10 ثواني
   const displayedProducts = ref<VisitorProductItem[]>([])
@@ -77,68 +77,88 @@ export function useVisitorLanding() {
   const secondsLeft = ref(ROTATE_INTERVAL_SECONDS)
   let intervalTimer: ReturnType<typeof setInterval> | null = null
 
+  // كل الحقول هنا من الـ API فقط. عند غياب القيمة نرجع null والواجهة تخفيها،
+  // بدل اختراع تقييمات أو أعداد أو أرقام ترخيص أو مواقع.
+
+  /** رقم موجب من الـ API أو null */
+  function toNumberOrNull(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null
+    const n = Number(value)
+    return Number.isFinite(n) ? n : null
+  }
+
+  const STORE_TYPE_LABELS: Record<string, string> = {
+    wholesaler: 'تاجر جملة',
+    retailer: 'تاجر تجزئة',
+    authorized_agent: 'وكيل معتمد',
+  }
+
   function mapProduct(item: any): VisitorProductItem {
     const mp = item.master_product || item.masterProduct || {}
-    const brand = mp.brand?.name || 'علامة معتمدة'
     const category = mp.category?.name_ar || mp.category?.name_en || mp.category?.name || 'طاقة شمسية'
-    const title = mp.title || 'منتج طاقة شمسية معتمد'
+    const title = mp.title || 'منتج طاقة شمسية'
     const imagePath = mp.images?.[0]?.image_path || mp.images?.[0]?.image_url || mp.image_url || item.image
 
     return {
       id: item.id,
       title,
-      modelNumber: mp.model_number || `SH-${item.id}`,
-      sku: item.sku || mp.sku || `SKU-${item.id}`,
-      brand,
+      modelNumber: mp.model_number || null,
+      sku: item.sku || mp.sku || null,
+      brand: mp.brand?.name || null,
       category,
       imageUrl: resolveProductImage(imagePath, category, title),
-      price: item.price ? Number(item.price) : null,
-      stockQuantity: item.stock_quantity ? Number(item.stock_quantity) : 0,
-      warrantyPeriod: item.warranty_period ? `ضمان ${item.warranty_period}` : 'ضمان رسمي معتمد',
-      governorateName: item.governorate?.name_ar || item.governorate?.name_en || 'صنعاء',
-      storeName: item.store?.company_name || 'متجر معتمد',
+      price: toNumberOrNull(item.price),
+      stockQuantity: toNumberOrNull(item.stock_quantity) ?? 0,
+      warrantyPeriod: item.warranty_period ? `ضمان ${item.warranty_period}` : null,
+      governorateName: item.governorate?.name_ar || item.governorate?.name_en || null,
+      storeName: item.store?.company_name || 'متجر',
       storeId: item.store?.id,
-      rating: 4.85,
-      reviewsCount: 20 + ((item.id * 11) % 80),
+      // لا يوجد تقييم للمنتجات في الـ API
+      rating: null,
+      reviewsCount: null,
     }
   }
 
   function mapStore(item: any): VisitorStoreItem {
     const rawLogo = item.company_logo_url || item.company_logo_path
+    const ratingsCount = toNumberOrNull(item.ratings_count) ?? 0
     return {
       id: item.id,
-      companyName: item.company_name || 'متجر معتمد',
-      governorateName: item.governorate_name || item.governorate?.name_ar || item.governorate?.name_en || 'صنعاء',
-      addressDetails: item.address_details || 'الجمهورية اليمنية',
-      bio: item.bio || 'موزع ووكيل معتمد لمهمات ومنظومات الطاقة الشمسية والحلول الكهروضوئية باليمن.',
+      companyName: item.company_name || 'متجر',
+      governorateName: item.governorate_name || item.governorate?.name_ar || item.governorate?.name_en || null,
+      addressDetails: item.address_details || null,
+      bio: item.bio || null,
       logoUrl: resolveStorageUrl(rawLogo, '/images/logo-expanded-transparent.png'),
-      storeType: item.store_type || 'وكيل وموزع رئيسي',
-      rating: item.average_rating ? Number(item.average_rating) : 4.85,
-      ratingsCount: item.ratings_count ? Number(item.ratings_count) : 28,
+      storeType: STORE_TYPE_LABELS[item.store_type] ?? null,
+      rating: ratingsCount > 0 ? toNumberOrNull(item.average_rating) : null,
+      ratingsCount,
       whatsappNumber: item.whatsapp_number,
-      productsCount: item.store_products_count || 14 + ((item.id * 7) % 30),
-      tags: ['ألواح شمسية', 'إنفرترات هجينة', 'بطاريات ليثيوم'],
+      productsCount: toNumberOrNull(item.store_products_count),
+      // لا توجد وسوم حقيقية للمتاجر في الـ API
+      tags: [],
     }
   }
 
   function mapEngineer(item: any): VisitorEngineerItem {
     const rawPhoto = item.profile_photo_path || item.cv_url
-    const rawSpecs = Array.isArray(item.specializations) && item.specializations.length > 0
+    const specs = Array.isArray(item.specializations) && item.specializations.length > 0
       ? item.specializations.map((s: any) => s.name_ar || s.name || s).join('، ')
-      : item.specialization || 'تصميم ومراجعة منظومات الطاقة الشمسية'
+      : item.specialization || null
+    const ratingsCount = toNumberOrNull(item.ratings_count) ?? 0
 
     return {
       id: item.id,
-      name: item.name || item.user?.name || 'مهندس استشاري',
-      specialization: rawSpecs,
-      governorateName: item.governorate_name || item.governorate?.name_ar || item.governorate?.name_en || 'صنعاء',
-      yearsOfExperience: item.years_of_experience ? Number(item.years_of_experience) : 6,
-      bio: item.bio || 'استشاري معتمد في دراسات الجدوى الفنية وقياس الأحمال والإشراف على التركيبات الكهروضوئية.',
+      name: item.name || item.user?.name || 'مهندس',
+      specialization: specs,
+      governorateName: item.governorate_name || item.governorate?.name_ar || item.governorate?.name_en || null,
+      yearsOfExperience: toNumberOrNull(item.years_of_experience),
+      bio: item.bio || null,
       photoUrl: resolveStorageUrl(rawPhoto, '/images/hero-solar.png'),
-      rating: item.rating_average ? Number(item.rating_average) : 4.9,
-      ratingsCount: item.ratings_count ? Number(item.ratings_count) : 22,
-      licenseNumber: item.license_number || `ENG-${item.id}`,
-      projectsCount: 15 + ((item.id * 7) % 35),
+      rating: ratingsCount > 0 ? toNumberOrNull(item.rating_average) : null,
+      ratingsCount,
+      licenseNumber: item.license_number || null,
+      // لا يوجد عدد مشاريع في الـ API
+      projectsCount: null,
     }
   }
 
@@ -254,7 +274,7 @@ export function useVisitorLanding() {
   // Non-Blocking SSR via useLazyAsyncData:
   // server: false guarantees instant TTFB (< 50ms) without SSR network pauses.
   // lazy: true ensures hydration proceeds immediately, showing skeletons while data loads in background.
-  const { data: landingPayload, pending, error: fetchError, refresh } = useLazyAsyncData(
+  const { data: landingPayload, pending, status: landingStatus, error: fetchError, refresh } = useLazyAsyncData(
     'visitor_landing_showcase',
     async () => {
       // 1. Try unified fast showcase endpoint first
@@ -345,7 +365,9 @@ export function useVisitorLanding() {
     if (allProducts.value.length > 0 || allStores.value.length > 0 || allEngineers.value.length > 0) {
       return false
     }
-    return pending.value
+    // مع server: false تكون الحالة 'idle' أثناء SSR (لم يبدأ الجلب بعد)، و'pending' عند أول رسم في المتصفح.
+    // اعتبار idle تحميلاً يجعل الخادم والمتصفح يرسمان الهيكل نفسه (skeleton)، فلا يحدث hydration mismatch.
+    return pending.value || landingStatus.value === 'idle'
   })
 
   // Error message formatting
@@ -356,11 +378,12 @@ export function useVisitorLanding() {
     return ''
   })
 
-  // إحصائيات المنصة الحية
+  // إحصائيات المنصة: من الـ API فقط. null يعني لا توجد أرقام حقيقية والواجهة تعرض "—".
+  // (طول القوائم المعروضة ليس عدداً حقيقياً: هي عينة عشوائية من 36/12/12 فقط)
   const stats = computed<PlatformStats>(() => ({
-    totalProducts: backendStats.value?.totalProducts || (allProducts.value.length > 0 ? allProducts.value.length : 80),
-    totalStores: backendStats.value?.totalStores || (allStores.value.length > 0 ? allStores.value.length : 12),
-    totalEngineers: backendStats.value?.totalEngineers || (allEngineers.value.length > 0 ? allEngineers.value.length : 14),
+    totalProducts: toNumberOrNull(backendStats.value?.totalProducts),
+    totalStores: toNumberOrNull(backendStats.value?.totalStores),
+    totalEngineers: toNumberOrNull(backendStats.value?.totalEngineers),
   }))
 
   async function fetchVisitorData() {

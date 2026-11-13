@@ -30,8 +30,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
     await fetchCurrentUser().catch(() => {})
   }
 
-  // 2. إذا كان المستخدم يحمل توكن جلسة ويزور صفحات الدخول/التسجيل المخصصة للضيوف فقط
-  if (isGuestOnlyAuthRoute && token.value && user.value) {
+  // 2. المستخدم المسجّل الذي يزور صفحات الضيوف (الدخول/التسجيل) أو الصفحة الرئيسية "/"
+  //    يُوجَّه إلى لوحة تحكمه (أو إلى تفعيل البريد إن لم يكن مفعلاً)
+  const isHomeRoute = path === '/'
+  if ((isGuestOnlyAuthRoute || isHomeRoute) && token.value && user.value) {
     // إذا كان الحساب غير مفعل بريده، يتم توجيهه حصراً للتحقق من البريد
     if (user.value.isVerified === false) {
       if (path !== '/auth/verify-email') {

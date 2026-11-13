@@ -1,39 +1,18 @@
 <script setup lang="ts">
-import { AtSign, Check, Download, FileText, Hash, Save, ShieldCheck } from 'lucide-vue-next'
+import { AtSign, Download, Hash, Save } from 'lucide-vue-next'
 import FinanceTabs from '../../../components/admin/finance/FinanceTabs.vue'
 
 definePageMeta({ layout: 'admin' })
 useSeoMeta({ title: 'الإدارة المالية — الضرائب | لوحة الإدارة العامة' })
 
+// لا يوجد في الـ API مسار لإعدادات الضرائب ولا لكشف الحساب الضريبي بعد.
+// الصفحة معروضة للاطلاع فقط: الحقول والأزرار معطلة مع "قريباً"، بلا قيم مخترعة وبلا رسالة نجاح وهمية.
 const form = ref({
-  vatTin: '1002458920',
-  vatRate: '15',
+  vatTin: '',
+  vatRate: '',
   isInclusive: true,
-  taxEmail: 'finance-tax@solarhub.ye',
+  taxEmail: '',
 })
-
-const isSaving = ref(false)
-const noticeMessage = ref('')
-
-function saveSettings() {
-  isSaving.value = true
-  setTimeout(() => {
-    isSaving.value = false
-    noticeMessage.value = 'تم حفظ إعدادات ضريبة القيمة المضافة وتحديث الفوترة بنجاح.'
-    setTimeout(() => {
-      noticeMessage.value = ''
-    }, 3000)
-  }, 600)
-}
-
-function resetForm() {
-  form.value = {
-    vatTin: '1002458920',
-    vatRate: '15',
-    isInclusive: true,
-    taxEmail: 'finance-tax@solarhub.ye',
-  }
-}
 </script>
 
 <template>
@@ -50,10 +29,13 @@ function resetForm() {
 
         <button
           type="button"
-          class="btn-outline h-11 px-4 text-xs font-bold gap-2 self-start sm:self-auto"
+          disabled
+          title="غير متاح بعد"
+          class="btn-outline h-11 px-4 text-xs font-bold gap-2 self-start sm:self-auto opacity-60 cursor-not-allowed"
         >
           <Download class="size-4" />
           <span>تصدير كشف حساب</span>
+          <span class="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">قريباً</span>
         </button>
       </div>
 
@@ -71,7 +53,12 @@ function resetForm() {
           </p>
         </div>
 
-        <form @submit.prevent="saveSettings" class="mt-6 flex flex-col gap-6">
+        <p class="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900" role="note">
+          إعدادات الضرائب غير مفعّلة بعد في المنصة (قريباً). لا تُحفظ أي قيمة هنا، ولا تُطبَّق ضريبة على الطلبات حالياً.
+        </p>
+
+        <form class="mt-6" @submit.prevent>
+          <fieldset disabled class="flex flex-col gap-6 opacity-70">
           <!-- الرقم الضريبي الموحد -->
           <div>
             <label class="block text-xs font-bold text-solar-text-body mb-2">
@@ -81,7 +68,6 @@ function resetForm() {
               <input
                 v-model="form.vatTin"
                 type="text"
-                required
                 dir="ltr"
                 class="solar-input h-12 text-sm font-mono tracking-widest text-right pl-10"
               />
@@ -103,7 +89,6 @@ function resetForm() {
                 type="number"
                 min="0"
                 max="100"
-                required
                 class="solar-input h-12 text-sm font-mono font-bold text-left pl-10"
               />
               <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-solar-text-muted text-sm">%</span>
@@ -166,7 +151,6 @@ function resetForm() {
               <input
                 v-model="form.taxEmail"
                 type="email"
-                required
                 dir="ltr"
                 class="solar-input h-12 text-sm text-right pl-10"
               />
@@ -177,26 +161,19 @@ function resetForm() {
             </p>
           </div>
 
-          <p v-if="noticeMessage" class="rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
-            <Check class="size-4 text-emerald-600" /> {{ noticeMessage }}
-          </p>
+          </fieldset>
 
-          <!-- أزرار الحفظ -->
-          <div class="flex items-center justify-end gap-3 pt-4 border-t border-solar-border-card">
+          <!-- زر الحفظ معطّل حتى يتوفر مسار في الـ API -->
+          <div class="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-solar-border-card">
             <button
               type="button"
-              @click="resetForm"
-              class="btn-outline h-11 px-6 text-xs font-bold"
-            >
-              إلغاء التغييرات
-            </button>
-            <button
-              type="submit"
-              :disabled="isSaving"
-              class="btn-primary h-11 px-8 text-xs font-bold bg-solar-navy text-white hover:bg-solar-navy-dark shadow-md gap-2"
+              disabled
+              title="غير متاح بعد"
+              class="btn-primary h-11 px-8 text-xs font-bold bg-solar-navy text-white shadow-md gap-2 opacity-60 cursor-not-allowed"
             >
               <Save class="size-4" />
-              <span>{{ isSaving ? 'جارٍ الحفظ...' : 'حفظ الإعدادات الضريبية' }}</span>
+              <span>حفظ الإعدادات الضريبية</span>
+              <span class="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">قريباً</span>
             </button>
           </div>
         </form>

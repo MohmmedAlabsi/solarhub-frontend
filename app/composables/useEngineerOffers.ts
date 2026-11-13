@@ -18,6 +18,10 @@ export interface EngineerOffer {
   attachmentName?: string
   attachmentSize?: string
   attachmentUrl?: string
+  // حالة طلب الخدمة (لعرض أزرار بدء التنفيذ/الإنهاء على العرض المقبول)
+  requestStatus?: string
+  requestStartedAt?: string | null
+  requestDoneAt?: string | null
 }
 
 const statusLabels: Record<OfferStatus, string> = {
@@ -41,7 +45,7 @@ function mapStatus(status: string): OfferStatus {
 function formatDate(dateString: string): string {
   try {
     const d = new Date(dateString)
-    return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })
+    return d.toLocaleDateString('ar-YE', { day: 'numeric', month: 'long', year: 'numeric' })
   } catch {
     return dateString || 'مؤخراً'
   }
@@ -88,6 +92,9 @@ export function useEngineerOffers() {
           attachmentName: item.proposal_file ? item.proposal_file.split('/').pop() : undefined,
           attachmentSize: item.proposal_file ? 'وثيقة هندسية معتمدة' : undefined,
           attachmentUrl: item.proposal_file_url || item.proposal_file || undefined,
+          requestStatus: item.service_request?.status,
+          requestStartedAt: item.service_request?.started_at ?? null,
+          requestDoneAt: item.service_request?.engineer_completed_at ?? null,
         }
       })
     } catch (err: any) {
@@ -131,8 +138,18 @@ export function useEngineerOffers() {
     fetchOffers()
   })
 
+  // تصدير العروض المعروضة حالياً (بعد البحث والفلترة) إلى CSV
+  function exportCsv() {
+    downloadAdminCsv(
+      'عروضي_الهندسية',
+      ['رقم العرض', 'رقم الطلب', 'عنوان الطلب', 'التكلفة (ر.ي)', 'مدة التنفيذ (يوم)', 'تاريخ التقديم', 'الحالة'],
+      filtered.value.map(o => [o.id, o.requestId, o.requestTitle, o.totalCost, o.durationDays, o.submittedAt, statusLabels[o.status] ?? o.status]),
+    )
+  }
+
   return {
     offers,
+    exportCsv,
     search,
     statusFilter,
     filtered,

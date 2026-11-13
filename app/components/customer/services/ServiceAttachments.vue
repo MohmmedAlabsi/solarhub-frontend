@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CloudUpload, FileText, X } from 'lucide-vue-next'
-import { attachmentAccept } from '../../../composables/useServiceRequest'
+// أنواع المرفقات المسموح بها لطلبات الخدمة
+const attachmentAccept = '.jpg,.jpeg,.png,.webp,.pdf,.dwg,.dxf'
 
 defineProps<{ files: File[]; error?: string; disabled: boolean }>()
 const emit = defineEmits<{ add: [files: File[]]; remove: [index: number] }>()

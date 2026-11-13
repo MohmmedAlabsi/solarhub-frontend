@@ -41,21 +41,17 @@ interface CvInfo {
 
 const cvData = ref<CvInfo | null>(null)
 
-const governoratesList = ref<{ id: number; name: string }[]>([
-  { id: 1, name: 'صنعاء' },
-  { id: 2, name: 'أمانة العاصمة' },
-  { id: 3, name: 'تعز' },
-  { id: 4, name: 'الحديدة' },
-  { id: 5, name: 'إب' },
-  { id: 7, name: 'حضرموت' },
-  { id: 9, name: 'مأرب' },
-])
+// المحافظات من الـ API فقط. القائمة الاحتياطية الثابتة السابقة كانت تحمل أرقاماً لا تطابق القاعدة
+// (مثلاً id 2 = «مدري» وليس «أمانة العاصمة»)، فيُحفظ للمهندس محافظة غير التي اختارها.
+const governoratesList = ref<{ id: number; name: string }[]>([])
+const governoratesStatus = ref<'loading' | 'ready' | 'error'>('loading')
 
 const form = reactive({
   fullName: authStore.user?.name || '',
   phone: authStore.user?.phone || '',
   email: authStore.user?.email || '',
-  governorate: (authStore.user as any)?.governorate_id || (authStore.user as any)?.governorate?.id || 1,
+  // لا قيمة افتراضية مخترعة: إن لم يحدد المهندس محافظته تبقى فارغة حتى يختارها
+  governorate: ((authStore.user as any)?.governorate_id || (authStore.user as any)?.governorate?.id || null) as number | null,
   currentPassword: '',
   newPassword: '',
   confirmPassword: '',
@@ -94,6 +90,7 @@ function syncUser() {
 watch(() => authStore.user, () => syncUser(), { immediate: true })
 
 async function loadGovernorates() {
+  governoratesStatus.value = 'loading'
   try {
     const res = await $api<any>('/governorates')
     const items = res?.data || res
@@ -102,9 +99,12 @@ async function loadGovernorates() {
         id: g.id,
         name: g.name_ar || g.name,
       }))
+      governoratesStatus.value = 'ready'
+      return
     }
+    governoratesStatus.value = 'error'
   } catch {
-    // Keep fallback list
+    governoratesStatus.value = 'error'
   }
 }
 
@@ -368,14 +368,23 @@ function handleCancel() {
           <div class="relative">
             <select
               v-model="form.governorate"
-              class="w-full appearance-none rounded-xl border border-solar-border-input bg-solar-bg-subtle/30 px-3.5 py-2.5 pl-10 text-xs font-bold text-solar-text-heading focus:border-solar-yellow focus:outline-none cursor-pointer"
+              data-testid="engineer-governorate"
+              :disabled="governoratesStatus !== 'ready'"
+              class="w-full appearance-none rounded-xl border border-solar-border-input bg-solar-bg-subtle/30 px-3.5 py-2.5 pl-10 text-xs font-bold text-solar-text-heading focus:border-solar-yellow focus:outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
             >
+              <option :value="null" disabled>
+                {{ governoratesStatus === 'loading' ? 'جارٍ تحميل المحافظات...' : governoratesStatus === 'error' ? 'تعذر تحميل المحافظات' : 'اختر المحافظة' }}
+              </option>
               <option v-for="gov in governoratesList" :key="gov.id" :value="gov.id">
                 {{ gov.name }}
               </option>
             </select>
             <ChevronDown class="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-solar-text-muted pointer-events-none" />
           </div>
+          <p v-if="governoratesStatus === 'error'" class="mt-1.5 text-[11px] font-bold text-red-600" role="alert">
+            تعذر تحميل قائمة المحافظات.
+            <button type="button" class="underline" @click="loadGovernorates">إعادة المحاولة</button>
+          </p>
         </div>
 
         <!-- السيرة الذاتية (CV) -->

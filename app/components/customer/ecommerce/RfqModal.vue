@@ -127,7 +127,7 @@ async function submitRfq() {
               v-model.number="targetPrice"
               type="number"
               min="0"
-              placeholder="مثال: 450 ر.س"
+              placeholder="مثال: 450 ر.ي"
               class="solar-input"
             />
           </div>

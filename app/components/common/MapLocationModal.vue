@@ -45,7 +45,7 @@ const emit = defineEmits<{
   select: [location: LocationData]
 }>()
 
-import { popularLocations, findNearestLocation, reverseGeocode } from '~/utils/geocoding'
+import { popularLocations, findNearestLocation, reverseGeocode, isInYemen, YEMEN_BOUNDS } from '~/utils/geocoding'
 
 // State
 const searchQuery = ref('')
@@ -244,6 +244,10 @@ async function initMap() {
       center: [lat, lng],
       zoom: 14,
       zoomControl: false,
+      // الخريطة مقيّدة باليمن: لا يمكن السحب أو التصغير لخارجها
+      maxBounds: L.latLngBounds(YEMEN_BOUNDS).pad(0.15),
+      maxBoundsViscosity: 1.0,
+      minZoom: 5,
     })
 
     // RTL Zoom control on top right
@@ -313,6 +317,14 @@ async function initMap() {
 
 // Update position safely and calculate address with real-time Reverse Geocoding
 async function updatePosition(lat: number, lng: number) {
+  // المنصة تخدم اليمن فقط: موقع خارج اليمن يُرفض ويعود المؤشر لآخر موقع صالح
+  if (!isInYemen(lat, lng)) {
+    const previous = selectedCoords.value
+    if (mapMarker) mapMarker.setLatLng([previous.lat, previous.lng])
+    locationError.value = 'الموقع المحدد خارج اليمن. المنصة تخدم المحافظات اليمنية فقط، اختر موقعاً داخل اليمن.'
+    return
+  }
+
   selectedCoords.value = { lat, lng }
   locationError.value = ''
 
@@ -602,7 +614,7 @@ onUnmounted(() => {
               @input="handleSearchInput"
               @keydown.enter.prevent="executeSearch()"
               type="text"
-              placeholder="اكتب اسم المنطقة، الحي، أو المدينة (مثال: صنعاء، حدة، السبعين، المكلا، الرياض)..."
+              placeholder="اكتب اسم المنطقة، الحي، أو المدينة في اليمن (مثال: صنعاء، حدة، السبعين، المكلا، عدن)..."
               class="w-full h-11 rounded-xl border border-solar-border-card bg-solar-bg-subtle px-3.5 pr-10 pl-9 text-xs font-semibold text-solar-text-heading placeholder:text-solar-text-muted focus:border-solar-yellow focus:bg-solar-bg-card focus:outline-none focus:ring-2 focus:ring-solar-yellow/20 transition-all text-right"
             />
             <Search class="absolute top-1/2 -translate-y-1/2 right-3.5 size-4 text-solar-text-muted pointer-events-none" />
@@ -684,9 +696,6 @@ onUnmounted(() => {
               popularLocations[37], // الحديدة
               popularLocations[43], // إب
               popularLocations[48], // مأرب
-              popularLocations[59], // الرياض
-              popularLocations[68], // جدة
-              popularLocations[66], // مكة
             ]"
             :key="loc.name"
             type="button"

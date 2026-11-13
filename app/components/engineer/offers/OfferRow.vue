@@ -14,7 +14,7 @@ const emit = defineEmits<{
 
 // تنسيق الرقم بالريال
 const formattedCost = computed(() =>
-  props.offer.totalCost.toLocaleString('ar-SA') + ' ر.س'
+  props.offer.totalCost.toLocaleString('ar-YE') + ' ر.ي'
 )
 
 // عنوان الطلب (السطر الأول فقط)

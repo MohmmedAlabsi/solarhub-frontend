@@ -288,18 +288,25 @@ export const useAuth = () => {
    * Log out user
    */
   const logout = async () => {
-    isLoading.value = true
-    try {
-      if (token.value) {
-        await $api('/auth/logout', {
-          method: 'POST',
-        }).catch(() => {})
-      }
-    } finally {
-      authStore.clearAuth()
-      isLoading.value = false
-      navigateTo('/auth/login', { replace: true })
+    // خروج فوري: نمسح الجلسة محلياً وننتقل لصفحة الدخول دون انتظار الخادم (كان يستغرق ~2 ثانية)،
+    // ثم نُبطل التوكن على الخادم في الخلفية بالتوكن الذي حفظناه قبل المسح.
+    const previousToken = token.value
+    if (import.meta.client) {
+      // صفحة الدخول تستخدمه لإعادة زر الرجوع/التحديث إلى الرئيسية بعد الخروج
+      try { sessionStorage.setItem('solar_just_logged_out', '1') } catch {}
     }
+    authStore.clearAuth()
+    isLoading.value = false
+    const navigation = navigateTo('/auth/login', { replace: true })
+
+    if (previousToken) {
+      void revokeTokenInBackground(() => $api('/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${previousToken}` },
+      }))
+    }
+
+    await navigation
   }
 
   return {

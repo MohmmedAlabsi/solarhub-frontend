@@ -92,32 +92,12 @@ export const useEngineerDashboard = () => {
     error.value = null
 
     try {
-      const [offersRes, requestsRes, portfolioRes] = await Promise.allSettled([
-        $api<{ status: string; data: any[] }>('/my/offers'),
-        $api<{ status: string; data: any[] }>('/service-requests/open'),
-        $api<{ status: string; data: any[] }>('/engineer/portfolio-items'),
-      ])
-
-      // 1. حساب العروض قيد المراجعة
-      if (offersRes.status === 'fulfilled') {
-        const val = offersRes.value as any
-        const offers = Array.isArray(val?.data) ? val.data : (Array.isArray(val) ? val : [])
-        pendingOffersCount.value = offers.filter((o: any) => o.status === 'pending').length
-      }
-
-      // 2. حساب طلبات الخدمات المفتوحة المتاحة
-      if (requestsRes.status === 'fulfilled') {
-        const val = requestsRes.value as any
-        const requests = Array.isArray(val?.data) ? val.data : (Array.isArray(val) ? val : [])
-        availableRequestsCount.value = requests.length
-      }
-
-      // 3. حساب نماذج الأعمال السابقة المنجزة
-      if (portfolioRes.status === 'fulfilled') {
-        const val = portfolioRes.value as any
-        const items = Array.isArray(val?.data) ? val.data : (Array.isArray(val) ? val : [])
-        completedProjectsCount.value = items.length
-      }
+      // طلب واحد خفيف يرجع الأرقام مباشرة (بدل جلب 3 قوائم كاملة فقط لعدّها)
+      const res: any = await $api('/engineer/dashboard/stats')
+      const data = res?.data || {}
+      pendingOffersCount.value = Number(data.pending_offers_count) || 0
+      availableRequestsCount.value = Number(data.available_requests_count) || 0
+      completedProjectsCount.value = Number(data.portfolio_items_count) || 0
     } catch (err: any) {
       error.value = err?.data?.message || 'تعذر تحميل بيانات لوحة التحكم'
     } finally {

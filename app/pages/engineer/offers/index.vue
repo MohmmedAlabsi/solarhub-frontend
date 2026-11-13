@@ -22,6 +22,8 @@ const {
   statusLabels,
   statusClasses,
   fetchOffers,
+  exportCsv,
+  offers,
 } = useEngineerOffers()
 
 // حالة المودال
@@ -31,6 +33,21 @@ const showDetailModal = ref(false)
 function openDetail(offer: EngineerOffer) {
   selectedOffer.value = offer
   showDetailModal.value = true
+}
+
+// بعد بدء التنفيذ أو الإبلاغ بالإنهاء: إعادة تحميل العروض وتحديث العرض المفتوح في النافذة
+async function handleOfferUpdated(request: { status?: string; started_at?: string | null; engineer_completed_at?: string | null }) {
+  const current = selectedOffer.value
+  if (!current) return
+  // تحديث فوري للنافذة من استجابة الخادم حتى لا يبقى الزر القديم ظاهراً أثناء إعادة التحميل
+  selectedOffer.value = {
+    ...current,
+    requestStatus: request.status ?? current.requestStatus,
+    requestStartedAt: request.started_at ?? current.requestStartedAt,
+    requestDoneAt: request.engineer_completed_at ?? current.requestDoneAt,
+  }
+  await fetchOffers()
+  selectedOffer.value = offers.value.find(o => o.rawId === current.rawId) ?? selectedOffer.value
 }
 
 const startIndex = computed(() => (currentPage.value - 1) * pageSize + 1)
@@ -87,6 +104,7 @@ const filterOptions = [
       <button
         type="button"
         class="flex items-center gap-2 rounded-lg bg-solar-navy-dark px-4 py-2 text-sm font-semibold text-white hover:bg-solar-navy transition-colors"
+        @click="exportCsv"
       >
         <Download class="size-4" aria-hidden="true" />
         تصدير البيانات
@@ -177,6 +195,7 @@ const filterOptions = [
       v-model="showDetailModal"
       :offer="selectedOffer"
       @withdrawn="fetchOffers"
+      @updated="handleOfferUpdated"
     />
   </div>
 </template>

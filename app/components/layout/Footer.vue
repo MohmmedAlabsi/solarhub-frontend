@@ -24,6 +24,25 @@ const contacts = [
   { icon: Phone, label: '+967 776369548', href: 'tel:+967776369548' },
   { icon: MapPin, label: 'الجمهورية اليمنية، صنعاء', href: '#' },
 ]
+
+// لا توجد حسابات تواصل اجتماعي حقيقية للمنصة، فبدل روابط "#" وهمية:
+// زر المشاركة يشارك رابط المنصة (أو ينسخه إن لم تدعم المتصفحات المشاركة)، وأيقونة الموقع تفتح الرئيسية.
+const shareNotice = ref('')
+async function shareSite() {
+  const url = window.location.origin
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: 'سولار هب', text: 'منصة حلول الطاقة الشمسية في اليمن', url })
+      return
+    }
+    await navigator.clipboard.writeText(url)
+    shareNotice.value = 'تم نسخ رابط المنصة'
+  } catch (err: any) {
+    if (err?.name === 'AbortError') return // المستخدم أغلق نافذة المشاركة
+    shareNotice.value = url
+  }
+  setTimeout(() => { shareNotice.value = '' }, 3000)
+}
 </script>
 
 <template>
@@ -50,20 +69,24 @@ const contacts = [
 
         <!-- شبكات التواصل -->
         <div class="flex items-center gap-2 pt-2">
-          <a
-            href="#"
+          <button
+            type="button"
             class="flex size-8 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-solar-yellow hover:text-solar-navy-dark transition-colors"
-            aria-label="مشاركة"
+            aria-label="مشاركة رابط المنصة"
+            :title="shareNotice || 'مشاركة رابط المنصة'"
+            data-testid="footer-share"
+            @click="shareSite"
           >
             <Share2 class="size-4" />
-          </a>
-          <a
-            href="#"
+          </button>
+          <NuxtLink
+            to="/"
             class="flex size-8 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-solar-yellow hover:text-solar-navy-dark transition-colors"
-            aria-label="الموقع"
+            aria-label="الصفحة الرئيسية للمنصة"
           >
             <Globe class="size-4" />
-          </a>
+          </NuxtLink>
+          <span v-if="shareNotice" class="text-[11px] font-bold text-solar-yellow" role="status">{{ shareNotice }}</span>
         </div>
       </div>
 

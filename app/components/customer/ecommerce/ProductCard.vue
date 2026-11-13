@@ -71,10 +71,11 @@ function handleRfq() {
       <!-- التقييم والفئة -->
       <div class="flex items-center justify-between text-xs">
         <span class="text-solar-text-muted truncate max-w-[140px]">{{ product.category }}</span>
-        <div class="flex items-center gap-1 font-bold text-solar-text-heading">
+        <!-- التقييم الحقيقي فقط: لا نعرض شيئاً إذا لم تكن هناك تقييمات -->
+        <div v-if="product.rating && product.reviewsCount" class="flex items-center gap-1 font-bold text-solar-text-heading">
           <Star class="size-3.5 fill-solar-yellow text-solar-yellow" />
-          <span>{{ product.rating || 4.9 }}</span>
-          <span class="text-[10px] text-solar-text-muted">({{ product.reviewsCount || 30 }})</span>
+          <span>{{ product.rating }}</span>
+          <span class="text-[10px] text-solar-text-muted">({{ product.reviewsCount }})</span>
         </div>
       </div>
 
@@ -94,7 +95,7 @@ function handleRfq() {
         <span class="text-xs text-solar-text-muted">السعر المعتمد:</span>
         <div v-if="product.price && product.price > 0" class="flex items-baseline gap-1">
           <span class="text-lg font-black text-solar-text-heading">{{ Number(product.price).toLocaleString() }}</span>
-          <span class="text-xs font-bold text-solar-text-muted">{{ product.currency || 'ر.س' }}</span>
+          <span class="text-xs font-bold text-solar-text-muted">{{ product.currency || 'ر.ي' }}</span>
         </div>
         <div v-else class="text-xs font-bold text-amber-600">
           عرض سعر حسب الطلب

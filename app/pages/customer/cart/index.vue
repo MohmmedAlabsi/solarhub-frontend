@@ -127,7 +127,7 @@ onMounted(async () => {
                 المورد المعتمد: {{ item.product.storeName }}
               </span>
               <span class="text-xs font-bold text-solar-navy-dark sm:hidden mt-1">
-                {{ Number(item.line_total ?? (item.product.price * item.quantity)).toLocaleString() }} ر.س
+                {{ Number(item.line_total ?? (item.product.price * item.quantity)).toLocaleString() }} ر.ي
               </span>
             </div>
           </div>
@@ -161,10 +161,10 @@ onMounted(async () => {
             <!-- إجمالي السطر للمكتبي -->
             <div class="hidden sm:flex flex-col text-left">
               <span class="text-sm font-black text-solar-text-heading">
-                {{ Number(item.line_total ?? (item.product.price * item.quantity)).toLocaleString() }} ر.س
+                {{ Number(item.line_total ?? (item.product.price * item.quantity)).toLocaleString() }} ر.ي
               </span>
               <span class="text-[10px] text-solar-text-muted">
-                ({{ Number(item.product.price).toLocaleString() }} ر.س / وحدة)
+                ({{ Number(item.product.price).toLocaleString() }} ر.ي / وحدة)
               </span>
             </div>
 
@@ -191,26 +191,16 @@ onMounted(async () => {
           <div class="flex flex-col gap-3 text-xs">
             <div class="flex items-center justify-between text-solar-text-body">
               <span>المجموع الفرعي ({{ cartStore.totalItemsCount }} منتجات)</span>
-              <span class="font-bold text-solar-text-heading">{{ cartStore.subtotal.toLocaleString() }} ر.س</span>
+              <span class="font-bold text-solar-text-heading">{{ cartStore.subtotal.toLocaleString() }} ر.ي</span>
             </div>
 
-            <div class="flex items-center justify-between text-solar-text-body">
-              <span>ضريبة القيمة المضافة (15%)</span>
-              <span class="font-bold text-solar-text-heading">{{ cartStore.vat.toLocaleString() }} ر.س</span>
-            </div>
-
-            <div class="flex items-center justify-between text-solar-text-body">
-              <span>رسوم الشحن والتوصيل</span>
-              <span class="font-bold" :class="cartStore.shippingFee === 0 ? 'text-emerald-600' : 'text-solar-text-heading'">
-                {{ cartStore.shippingFee === 0 ? 'شحن مجاني' : `${cartStore.shippingFee} ر.س` }}
-              </span>
-            </div>
+            <p class="text-[11px] text-solar-text-muted">رسوم التوصيل (إن وُجدت) يتم الاتفاق عليها مع المتجر.</p>
 
             <div class="border-t border-solar-border-card pt-3 flex items-baseline justify-between text-base">
               <span class="font-bold text-solar-text-heading">الإجمالي المستحق:</span>
               <div class="flex items-baseline gap-1">
                 <span class="text-xl font-black text-solar-navy-dark">{{ cartStore.total.toLocaleString() }}</span>
-                <span class="text-xs font-bold text-solar-text-muted">ر.س</span>
+                <span class="text-xs font-bold text-solar-text-muted">ر.ي</span>
               </div>
             </div>
           </div>

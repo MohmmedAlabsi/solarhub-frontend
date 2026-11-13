@@ -105,7 +105,7 @@ export function useEngineerProfile() {
             project: 'مشروع طاقة شمسية',
             rating: (Math.min(5, Math.max(1, Math.round(Number(r.rating) || 5)))) as 1 | 2 | 3 | 4 | 5,
             relativeDate: r.created_at
-              ? new Date(r.created_at).toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })
+              ? new Date(r.created_at).toLocaleDateString('ar-YE', { month: 'long', year: 'numeric' })
               : 'مؤخراً',
             comment: r.comment || 'تقييم إيجابي.',
           }))

@@ -489,7 +489,7 @@ onMounted(async () => {
 
                 <div class="flex items-baseline gap-1">
                   <span class="text-base font-black text-solar-navy-dark">{{ Number(offer.price).toLocaleString() }}</span>
-                  <span class="text-xs font-bold text-solar-text-muted">ر.س</span>
+                  <span class="text-xs font-bold text-solar-text-muted">ر.ي</span>
                 </div>
               </div>
             </div>
